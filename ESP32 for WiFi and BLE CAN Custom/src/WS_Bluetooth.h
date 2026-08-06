@@ -4,6 +4,7 @@
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
+#include <BLE2902.h>
 #include "WS_RS485.h"
 #include "WS_CAN.h"
 #include "WS_Information.h"

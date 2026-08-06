@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESP32 CAN BLE 助手</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: #1a1a2e; color: #eee; padding: 20px; max-width: 700px; margin: auto;
+  }
+  h1 { text-align: center; color: #00d4ff; margin-bottom: 20px; font-size: 1.5em; }
+  .card {
+    background: #16213e; border-radius: 10px; padding: 16px; margin-bottom: 14px;
+    border: 1px solid #0f3460;
+  }
+  .card-title {
+    font-size: 1em; color: #00d4ff; margin-bottom: 10px;
+    border-bottom: 1px solid #0f3460; padding-bottom: 6px;
+  }
+  button {
+    background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff;
+    padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9em;
+    margin: 4px;
+  }
+  button:hover { background: #1a5276; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.primary { background: #00d4ff; color: #1a1a2e; font-weight: bold; border: none; }
+  button.primary:hover { background: #33ddff; }
+  button.danger { background: #8b0000; color: #fcc; border-color: #f66; }
+  input, select, textarea {
+    background: #0d1b36; color: #eee; border: 1px solid #0f3460;
+    padding: 8px; border-radius: 4px; font-size: 0.85em; font-family: inherit;
+  }
+  input { width: 100%; margin: 4px 0; }
+  select { margin: 4px; }
+  textarea {
+    width: 100%; height: 200px; resize: vertical; margin-top: 6px;
+    font-family: "Consolas", "Courier New", monospace; font-size: 0.8em;
+    white-space: pre-wrap; word-break: break-all;
+  }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .row label { white-space: nowrap; color: #aaa; font-size: 0.85em; min-width: 50px; }
+  .inline { display: flex; gap: 8px; align-items: center; }
+  .status { font-size: 0.85em; padding: 4px 10px; border-radius: 12px; display: inline-block; }
+  .status.ok { background: #1b5e20; color: #a5d6a7; }
+  .status.err { background: #4a0000; color: #fcc; }
+  .hint { color: #888; font-size: 0.78em; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<h1>🔧 ESP32 CAN BLE 助手</h1>
+
+<!-- 蓝牙连接 -->
+<div class="card">
+  <div class="card-title">📡 蓝牙连接</div>
+  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+    <button id="btnScan" onclick="scanDevices()">🔍 扫描设备</button>
+    <button id="btnConnect" class="primary" onclick="connect()" disabled>🔗 连接</button>
+    <button id="btnDisconnect" class="danger" onclick="disconnect()" disabled>❌ 断开</button>
+    <span id="statusText" class="status err">未连接</span>
+  </div>
+  <div id="deviceList" style="margin-top:8px;" class="hint"></div>
+</div>
+
+<!-- CAN 波特率 -->
+<div class="card">
+  <div class="card-title">⚙️ CAN 波特率</div>
+  <div class="row">
+    <select id="canBaudRate" style="width:130px;">
+      <option value="25">25 kbps</option>
+      <option value="50">50 kbps</option>
+      <option value="100">100 kbps</option>
+      <option value="125">125 kbps</option>
+      <option value="250">250 kbps</option>
+      <option value="500">500 kbps</option>
+      <option value="800">800 kbps</option>
+      <option value="1000" selected>1 Mbps</option>
+    </select>
+    <button id="btnSetRate" class="primary" onclick="setCANRate()" disabled>⚡ 设置波特率</button>
+  </div>
+  <div class="hint">设置后立即生效，会和 CAN 分析仪保持一致。</div>
+</div>
+
+<!-- 发送CAN指令 -->
+<div class="card">
+  <div class="card-title">📤 发送 CAN 指令 (0A 0C)</div>
+  <div class="row">
+    <label>CAN ID (Hex):</label>
+    <input type="text" id="canId" value="0000007B" maxlength="8" style="width:120px;"
+           oninput="this.value = this.value.replace(/[^0-9a-fA-F]/g,'')">
+    <select id="canFrame" style="width:110px;">
+      <option value="00">标准帧</option>
+      <option value="01">扩展帧</option>
+    </select>
+  </div>
+  <div class="row" style="margin-top: 8px;">
+    <label>数据 (Hex):</label>
+    <input type="text" id="canData" value="11 22 33 44 55 66 77 88"
+           placeholder="如: 11 22 33" style="flex:1;">
+    <button id="btnSendCAN" class="primary" onclick="sendCAN()" disabled>🚀 发送</button>
+  </div>
+  <div class="hint">CAN ID 会自动补零到 8 位。数据以空格分隔，支持 1-64 字节。</div>
+</div>
+
+<!-- 快速指令 -->
+<div class="card">
+  <div class="card-title">⚡ 快速指令</div>
+  <button id="btnQueryIP" onclick="sendRawHex('0A0D')" disabled>查 WiFi IP (0A 0D)</button>
+  <button id="btnQueryCAN" onclick="sendRawHex('0A0F')" disabled>查 CAN 缓冲区 (0A 0F)</button>
+</div>
+
+<!-- 接收区 -->
+<div class="card">
+  <div class="card-title">📥 接收数据 <span id="rxCount" style="color:#888; font-size:0.8em;"></span></div>
+  <textarea id="rxArea" readonly placeholder="等待接收...&#10;CAN 数据会自动推送到这里。"></textarea>
+  <div style="margin-top:6px;">
+    <button onclick="document.getElementById('rxArea').value = ''">🗑️ 清空</button>
+    <label style="margin-left:10px; color:#aaa; font-size:0.85em;">
+      <input type="checkbox" id="autoScroll" checked> 自动滚动
+    </label>
+  </div>
+</div>
+
+<script>
+// ===== BLE 服务 UUID（和 ESP32 代码一致）=====
+const SERVICE_UUID   = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+const RX_CHAR_UUID   = "beb5483e-36e1-4688-b7f5-ea07361b26a8";  // 笔记本 → ESP32 (WRITE)
+const TX_CHAR_UUID   = "beb5484a-36e1-4688-b7f5-ea07361b26a8";  // ESP32 → 笔记本 (NOTIFY)
+
+let bleDevice   = null;
+let bleServer   = null;
+let txChar      = null;  // ESP32 发过来的特征值
+let rxChar      = null;  // 发给 ESP32 的特征值
+
+function updateUI(connected) {
+  document.getElementById("btnConnect").disabled = connected;
+  document.getElementById("btnDisconnect").disabled = !connected;
+  document.getElementById("btnScan").disabled = connected;
+  document.getElementById("btnSendCAN").disabled = !connected;
+  document.getElementById("btnSetRate").disabled = !connected;
+  document.getElementById("btnQueryIP").disabled = !connected;
+  document.getElementById("btnQueryCAN").disabled = !connected;
+  document.getElementById("statusText").textContent = connected ? "已连接" : "未连接";
+  document.getElementById("statusText").className = "status " + (connected ? "ok" : "err");
+}
+
+function appendLog(text) {
+  const area = document.getElementById("rxArea");
+  const now = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+  area.value += `[${now}] ${text}\n`;
+  if (document.getElementById("autoScroll").checked) {
+    area.scrollTop = area.scrollHeight;
+  }
+}
+
+// ===== 扫描 =====
+async function scanDevices() {
+  try {
+    document.getElementById("deviceList").innerHTML = "<span style='color:#00d4ff;'>正在扫描... 请确保 ESP32 已上电</span>";
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ name: "ESP32-BLE-CAN" }],
+      optionalServices: [SERVICE_UUID]
+    });
+    bleDevice = device;
+    document.getElementById("deviceList").innerHTML =
+      `<span style='color:#a5d6a7;'>✅ 找到设备: ${device.name} (${device.id}) — 请点击"连接"</span>`;
+    document.getElementById("btnConnect").disabled = false;
+  } catch (e) {
+    if (e.name === "NotFoundError") {
+      document.getElementById("deviceList").innerHTML = "<span style='color:#fcc;'>❌ 未找到 ESP32-BLE-CAN，请确认：<br>1. ESP32 已上电烧录<br>2. 手机/其他设备未占用蓝牙</span>";
+    } else if (e.name !== "AbortError") {
+      document.getElementById("deviceList").innerHTML = `<span style='color:#fcc;'>❌ 错误: ${e.message}</span>`;
+    }
+  }
+}
+
+// ===== 连接 =====
+async function connect() {
+  if (!bleDevice) return;
+  try {
+    appendLog("正在连接 ESP32...");
+    bleServer = await bleDevice.gatt.connect();
+    const service = await bleServer.getPrimaryService(SERVICE_UUID);
+
+    rxChar = await service.getCharacteristic(RX_CHAR_UUID);  // 笔记本写
+    txChar = await service.getCharacteristic(TX_CHAR_UUID);  // ESP32 通知
+
+    // 启用通知接收
+    await txChar.startNotifications();
+    txChar.addEventListener("characteristicvaluechanged", onDataReceived);
+
+    updateUI(true);
+    appendLog("✅ 蓝牙已连接！自动推送接收已开启。");
+    appendLog("提示：发 0A 0F 可查询 CAN 缓冲区。");
+  } catch (e) {
+    appendLog(`❌ 连接失败: ${e.message}`);
+    updateUI(false);
+  }
+}
+
+// ===== 断开 =====
+function disconnect() {
+  if (bleServer) {
+    bleServer.disconnect();
+    bleServer = null;
+    rxChar = null;
+    txChar = null;
+    bleDevice = null;
+  }
+  updateUI(false);
+  appendLog("蓝牙已断开。");
+}
+
+bleDevice?.addEventListener?.("gattserverdisconnected", () => {
+  updateUI(false);
+  appendLog("⚠️ ESP32 断开连接，点击扫描重新连接。");
+});
+
+// ===== 接收速率统计 =====
+let rxMsgCount = 0;
+let rxLastTime = Date.now();
+let rxRate = 0;
+
+// ===== 接收数据回调 =====
+function onDataReceived(event) {
+  const value = event.target.value;
+  const decoder = new TextDecoder("utf-8");
+  const text = decoder.decode(value);
+  rxMsgCount++;
+  const now = Date.now();
+  if (now - rxLastTime >= 1000) {
+    rxRate = (rxMsgCount / ((now - rxLastTime) / 1000.0)).toFixed(1);
+    rxMsgCount = 0;
+    rxLastTime = now;
+  }
+  document.getElementById("rxCount").textContent =
+    `| 收到 ${rxMsgCount} 条 | 速率: ${rxRate} 帧/秒`;
+  appendLog(`📩 ${text}`);
+}
+
+// ===== 发送 CAN 指令 (0A 0C) =====
+function sendCAN() {
+  const canIdStr  = document.getElementById("canId").value.padStart(8, "0");
+  const frameType = document.getElementById("canFrame").value;
+  const dataStr   = document.getElementById("canData").value.trim();
+
+  // 拼装 hex 字节数组
+  let bytes = [0x0A, 0x0C];
+
+  // 4 字节 CAN ID (大端)
+  for (let i = 0; i < 8; i += 2) {
+    bytes.push(parseInt(canIdStr.substring(i, i + 2), 16));
+  }
+
+  // 1 字节帧类型
+  bytes.push(parseInt(frameType, 16));
+
+  // 数据字节
+  const dataBytes = dataStr.split(/\s+/).filter(b => b.length > 0);
+  for (const b of dataBytes) {
+    bytes.push(parseInt(b, 16));
+  }
+
+  writeHex(bytes);
+  appendLog(`📤 已发送 CAN: ID=0x${canIdStr} 帧=${frameType==="00"?"标准":"扩展"} 数据=${dataStr}`);
+}
+
+// ===== 设置 CAN 波特率 (0A 10) =====
+function setCANRate() {
+  const rate = parseInt(document.getElementById("canBaudRate").value);
+  // 格式: 0A 10 + 4字节 big-endian 波特率(kbps)
+  const bytes = [
+    0x0A, 0x10,
+    (rate >> 24) & 0xFF,
+    (rate >> 16) & 0xFF,
+    (rate >> 8) & 0xFF,
+    rate & 0xFF
+  ];
+  writeHex(bytes);
+  appendLog(`📤 设置 CAN 波特率: ${rate} kbps`);
+}
+
+// ===== 发送原始 HEX 指令 =====
+function sendRawHex(hexStr) {
+  const bytes = [];
+  for (let i = 0; i < hexStr.length; i += 2) {
+    bytes.push(parseInt(hexStr.substring(i, i + 2), 16));
+  }
+  writeHex(bytes);
+  if (hexStr === "0A0D") appendLog("📤 查询 WiFi IP (0A 0D)");
+  if (hexStr === "0A0F") appendLog("📤 查询 CAN 缓冲区 (0A 0F)");
+}
+
+function writeHex(bytes) {
+  if (!rxChar) { appendLog("❌ 未连接！"); return; }
+  const buffer = new Uint8Array(bytes);
+  rxChar.writeValue(buffer)
+    .then(() => { /* OK */ })
+    .catch(e => appendLog(`❌ 写入失败: ${e.message}`));
+}
+</script>
+
+</body>
+</html>

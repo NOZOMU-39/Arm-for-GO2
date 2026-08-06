@@ -3,10 +3,12 @@
 #include "driver/twai.h"
 #include "WS_GPIO.h"
 #include "WS_PCF85063.h"
-// Interval:
-#define TRANSMIT_RATE_MS      1000
-// Interval:
-#define POLLING_RATE_MS       1000
+// CAN 主循环轮询间隔 (ms)，越小越快
+#define CAN_LOOP_INTERVAL_MS  2
+// CAN 警报读取超时 (ms)，设短避免阻塞
+#define POLLING_RATE_MS       2
+// 速率统计打印间隔 (ms)
+#define CAN_STATS_INTERVAL_MS 1000
 
 #define Communication_failure_Enable    1         // If the CAN bus is faulty for a long time, determine whether to forcibly exit
 
@@ -27,6 +29,10 @@ typedef struct {
 extern char * CAN_Read_Data;
 extern size_t CAN_Received_Len;
 extern uint32_t CAN_bitrate_kbps;
+extern uint32_t CAN_rx_count;    // 每秒接收帧计数
+extern uint32_t CAN_tx_count;    // 每秒发送帧计数
+extern float CAN_rx_rate;        // 实际接收速率 (帧/秒)
+extern float CAN_tx_rate;        // 实际发送速率 (帧/秒)
 void CAN_Init(void);
 void CAN_UpdateRate(uint32_t bitrate_kbps);
 void CAN_Loop(void);

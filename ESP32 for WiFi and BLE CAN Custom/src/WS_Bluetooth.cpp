@@ -4,6 +4,7 @@
 0A 0C + 数据  : CAN 发送数据 (4字节ID + 1字节帧类型 + 数据)
 0A 0D         : 获取 WIFI 的 IP
 0A 0F         : 查询 CAN 接收缓冲区（ESP32 把收到的 CAN 数据通过蓝牙返回）
+0A 10 + 4字节  : 设置 CAN 波特率 (4字节 big-endian, 单位 kbps, 如 0A 10 00 00 03 E8 = 1000kbps/1M)
 */
 BLEServer* pServer;                                                             // Used to represent a BLE server
 BLECharacteristic* pTxCharacteristic;
@@ -72,6 +73,11 @@ class MyRXCallback : public BLECharacteristicCallbacks {
             }
             send_message_Bytes(Ble_message);                                  // Send data from the CAN
         }
+        else if(valueBytes[0] == 0x0A && valueBytes[1] == 0x10 && Ble_Length == 6){   // Set CAN baud rate
+            uint32_t newRate = (valueBytes[2] << 24) | (valueBytes[3] << 16) | (valueBytes[4] << 8) | valueBytes[5];
+            printf("BLE Set CAN Rate: %lu kbps\r\n", newRate);
+            CAN_UpdateRate(newRate);
+        }
         else
           printf("Note : Non-instruction data was received - Bluetooth !\r\n");
       }
@@ -97,19 +103,20 @@ void Bluetooth_Init()
   /*************************************************************************
   Bluetooth
   *************************************************************************/
-  BLEDevice::init("ESP32-S3-RS485-CAN");                                        // Initialize Bluetooth and start broadcasting                           
+  BLEDevice::init("ESP32-BLE-CAN");                                        // Initialize Bluetooth and start broadcasting                           
   pServer = BLEDevice::createServer();                                          
   pServer->setCallbacks(new MyServerCallbacks());                               
   BLEService* pService = pServer->createService(SERVICE_UUID);                  
   pTxCharacteristic = pService->createCharacteristic(
                                     TX_CHARACTERISTIC_UUID,
                                     BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);  // Readable + Notifiable
+  pTxCharacteristic->addDescriptor(new BLE2902());  // CCCD descriptor required for Web Bluetooth notification
   pRxCharacteristic = pService->createCharacteristic(
                                     RX_CHARACTERISTIC_UUID,
                                     BLECharacteristic::PROPERTY_WRITE);         // The eigenvalues are writable and can be written to by remote devices
   pRxCharacteristic->setCallbacks(new MyRXCallback());
 
-  pRxCharacteristic->setValue("Successfully Connect To ESP32-S3-RS485-CAN");      
+  pRxCharacteristic->setValue("Successfully Connect To ESP32-BLE-CAN");      
   pService->start();   
 
   BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();                   
@@ -144,15 +151,14 @@ void BLETask(void *parameter) {
 
     // Priority 2: Auto-push CAN received data to BLE client
     if(pServer->getConnectedCount() > 0 && CAN_Received_Len > 0 && CAN_Read_Data != nullptr){
-      printf("BLE Auto-Push CAN Data (%d bytes)\r\n", CAN_Received_Len);
       Bluetooth_SendData(CAN_Read_Data);
       memset(CAN_Read_Data, 0, CAN_Received_Len_MAX);
       CAN_Received_Len = 0;
-      vTaskDelay(pdMS_TO_TICKS(200));
+      vTaskDelay(pdMS_TO_TICKS(5));   // 推送后短暂等待
       continue;
     }
 
-    vTaskDelay(pdMS_TO_TICKS(500));
+    vTaskDelay(pdMS_TO_TICKS(10));    // 空闲时每 10ms 检查一次 CAN 缓冲区
   }
   vTaskDelete(NULL);
 }

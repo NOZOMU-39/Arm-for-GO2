@@ -4,12 +4,21 @@ static bool driver_installed = false;
 static TaskHandle_t CANTaskHandle = NULL;
 char * CAN_Read_Data;
 size_t CAN_Received_Len = 0;
-uint32_t CAN_bitrate_kbps = 250;
+uint32_t CAN_bitrate_kbps = 1000;
+
+// === 速率统计 ===
+uint32_t CAN_rx_count = 0;       // 当前统计周期接收帧数
+uint32_t CAN_tx_count = 0;       // 当前统计周期发送帧数
+float CAN_rx_rate = 0.0f;        // 实际 RX 速率 (帧/秒)
+float CAN_tx_rate = 0.0f;        // 实际 TX 速率 (帧/秒)
+static uint32_t g_rx_total = 0;  // 周期内累计
+static uint32_t g_tx_total = 0;
+static unsigned long g_last_stats_time = 0;
 void CAN_Init(void)
 {                                // Initializing serial port
   // Initialize configuration structures using macro initializers
   twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT((gpio_num_t)TXD2, (gpio_num_t)RXD2, TWAI_MODE_NORMAL);
-  twai_timing_config_t t_config = TWAI_TIMING_CONFIG_250KBITS();  //Look in the api-reference for other speed sets.
+  twai_timing_config_t t_config = TWAI_TIMING_CONFIG_1MBITS();  //Look in the api-reference for other speed sets.
   twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
 
   // Install TWAI driver
@@ -64,49 +73,36 @@ esp_err_t CAN_Set_Bitrate(uint32_t bitrate_kbps) {
     return ESP_ERR_INVALID_STATE;
   }
 
+  // 先验证波特率是否支持，再做破坏性操作
+  twai_timing_config_t t_config;
+  switch (bitrate_kbps) {
+    case 25:   t_config = TWAI_TIMING_CONFIG_25KBITS();  break;
+    case 50:   t_config = TWAI_TIMING_CONFIG_50KBITS();  break;
+    case 100:  t_config = TWAI_TIMING_CONFIG_100KBITS(); break;
+    case 125:  t_config = TWAI_TIMING_CONFIG_125KBITS(); break;
+    case 250:  t_config = TWAI_TIMING_CONFIG_250KBITS(); break;
+    case 500:  t_config = TWAI_TIMING_CONFIG_500KBITS(); break;
+    case 800:  t_config = TWAI_TIMING_CONFIG_800KBITS(); break;
+    case 1000: t_config = TWAI_TIMING_CONFIG_1MBITS();   break;
+    default:
+      printf("Unsupported bitrate: %lu kbps (支持: 25/50/100/125/250/500/800/1000)\r\n", bitrate_kbps);
+      return ESP_ERR_INVALID_ARG;
+  }
+
+  // 保存当前波特率，以便失败时恢复
+  uint32_t old_rate = CAN_bitrate_kbps;
+
   if (CANTaskHandle != NULL) {
-    vTaskSuspend(CANTaskHandle);   // 先暂停任务，避免访问冲突
+    vTaskSuspend(CANTaskHandle);
   }
   CAN_Received_Len = 0;
   if(CAN_Read_Data != NULL)
     memset(CAN_Read_Data, 0, CAN_Received_Len_MAX);
-  printf("Stopping and uninstalling TWAI driver to change bitrate...\r\n");
+
   twai_stop();
   vTaskDelay(pdMS_TO_TICKS(10));
   twai_driver_uninstall();
   driver_installed = false;
-
-  // Select timing config based on bitrate
-  twai_timing_config_t t_config;
-  switch (bitrate_kbps) {
-    case 25:
-      t_config = TWAI_TIMING_CONFIG_25KBITS();
-      break;
-    case 50:
-      t_config = TWAI_TIMING_CONFIG_50KBITS();
-      break;
-    case 100:
-      t_config = TWAI_TIMING_CONFIG_100KBITS();
-      break;
-    case 125:
-      t_config = TWAI_TIMING_CONFIG_125KBITS();
-      break;
-    case 250:
-      t_config = TWAI_TIMING_CONFIG_250KBITS();
-      break;
-    case 500:
-      t_config = TWAI_TIMING_CONFIG_500KBITS();
-      break;
-    case 800:
-      t_config = TWAI_TIMING_CONFIG_800KBITS();
-      break;
-    case 1000:
-      t_config = TWAI_TIMING_CONFIG_1MBITS();
-      break;
-    default:
-      printf("Unsupported bitrate: %u kbps\r\n", bitrate_kbps);
-      return ESP_ERR_INVALID_ARG;
-  }
 
   // Recreate configs
   twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT((gpio_num_t)TXD2, (gpio_num_t)RXD2, TWAI_MODE_NORMAL);
@@ -115,6 +111,12 @@ esp_err_t CAN_Set_Bitrate(uint32_t bitrate_kbps) {
   // Reinstall driver
   if (twai_driver_install(&g_config, &t_config, &f_config) != ESP_OK) {
     printf("Failed to reinstall TWAI driver.\r\n");
+    // 尝试用旧波特率恢复
+    if (old_rate != bitrate_kbps) {
+      printf("Attempting to restore old bitrate %lu kbps...\r\n", old_rate);
+      CAN_Set_Bitrate(old_rate);
+      return ESP_FAIL;
+    }
     return ESP_FAIL;
   }
 
@@ -132,10 +134,11 @@ esp_err_t CAN_Set_Bitrate(uint32_t bitrate_kbps) {
     return ESP_FAIL;
   }
 
+  CAN_bitrate_kbps = bitrate_kbps;
   driver_installed = true;
-  printf("TWAI driver restarted at %u kbps\r\n", bitrate_kbps);
+  printf("TWAI driver restarted at %lu kbps\r\n", bitrate_kbps);
   if (CANTaskHandle != NULL) {
-    vTaskResume(CANTaskHandle);  // 恢复任务
+    vTaskResume(CANTaskHandle);
   }
   return ESP_OK;
 }
@@ -248,6 +251,23 @@ unsigned long previousMillis = 0;  // will store last time a message was send
 #if Communication_failure_Enable
   static unsigned long previous_bus_error_time = 0; // To store the last time a BUS_ERROR was printed
 #endif
+
+static void update_can_stats(void) {
+  unsigned long now = millis();
+  if (now - g_last_stats_time >= CAN_STATS_INTERVAL_MS) {
+    float elapsed = (now - g_last_stats_time) / 1000.0f;
+    CAN_rx_rate = g_rx_total / elapsed;
+    CAN_tx_rate = g_tx_total / elapsed;
+    CAN_rx_count = g_rx_total;
+    CAN_tx_count = g_tx_total;
+    printf("[CAN Stats] RX: %.1f fps (%lu frames) | TX: %.1f fps (%lu frames)\r\n",
+           CAN_rx_rate, g_rx_total, CAN_tx_rate, g_tx_total);
+    g_rx_total = 0;
+    g_tx_total = 0;
+    g_last_stats_time = now;
+  }
+}
+
 void CAN_Loop(void)
 {
   if(driver_installed){
@@ -286,8 +306,7 @@ void CAN_Loop(void)
       printf("TX failed: %ld\n", twaistatus.tx_failed_count);
     }
     if (alerts_triggered & TWAI_ALERT_TX_SUCCESS) {
-      printf("Alert: The Transmission was successful.\r\n");
-      printf("TX buffered: %ld\t \r\n", twaistatus.msgs_to_tx);
+      g_tx_total++;  // 发送成功计数
     }
 
     // Receive messages if any are available
@@ -296,7 +315,7 @@ void CAN_Loop(void)
       twai_message_t message;                             // This is the structure used to store the received CAN message.
       while (twai_receive(&message, 0) == ESP_OK) {
         handle_rx_message(message);                       // This function will process the received message.
-        
+        g_rx_total++;  // 接收计数
       }
       char datetime_str[50];
       datetime_to_str(datetime_str,datetime);
@@ -320,6 +339,7 @@ void CAN_Loop(void)
         CAN_Received_Len += snprintf(CAN_Read_Data + CAN_Received_Len, CAN_Received_Len_MAX - CAN_Received_Len, "%s :\n   CAN ID:0x%lx   CAN Type:Standard frames\n   %s\n", datetime_str, message.identifier, temp);
 
     }
+    // update_can_stats();  // 已改用 Python 脚本显示帧率，ESP32 串口不再输出
   }
 }
 
@@ -336,7 +356,7 @@ void CANTask(void *parameter) {
   }
   while(1){
     CAN_Loop();
-    vTaskDelay(pdMS_TO_TICKS(50));
+    vTaskDelay(pdMS_TO_TICKS(CAN_LOOP_INTERVAL_MS));  // 2ms = 最高 ~500Hz
   }
   vTaskDelete(NULL);
 }

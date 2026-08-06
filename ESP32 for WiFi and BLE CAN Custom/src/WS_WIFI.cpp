@@ -307,7 +307,7 @@ void handleRoot() {
     "                <option value=\"250\">250Kbps</option>" + 
     "                <option value=\"500\">500Kbps</option>" + 
     "                <option value=\"800\">800Kbps</option>" + 
-    "                <option value=\"1000\">1Mbps</option>" +  
+    "                <option value=\"1000\" selected>1Mbps</option>" +  
     "            </select>" +   
     "            <button class=\"btn\" id=\"CANRateConfig\" onclick=\"SetCANRate()\">Set Rate</button>" + 
     "            <label for=\"CANSend\" style=\"font-weight:normal;\">CAN Send Data: </label> "+

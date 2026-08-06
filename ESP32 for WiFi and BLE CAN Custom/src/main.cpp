@@ -13,11 +13,11 @@ void setup() {
   I2C_Init();
   RS485_Init();
   CAN_Init();
-  RTC_Init();// RTC
-  WIFI_Init();// WIFI
-  Bluetooth_Init();// Bluetooth
+  RTC_Init();
+  Bluetooth_Init();   // BLE 先于 WiFi 初始化，避免无线模块冲突
+  WIFI_Init();
 
-  printf("Connect to the WIFI network named \"ESP32-S3-RS485-CAN\" and access the Internet using the connected IP address!!!\r\n");
+  printf("ESP32-BLE-CAN ready. BLE: ESP32-BLE-CAN | WiFi AP: ESP32-S3-RS485-CAN\r\n");
 }
 
 /**********************************************************  While  **********************************************************/
