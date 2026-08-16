@@ -15,6 +15,7 @@ volatile uint16_t can_ring_head = 0;
 volatile uint16_t can_ring_tcp_tail = 0;
 volatile uint16_t can_ring_serial_tail = 0;
 volatile uint16_t can_ring_web_tail = 0;
+volatile uint16_t can_ring_udp_tail = 0;   // v2.1 UDP 消费者
 SemaphoreHandle_t can_ring_mutex = nullptr;
 
 // ====== 自收回显过滤 ======
@@ -43,6 +44,8 @@ static uint32_t g_tx_total = 0;
 static unsigned long g_last_stats_time = 0;
 static uint32_t g_boot_time_ms = 0;    // 开机计时 (ms)
 static unsigned long g_boot_millis = 0; // 记录 millis() 开机时刻
+static uint32_t g_cmd_rx_total = 0;    // 收到的 CAN_SEND 命令总数 (节流统计)
+static uint32_t g_cmd_last_total = 0;  // 上次统计时的命令数
 
 /*============================================================================
  * 时间戳：开机计时 (ms)
@@ -115,6 +118,40 @@ static void can_ring_push(CAN_Frame *frame) {
         can_ring_serial_tail = (can_ring_serial_tail + 1) % CAN_RING_SIZE;
     if (h == can_ring_web_tail)
         can_ring_web_tail = (can_ring_web_tail + 1) % CAN_RING_SIZE;
+    if (h == can_ring_udp_tail)
+        can_ring_udp_tail = (can_ring_udp_tail + 1) % CAN_RING_SIZE;
+}
+
+/*============================================================================
+ * 批帧序列化 (v2.1)
+ *
+ * 载荷格式: [2B 帧数N 大端] [N × 帧块]
+ * 帧块: [4B CAN_ID 大端] [1B extd] [4B 时间戳ms 大端] [1B DLC] [0-8B data]
+ * 帧块布局与 0x03 单帧载荷完全一致，客户端解析器可复用。
+ *============================================================================*/
+uint16_t CAN_SerializeBatch(uint8_t *out, const CAN_Frame *frames, uint16_t n) {
+    uint16_t pos = 0;
+    out[pos++] = (n >> 8) & 0xFF;
+    out[pos++] = n & 0xFF;
+
+    for (uint16_t i = 0; i < n; i++) {
+        const CAN_Frame *f = &frames[i];
+        out[pos++] = (f->id >> 24) & 0xFF;
+        out[pos++] = (f->id >> 16) & 0xFF;
+        out[pos++] = (f->id >> 8) & 0xFF;
+        out[pos++] = f->id & 0xFF;
+        out[pos++] = f->extd;
+        out[pos++] = (f->timestamp_ms >> 24) & 0xFF;
+        out[pos++] = (f->timestamp_ms >> 16) & 0xFF;
+        out[pos++] = (f->timestamp_ms >> 8) & 0xFF;
+        out[pos++] = f->timestamp_ms & 0xFF;
+        out[pos++] = f->dlc;
+        if (f->dlc > 0 && f->dlc <= 8) {
+            memcpy(out + pos, f->data, f->dlc);
+            pos += f->dlc;
+        }
+    }
+    return pos;
 }
 
 /*============================================================================
@@ -123,6 +160,9 @@ static void can_ring_push(CAN_Frame *frame) {
 void CAN_Init(void) {
     twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(
         (gpio_num_t)TXD2, (gpio_num_t)RXD2, TWAI_MODE_NORMAL);
+    // 默认 TX/RX 队列只有 5 帧，高速突发下易溢出/阻塞 → 加大到 64
+    g_config.rx_queue_len = 64;
+    g_config.tx_queue_len = 64;
     twai_timing_config_t t_config = TWAI_TIMING_CONFIG_1MBITS();
     twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
 
@@ -136,18 +176,21 @@ void CAN_Init(void) {
     }
 
     uint32_t alerts = TWAI_ALERT_RX_DATA | TWAI_ALERT_ERR_PASS |
-                      TWAI_ALERT_BUS_ERROR | TWAI_ALERT_RX_QUEUE_FULL |
+                      TWAI_ALERT_BUS_ERROR | TWAI_ALERT_BUS_OFF |
+                      TWAI_ALERT_RX_QUEUE_FULL |
                       TWAI_ALERT_TX_IDLE | TWAI_ALERT_TX_SUCCESS |
                       TWAI_ALERT_TX_FAILED;
     twai_reconfigure_alerts(alerts, nullptr);
 
     driver_installed = true;
     g_boot_millis = millis();
-    printf("[CAN] 驱动就绪, 默认 %lu kbps\r\n", CAN_bitrate_kbps);
+    printf("[CAN] 驱动就绪, 默认 %lu kbps (队列64/超时10ms)\r\n", CAN_bitrate_kbps);
 
     // 创建 CANTask
+    // 核心 1 (APP_CPU): 核心 0 必须独占给 WiFi/lwIP 协议栈,
+    // 否则 tcpip_thread 被用户任务抢占, TCP 收包卡死 (v2.1.2 修复)
     xTaskCreatePinnedToCore(CANTask, "CANTask", 4096, nullptr, 3,
-                            &can_task_handle, 0);
+                            &can_task_handle, 1);
 }
 
 /*============================================================================
@@ -185,6 +228,8 @@ static esp_err_t CAN_SetBitrate(uint32_t bitrate_kbps) {
 
     twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(
         (gpio_num_t)TXD2, (gpio_num_t)RXD2, TWAI_MODE_NORMAL);
+    g_config.rx_queue_len = 64;   // 与 CAN_Init 保持一致
+    g_config.tx_queue_len = 64;
     twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
 
     if (twai_driver_install(&g_config, &t_config, &f_config) != ESP_OK) {
@@ -201,7 +246,8 @@ static esp_err_t CAN_SetBitrate(uint32_t bitrate_kbps) {
     }
 
     uint32_t alerts = TWAI_ALERT_RX_DATA | TWAI_ALERT_ERR_PASS |
-                      TWAI_ALERT_BUS_ERROR | TWAI_ALERT_RX_QUEUE_FULL |
+                      TWAI_ALERT_BUS_ERROR | TWAI_ALERT_BUS_OFF |
+                      TWAI_ALERT_RX_QUEUE_FULL |
                       TWAI_ALERT_TX_IDLE | TWAI_ALERT_TX_SUCCESS |
                       TWAI_ALERT_TX_FAILED;
     twai_reconfigure_alerts(alerts, nullptr);
@@ -229,7 +275,7 @@ void CAN_SendMessage(twai_message_t message) {
 }
 
 void CAN_Send(uint32_t CAN_ID, uint8_t *Data, uint8_t Data_length, bool Frame_type) {
-    twai_message_t msg;
+    twai_message_t msg = {};   // 清零初始化: self_reception 等字段不能是垃圾值
     msg.identifier = CAN_ID;
     msg.rtr = 0;
 
@@ -242,25 +288,26 @@ void CAN_Send(uint32_t CAN_ID, uint8_t *Data, uint8_t Data_length, bool Frame_ty
     }
 
     // >8 字节自动分帧发送
+    // 超时用 CAN_TX_TIMEOUT_MS (10ms): 总线无 ACK 时快速失败, 不卡死 TCPTask
     if (Data_length > 8) {
         uint16_t frame_count = Data_length / 8;
         for (int i = 0; i < frame_count; i++) {
             msg.data_length_code = 8;
             memcpy(msg.data, Data + (i * 8), 8);
-            twai_transmit(&msg, pdMS_TO_TICKS(1000));
+            twai_transmit(&msg, pdMS_TO_TICKS(CAN_TX_TIMEOUT_MS));
         }
         uint8_t remainder = Data_length % 8;
         if (remainder) {
             msg.data_length_code = remainder;
             memcpy(msg.data, Data + (Data_length - remainder), remainder);
-            twai_transmit(&msg, pdMS_TO_TICKS(1000));
+            twai_transmit(&msg, pdMS_TO_TICKS(CAN_TX_TIMEOUT_MS));
         }
     } else {
         msg.data_length_code = Data_length;
         if (Data_length > 0) {
             memcpy(msg.data, Data, Data_length);
         }
-        twai_transmit(&msg, pdMS_TO_TICKS(1000));
+        twai_transmit(&msg, pdMS_TO_TICKS(CAN_TX_TIMEOUT_MS));
     }
 
     // 记录发送签名用于回显过滤
@@ -278,10 +325,13 @@ static void update_can_stats(void) {
         CAN_tx_rate = g_tx_total / elapsed;
         CAN_rx_count = g_rx_total;
         CAN_tx_count = g_tx_total;
-        printf("[CAN] RX: %.1f fps (%lu帧) | TX: %.1f fps (%lu帧)\r\n",
-               CAN_rx_rate, g_rx_total, CAN_tx_rate, g_tx_total);
+        // 命令接收统计并入每秒日志 (原每帧 printf 已节流为计数)
+        uint32_t cmd_this_sec = g_cmd_rx_total - g_cmd_last_total;
+        printf("[CAN] RX: %.1f fps (%lu帧) | TX: %.1f fps (%lu帧) | CMD: %lu\r\n",
+               CAN_rx_rate, g_rx_total, CAN_tx_rate, g_tx_total, cmd_this_sec);
         g_rx_total = 0;
         g_tx_total = 0;
+        g_cmd_last_total = g_cmd_rx_total;
         g_last_stats_time = now;
     }
 }
@@ -323,6 +373,12 @@ void CANTask(void *parameter) {
         // ---- 总线告警 ----
         if (alerts_triggered & TWAI_ALERT_ERR_PASS) {
             printf("[CAN] 告警: 进入 Error Passive 状态\r\n");
+        }
+        if (alerts_triggered & TWAI_ALERT_BUS_OFF) {
+            // 总线无 ACK/短路等导致 BUS-OFF → 自动恢复 (v2.1.1)
+            // 恢复期间 twai_transmit 会快速失败, 不阻塞 TCP 处理
+            printf("[CAN] 告警: BUS-OFF (总线无对端?), 自动恢复中...\r\n");
+            twai_initiate_recovery();
         }
 #if COMMUNICATION_FAILURE_ENABLE
         if (alerts_triggered & TWAI_ALERT_BUS_ERROR) {
@@ -408,7 +464,7 @@ void ProcessCommand(uint8_t *buf, uint16_t len) {
                 uint8_t extd = buf[7];
                 uint8_t dlc = len - 8;
                 CAN_Send(id, buf + 8, dlc > 8 ? 8 : dlc, extd != 0);
-                printf("[CMD] CAN发送 ID=0x%lX extd=%d len=%d\r\n", id, extd, dlc);
+                g_cmd_rx_total++;   // v2.1.1: 计数节流, 每秒统计打印
             }
             else if (cmd == CMD_QUERY_IP) {
                 // 设置标志位，由 TCPTask/SerialTask 各自响应
@@ -444,7 +500,7 @@ void ProcessCommand(uint8_t *buf, uint16_t len) {
             uint8_t extd = buf[5];
             uint8_t dlc = len - 6;
             CAN_Send(id, buf + 6, dlc > 8 ? 8 : dlc, extd != 0);
-            printf("[CMD] CAN发送(直通) ID=0x%lX extd=%d len=%d\r\n", id, extd, dlc);
+            g_cmd_rx_total++;   // v2.1.1: 计数节流, 每秒统计打印
             break;
         }
 

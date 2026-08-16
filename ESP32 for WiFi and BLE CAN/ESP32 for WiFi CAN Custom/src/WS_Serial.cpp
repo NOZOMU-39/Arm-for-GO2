@@ -54,7 +54,8 @@ void Serial_Init(void) {
     }
     printf("[Serial] USB CDC 串口就绪\r\n");
 
-    xTaskCreatePinnedToCore(SerialTask, "SerialTask", 4096, nullptr, 1, nullptr, 0);
+    // 核心 1 (APP_CPU): 核心 0 必须独占给 WiFi/lwIP 协议栈 (v2.1.2 修复)
+    xTaskCreatePinnedToCore(SerialTask, "SerialTask", 4096, nullptr, 1, nullptr, 1);
 }
 
 void SerialTask(void *parameter) {

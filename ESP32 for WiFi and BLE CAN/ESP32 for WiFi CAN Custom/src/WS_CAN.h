@@ -28,6 +28,7 @@ extern volatile uint16_t can_ring_head;          // CANTask 写入位置
 extern volatile uint16_t can_ring_tcp_tail;      // TCP 消费者读位置
 extern volatile uint16_t can_ring_serial_tail;   // Serial 消费者读位置
 extern volatile uint16_t can_ring_web_tail;      // Web 消费者读位置
+extern volatile uint16_t can_ring_udp_tail;      // UDP 消费者读位置 (v2.1)
 extern SemaphoreHandle_t can_ring_mutex;          // 写互斥锁
 
 // ---- CAN 状态 ----
@@ -72,6 +73,15 @@ bool CAN_ReadFrame(volatile uint16_t *tail, CAN_Frame *out_frame);
  * 获取当前时间戳 (ms)，用于给 CAN 帧打时间
  *---------------------------------------------------------------------------*/
 uint32_t CAN_GetTimestamp(void);
+
+/*---------------------------------------------------------------------------
+ * 批帧序列化 (v2.1) — 把 N 帧 CAN_Frame 打包成 FRAME_CAN_BATCH 的载荷
+ *
+ * 载荷格式: [2B 帧数N 大端] [N × 帧块]
+ * 帧块: [4B CAN_ID 大端] [1B extd] [4B 时间戳ms 大端] [1B DLC] [0-8B data]
+ * 返回序列化后的载荷总字节数（out 至少需要 2 + N×18 字节）
+ *---------------------------------------------------------------------------*/
+uint16_t CAN_SerializeBatch(uint8_t *out, const CAN_Frame *frames, uint16_t n);
 
 /*---------------------------------------------------------------------------
  * 帧协议：命令分发处理（TCP 和 Serial 共用）

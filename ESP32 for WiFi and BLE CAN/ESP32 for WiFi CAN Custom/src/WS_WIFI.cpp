@@ -125,7 +125,8 @@ void WIFI_Init(void) {
     // 注册 Web 路由
     WebServer_Init();
 
-    xTaskCreatePinnedToCore(WebTask, "WebTask", 8192, nullptr, 2, nullptr, 0);
+    // 核心 1 (APP_CPU): 核心 0 必须独占给 WiFi/lwIP 协议栈 (v2.1.2 修复)
+    xTaskCreatePinnedToCore(WebTask, "WebTask", 8192, nullptr, 2, nullptr, 1);
 }
 
 /*============================================================================

@@ -7,7 +7,7 @@
  *   第3级(兜底) : USB CDC 串口 → 二进制帧协议
  *
  * 初始化顺序：
- *   I2C → CAN → RTC → WiFi(含WebServer) → TCP → Serial
+ *   I2C → CAN → RTC → WiFi(含WebServer) → TCP → UDP → Serial
  *
  * 模块    文件          职责
  *  配置    WS_Config.h   协议常量、帧结构、全局参数
@@ -15,7 +15,8 @@
  *  RTC     WS_RTC        PCF85063 时钟（按需读取）
  *  WiFi    WS_WIFI       AP+STA 双模 + NVS 持久化
  *  Web     WS_WebServer  HTTP 路由 + 内嵌 SPA 控制台
- *  TCP     WS_TCP        帧服务器 + CAN 数据自动推送
+ *  TCP     WS_TCP        帧服务器 + CAN 批帧/单帧推送
+ *  UDP     WS_UDP        UDP 订阅式批帧推送 (v2.1 可选)
  *  Serial  WS_Serial     USB CDC 串口指令处理
  *============================================================================*/
 #include <Arduino.h>
@@ -23,6 +24,7 @@
 #include "WS_RTC.h"
 #include "WS_WIFI.h"
 #include "WS_TCP.h"
+#include "WS_UDP.h"
 #include "WS_Serial.h"
 
 void setup() {
@@ -33,7 +35,8 @@ void setup() {
     CAN_Init();       // TWAI 驱动 + CANTask (1ms 循环, 目标 1000Hz)
     RTC_Init();       // PCF85063 时钟初始化
     WIFI_Init();      // WiFi AP+STA 双模 + WebServer + WebTask
-    TCP_Init();       // TCP 帧服务器 + TCPTask (端口 8888)
+    TCP_Init();       // TCP 帧服务器 + TCPTask (端口 8888, 批帧推送)
+    UDP_Init();       // UDP 订阅式批帧推送 (端口 8889, v2.1 可选)
     Serial_Init();    // USB CDC 串口 + SerialTask (第3级兜底)
 
     // 打印启动信息
@@ -47,7 +50,8 @@ void setup() {
     } else {
         printf("  STA: 未配置 (在设置页填入笔记本热点名)\r\n");
     }
-    printf("  TCP: 端口 %d\r\n", TCP_SERVER_PORT);
+    printf("  TCP: 端口 %d (批帧推送)\r\n", TCP_SERVER_PORT);
+    printf("  UDP: 端口 %d (订阅式推送, 可选)\r\n", UDP_SERVER_PORT);
     printf("  USB: CDC 串口就绪\r\n");
     printf("  Web: http://192.168.4.1\r\n");
     printf("  CAN : %lu kbps\r\n", CAN_bitrate_kbps);
@@ -57,7 +61,8 @@ void setup() {
 void loop() {
     // 所有工作在 FreeRTOS 任务中并行运行
     // CANTask (3, 1ms) → CAN 收发 + 环形缓冲区
-    // TCPTask (3, 1ms) → TCP 帧服务器 + CAN 推送
+    // TCPTask (3, 1ms) → TCP 帧服务器 + CAN 批帧/单帧推送
+    // UDPTask (3, 1ms) → UDP 订阅式批帧推送
     // WebTask (2, 10ms)→ HTTP 处理 + STA 自动重连
     // SerialTask(1, 2ms)→ USB CDC 串口指令
     delay(1000);

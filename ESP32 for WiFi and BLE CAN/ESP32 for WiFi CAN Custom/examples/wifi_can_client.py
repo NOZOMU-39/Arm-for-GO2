@@ -43,13 +43,18 @@ except ImportError:
 # ====== 帧协议常量 (与 WS_Config.h 保持一致) ======
 FRAME_CMD_REQ  = 0x01   # PC → ESP32  命令请求
 FRAME_CMD_RESP = 0x02   # ESP32 → PC  命令响应
-FRAME_CAN_PUSH = 0x03   # ESP32 → PC  CAN 接收帧推送
+FRAME_CAN_PUSH = 0x03   # ESP32 → PC  CAN 接收帧推送 (单帧, 兼容模式)
 FRAME_CAN_SEND = 0x04   # PC → ESP32  CAN 发送帧
+FRAME_CAN_BATCH = 0x05  # ESP32 → PC  CAN 批帧推送 (协商后启用)
 
-CMD_QUERY_IP     = 0x0A0D
-CMD_QUERY_CAN    = 0x0A0F
-CMD_SET_CAN_RATE = 0x0A10
-CMD_QUERY_RTC    = 0x0A11
+CMD_QUERY_IP      = 0x0A0D
+CMD_QUERY_CAN     = 0x0A0F
+CMD_SET_CAN_RATE  = 0x0A10
+CMD_QUERY_RTC     = 0x0A11
+CMD_ENABLE_BATCH  = 0x0A13   # 0x0A12 预留给心跳看门狗
+
+# 批帧参数 (与 WS_Config.h 一致)
+UDP_PORT = 8889   # UDP 订阅式推送端口
 
 # ====== 可能的热点网段 ======
 HOTSPOT_SUBNETS = [
@@ -93,6 +98,32 @@ class CANFrame:
         payload = data[10:10 + dlc] if dlc > 0 else b''
         return cls(id=can_id, extd=extd, dlc=dlc, data=payload, timestamp_ms=timestamp_ms)
 
+    @staticmethod
+    def parse_batch(payload: bytes) -> List['CANFrame']:
+        """解析 CAN_BATCH(0x05) 批帧载荷: [2B 帧数][N × 帧块]
+
+        帧块格式与 0x03 单帧载荷完全一致，可复用 from_bytes 的解析逻辑。
+        """
+        if len(payload) < 2:
+            return []
+        n = struct.unpack('>H', payload[0:2])[0]
+        frames = []
+        pos = 2
+        for _ in range(n):
+            if pos + 10 > len(payload):
+                break
+            can_id = struct.unpack('>I', payload[pos:pos + 4])[0]
+            extd = payload[pos + 4] != 0
+            timestamp_ms = struct.unpack('>I', payload[pos + 5:pos + 9])[0]
+            dlc = payload[pos + 9]
+            if pos + 10 + dlc > len(payload):
+                break
+            data = payload[pos + 10:pos + 10 + dlc]
+            frames.append(CANFrame(id=can_id, extd=extd, dlc=dlc,
+                                   data=data, timestamp_ms=timestamp_ms))
+            pos += 10 + dlc
+        return frames
+
 
 class WiFiCANClient:
     """WiFi CAN 客户端 — TCP/串口双模，支持库调用和交互式终端"""
@@ -101,9 +132,10 @@ class WiFiCANClient:
     SCAN_WORKERS = 8       # 并发线程数 (Windows 下不宜过高)
 
     def __init__(self, host: Optional[str] = None, port: int = 8888,
-                 serial_port: Optional[str] = None):
+                 serial_port: Optional[str] = None, batch: bool = True):
         self.conn = None
         self.mode: Optional[str] = None    # 'tcp' 或 'serial'
+        self.batch_enabled = False         # 批帧模式是否协商成功
         self._lock = threading.Lock()
         self._tx_count = 0
         self._rx_count = 0
@@ -115,6 +147,29 @@ class WiFiCANClient:
             self._connect_tcp(host, port)
         else:
             self._auto_connect(port)
+
+        # TCP 连接成功后自动协商批帧模式 (v2.1)
+        # 旧固件/旧版客户端不受影响：协商失败自动回退单帧模式
+        if batch and self.mode == 'tcp':
+            self._negotiate_batch()
+
+    def _negotiate_batch(self) -> bool:
+        """向 ESP32 协商启用批帧模式 (CMD_ENABLE_BATCH = 0x0A12)
+
+        固件 v2.1 响应 "BATCH" → 启用成功，推送改为 0x05 批帧。
+        固件 v2.0 无此命令 → 无响应，保持 0x03 单帧，行为不变。
+        """
+        try:
+            self._send_frame(FRAME_CMD_REQ, struct.pack('>H', CMD_ENABLE_BATCH))
+            result = self._recv_frame(timeout=0.8)
+            if result and result[0] == FRAME_CMD_RESP and result[1] == b'BATCH':
+                self.batch_enabled = True
+                print("[OK] 批帧模式已启用 (高吞吐)")
+                return True
+        except Exception:
+            pass
+        print("[..] 未启用批帧模式 (固件旧版? 继续使用单帧模式)")
+        return False
 
     # ====== 网络发现 ======
 
@@ -216,15 +271,32 @@ class WiFiCANClient:
             raise ConnectionError(f"串口连接失败 {port}: {e}")
 
     def _auto_connect(self, port: int):
-        """智能多级自动降级: 本机子网 → 热点网段 → AP → 串口"""
+        """智能多级自动降级: AP直连(秒连) → 本机子网 → 热点网段 → 串口
 
-        # 第0级: 本机所有网卡
+        v2.1.3: AP 直连提到最前 (0.3s 快速失败) —
+        AP 模式下不再先白扫几个网段才轮到 AP, 连接秒开;
+        STA 模式只多花 0.3s, 无感知。
+        """
+
+        # 第0级: AP 直连 (192.168.4.1) — AP 模式秒连, 失败快速降级
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(0.3)
+            s.connect(("192.168.4.1", port))
+            s.close()
+            print("[*] 第0级: AP 直连 192.168.4.1...")
+            self._connect_tcp("192.168.4.1", port)
+            return
+        except Exception:
+            pass  # AP 不可达, 继续扫描
+
+        # 第1级: 本机所有网卡
         local_subnets = self._get_all_local_subnets()
         if local_subnets:
             print(f"[*] 检测到 {len(local_subnets)} 个网段: " +
                   ', '.join(s + '.0/24' for s in local_subnets))
             for subnet in local_subnets:
-                print(f"[*] 第0级: 扫描 {subnet}.1-254 (port {port})...")
+                print(f"[*] 第1级: 扫描 {subnet}.1-254 (port {port})...")
                 found = self._scan_subnet_with_retry(
                     subnet, port, timeout=self.SCAN_TIMEOUT, max_workers=self.SCAN_WORKERS)
                 if found:
@@ -235,8 +307,8 @@ class WiFiCANClient:
         else:
             print("[!] 未能检测到本机网段")
 
-        # 第1级: 热点网段
-        print(f"[*] 第1级: 扫描热点网段 (port {port})...")
+        # 第2级: 热点网段 (AP 已在第0级试过)
+        print(f"[*] 第2级: 扫描热点网段 (port {port})...")
         scanned = set(local_subnets) if local_subnets else set()
         for subnet in HOTSPOT_SUBNETS:
             if subnet in scanned:
@@ -250,14 +322,6 @@ class WiFiCANClient:
                 self._connect_tcp(found, port)
                 return
             print(f"    [--] {subnet}.0/24 无设备")
-
-        # 第2级: AP 直连
-        print("[*] 第2级: AP 直连 192.168.4.1...")
-        try:
-            self._connect_tcp("192.168.4.1", port)
-            return
-        except ConnectionError:
-            print("    [--] AP 不可达")
 
         # 第3级: 串口
         if HAS_SERIAL:
@@ -356,14 +420,19 @@ class WiFiCANClient:
 
     # ====== 公开 API ======
 
-    def send_can(self, can_id: int, data: bytes, extended: bool = False):
-        """发送 CAN 帧 (FRAME_CAN_SEND 类型，直通模式)"""
+    def send_can(self, can_id: int, data: bytes, extended: bool = False,
+                 verbose: bool = True):
+        """发送 CAN 帧 (FRAME_CAN_SEND 类型，直通模式)
+
+        verbose=False 时静默发送（批量测试用，默认保持日志输出）
+        """
         payload = struct.pack('>I', can_id) + bytes([1 if extended else 0]) + data
         self._send_frame(FRAME_CAN_SEND, payload)
         self._tx_count += 1
-        hex_str = ' '.join(f'{b:02X}' for b in data) if data else '(空)'
-        frame_type = '扩展帧' if extended else '标准帧'
-        print(f"[CAN TX] ID=0x{can_id:X} [{frame_type}] len={len(data)} [{hex_str}]")
+        if verbose:
+            hex_str = ' '.join(f'{b:02X}' for b in data) if data else '(空)'
+            frame_type = '扩展帧' if extended else '标准帧'
+            print(f"[CAN TX] ID=0x{can_id:X} [{frame_type}] len={len(data)} [{hex_str}]")
 
     def set_can_rate(self, rate_kbps: int):
         """设置 CAN 波特率"""
@@ -394,6 +463,8 @@ class WiFiCANClient:
             frame_type, payload = result
             if frame_type == FRAME_CAN_PUSH and len(payload) >= 10:
                 frames.append(CANFrame.from_bytes(payload))
+            elif frame_type == FRAME_CAN_BATCH:
+                frames.extend(CANFrame.parse_batch(payload))
             elif frame_type == FRAME_CMD_RESP:
                 text = payload.decode('utf-8', errors='replace')
                 if 'Empty' in text:
@@ -422,11 +493,20 @@ class WiFiCANClient:
             self._tx_count = 0
             self._stats_time = now
 
-    def monitor(self, callback: Optional[Callable[[CANFrame], None]] = None):
-        """持续监听 CAN 数据 (阻塞)"""
-        print("[MONITOR] 开始监听 CAN 数据 (Ctrl+C 停止)...")
+    def monitor(self, callback: Optional[Callable[[CANFrame], None]] = None,
+                stop_event: Optional[threading.Event] = None):
+        """持续监听 CAN 数据 (阻塞)
+
+        callback: 每帧回调 (收到 CANFrame 对象)
+        stop_event: 可选 threading.Event，置位后自动退出（配合超时监听）
+        """
+        mode_str = '批帧(高频推荐)' if self.batch_enabled else '单帧(兼容)'
+        print(f"[MONITOR] 开始监听 CAN 数据 (推送: {mode_str}, Ctrl+C 停止)...")
         try:
             while True:
+                if stop_event and stop_event.is_set():
+                    print("[MONITOR] 已结束 (stop_event)")
+                    break
                 result = self._recv_frame(timeout=0.5)
                 if result:
                     frame_type, payload = result
@@ -440,6 +520,17 @@ class WiFiCANClient:
                             ts = datetime.now().strftime('%H:%M:%S') + \
                                  f'.{int(time.time()*1000)%1000:03d}'
                             print(f"[{ts}] {frame}")
+                    elif frame_type == FRAME_CAN_BATCH:
+                        # 批帧展开 (v2.1)
+                        for frame in CANFrame.parse_batch(payload):
+                            self._rx_count += 1
+                            if callback:
+                                callback(frame)
+                            else:
+                                ts = datetime.now().strftime('%H:%M:%S') + \
+                                     f'.{int(time.time()*1000)%1000:03d}'
+                                print(f"[{ts}] {frame}")
+                        self._update_stats()
                     elif frame_type == FRAME_CMD_RESP:
                         text = payload.decode('utf-8', errors='replace').strip()
                         if text:
@@ -453,24 +544,89 @@ class WiFiCANClient:
             print("[INFO] 连接已关闭")
 
 
+# ====== UDP 订阅式监听 (v2.1, 可选) ======
+
+def udp_monitor(host: str, port: int = UDP_PORT,
+                callback: Optional[Callable[[CANFrame], None]] = None):
+    """UDP 订阅式批帧监听（单向接收，不占用 TCP 连接）
+
+    向 ESP32 的 UDP 8889 端口发一个订阅包即开始接收 0x05 批帧。
+    30s 无续订会被 ESP32 移除，故每 20s 自动续订一次。
+    """
+    if not host:
+        raise ValueError("UDP 模式需要指定 ESP32 IP (--host)")
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.settimeout(20.0)
+    s.sendto(b'\x01', (host, port))   # 订阅请求
+    print(f"[UDP] 已订阅 {host}:{port} 批帧推送 (Ctrl+C 停止)...")
+
+    try:
+        while True:
+            try:
+                data, _ = s.recvfrom(65535)
+            except socket.timeout:
+                # 20s 无数据 → 续订保活 (ESP32 30s 超时移除)
+                try:
+                    s.sendto(b'\x01', (host, port))
+                except OSError:
+                    break
+                continue
+            if len(data) < 3:
+                continue
+            frame_type = data[2]
+            if frame_type == FRAME_CAN_BATCH and len(data) > 3:
+                for frame in CANFrame.parse_batch(data[3:]):
+                    if callback:
+                        callback(frame)
+                    else:
+                        ts = datetime.now().strftime('%H:%M:%S') + \
+                             f'.{int(time.time()*1000)%1000:03d}'
+                        print(f"[{ts}] {frame}")
+    except KeyboardInterrupt:
+        print("\n[UDP] 已停止")
+    finally:
+        s.close()
+
+
 # ====== 快捷函数（供外部 import 引用） ======
 
 def quick_demo(client: WiFiCANClient):
-    """一键演示：发帧 → 查询 → 读缓冲 → 监听"""
-    client.send_can(can_id=0x1F6, data=bytes([0xAA, 0xBB]), extended=True)
+    """一键演示：发帧 → 查询 → 读缓冲 → 监听（带日志）"""
+    print(f"[INFO] 连接模式: {client.mode} | "
+          f"推送: {'批帧(高频推荐)' if client.batch_enabled else '单帧(兼容)'}")
 
-    print(client.query_ip())
-    print(client.query_rtc_time())
+    # 发送扩展帧
+    try:
+        client.send_can(can_id=0x1F6, data=bytes([0xAA, 0xBB]), extended=True)
+        print("[OK] 扩展帧已发送")
+    except Exception as e:
+        print(f"[FAIL] 发送异常: {e}")
 
+    # 查询 IP / RTC
+    ip = client.query_ip()
+    print(f"[INFO] ESP32 IP: {ip if ip else '(无响应)'}")
+    t = client.query_rtc_time()
+    print(f"[INFO] RTC 时间: {t if t else '(无响应)'}")
+
+    # 读取缓冲区
     frames = client.read_can_buffer()
-    for f in frames:
-        print(f"ID=0x{f.id:X} 数据={f.data.hex(' ')} 时间={f.timestamp_ms}ms")
+    if frames:
+        print(f"[OK] 缓冲区 {len(frames)} 帧:")
+        for f in frames:
+            print(f"    ID=0x{f.id:X} 数据={f.data.hex(' ')} 时间={f.timestamp_ms}ms")
+    else:
+        print("[FAIL] 缓冲区为空 (总线上没有其他设备在发帧?)")
 
-    def on_frame(frame: CANFrame):
-        print(f"收到: {frame}")
-
-    client.monitor(callback=on_frame)
-    client.close()
+    # 监听
+    print("[INFO] 开始监听 (Ctrl+C 停止)...")
+    try:
+        client.monitor(callback=lambda f: print(f"    收到: {f}"))
+    except KeyboardInterrupt:
+        print("[INFO] 监听结束")
+    finally:
+        client.close()
+        print("[INFO] 连接已关闭")
 
 
 # ====== 扫描工具 ======
@@ -578,12 +734,14 @@ def main():
   python wifi_can_client.py --serial COM3                # 串口直连
   python wifi_can_client.py --can-id 0x141 --can-data "A4 00 F4 01"  # 发送一帧
   python wifi_can_client.py --monitor                    # 监听模式
+  python wifi_can_client.py --udp 192.168.4.1            # UDP 批帧监听 (v2.1)
   python wifi_can_client.py --scan                       # 扫描设备
   python wifi_can_client.py --list-ports                 # 列串口
         """)
-    parser.add_argument('--host', help='ESP32 IP 地址 (TCP)')
+    parser.add_argument('--host', help='ESP32 IP 地址 (TCP/UDP)')
     parser.add_argument('--port', type=int, default=8888, help='TCP 端口 (默认8888)')
     parser.add_argument('--serial', dest='serial_port', help='串口 (如 COM3)')
+    parser.add_argument('--udp', action='store_true', help='UDP 订阅式批帧监听 (需 --host)')
     parser.add_argument('--can-id', type=str, default='0x123', help='CAN ID (hex)')
     parser.add_argument('--can-data', type=str, help='CAN 数据 hex 空格分隔')
     parser.add_argument('--can-extd', action='store_true', help='CAN 扩展帧')
@@ -604,8 +762,18 @@ def main():
         scan_esp32()
         return
 
+    # UDP 模式：独立于 TCP 的单向批帧监听
+    if args.udp:
+        host = args.host or "192.168.4.1"
+        udp_monitor(host)
+        return
+
     client = WiFiCANClient(host=args.host, port=args.port, serial_port=args.serial_port)
-    print(f"[INFO] 连接模式: {client.mode}")
+    mode_str = '批帧(高频推荐)' if client.batch_enabled else '单帧(兼容)'
+    print(f"[INFO] 连接模式: {client.mode} | 推送模式: {mode_str}")
+    if not client.batch_enabled:
+        print("[INFO] 提示: 未启用批帧 → 固件可能是 v2.0 旧版或协商超时, "
+              "已自动回退单帧模式。高频通信建议烧录 v2.1 固件")
 
     try:
         if args.query_ip:
@@ -714,9 +882,11 @@ def main():
                     # ---- stat ----
                     elif c == 'stat':
                         ip = client.query_ip()
-                        print(f"ESP32 IP: {ip}")
+                        print(f"ESP32 IP: {ip if ip else '(无响应)'}")
+                        mode_str = '批帧(高频推荐)' if client.batch_enabled else '单帧(兼容)'
+                        print(f"推送模式: {mode_str}")
                         frames = client.read_can_buffer()
-                        print(f"CAN 缓冲区: {'有数据' if frames else '空'}")
+                        print(f"CAN 缓冲区: {len(frames)} 帧" if frames else "CAN 缓冲区: 空")
 
                     # ---- mon ----
                     elif c == 'mon':

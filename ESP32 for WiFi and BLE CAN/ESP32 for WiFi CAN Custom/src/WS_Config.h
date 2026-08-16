@@ -13,7 +13,7 @@
  * 一、设备标识
  *============================================================================*/
 #define DEVICE_NAME        "ESP32-WiFi-CAN"
-#define FIRMWARE_VERSION   "2.0.0"
+#define FIRMWARE_VERSION   "2.1.3"
 
 /*============================================================================
  * 二、WiFi 默认参数（编译期默认值，运行时可网页修改并存 NVS）
@@ -31,6 +31,18 @@
 #define TCP_RX_BUF_SIZE    2048
 #define SERIAL_RX_BUF_SIZE 2048
 
+// ---- 批帧推送 (v2.1) ----
+// 攒批参数权衡：帧数越大包率越低（CPU开销越小），超时越长延迟越大。
+// 满 64 帧立即发 + 10ms 超时兜底 → 1kHz 输入时约 100 包/s，延迟 ≤10ms。
+#define CAN_BATCH_MAX_FRAMES    64     // 每批最多帧数 (64×18B ≈ 1.2KB, TCP 段内)
+#define CAN_BATCH_TIMEOUT_MS    10     // 攒批超时 (ms)，超时即使不满也强制发
+
+// ---- UDP 推送通道 (v2.1, 可选) ----
+// 只做单向 CAN 批帧推送（订阅即推），控制命令仍走 TCP 8888（可靠）。
+#define UDP_SERVER_PORT         8889
+#define UDP_MAX_CLIENTS         4      // 最多订阅者数
+#define UDP_KEEPALIVE_MS        30000  // 订阅者无活动超时移除 (ms)
+
 /*============================================================================
  * 四、CAN 默认参数
  *============================================================================*/
@@ -40,6 +52,8 @@
 #define CAN_ECHO_FILTER_SIZE      16     // 自收回显过滤：最近发送帧签名数
 #define CAN_STATS_INTERVAL_MS     1000   // 速率统计打印间隔 (ms)
 #define CAN_POLLING_RATE_MS       1      // TWAI 警报读取超时 (ms)
+#define CAN_TX_TIMEOUT_MS         10     // 发送入队超时 (ms)。
+                                          // 原 1000ms: 总线无 ACK 时每帧卡 1s → TCPTask 被拖死 (v2.1.1 修复)
 
 /*============================================================================
  * 五、二进制帧协议
@@ -50,8 +64,9 @@
  * 类型字节:
  *   0x01 CMD_REQ    PC → ESP32  命令请求
  *   0x02 CMD_RESP   ESP32 → PC  命令响应
- *   0x03 CAN_FRAME   ESP32 → PC  CAN 接收帧推送
+ *   0x03 CAN_FRAME   ESP32 → PC  CAN 接收帧推送（单帧，兼容模式）
  *   0x04 CAN_SEND    PC → ESP32  CAN 发送帧
+ *   0x05 CAN_BATCH   ESP32 → PC  CAN 批帧推送（协商后启用，高吞吐）
  *
  * 命令字（载荷的前2字节，仅 CMD_REQ/CMD_RESP）:
  *   0A 0C  发送 CAN 帧
@@ -59,6 +74,18 @@
  *   0A 0F  查询 CAN 接收缓冲区
  *   0A 10  设置 CAN 波特率
  *   0A 11  查询 RTC 时间
+ *   0A 13  启用批帧模式（客户端主动协商，启用后推送改为 0x05）
+ *          ⚠️ 0x0A12 预留给心跳看门狗（见 AI间交流\情报.md 通信与控制节），勿占用
+ *
+ * 批帧 0x05 载荷格式:
+ *   [2B 帧数N 大端] [N × 帧块]
+ *   帧块: [4B CAN_ID 大端] [1B extd] [4B 时间戳ms 大端] [1B DLC] [0-8B data]
+ *   （帧块与 0x03 单帧载荷完全一致，解析器可复用）
+ *
+ * 兼容性（重要）:
+ *   旧客户端不发送 0x0A12 → ESP32 继续推 0x03 单帧，行为与 v2.0 完全一致。
+ *   新客户端发送 0x0A12 → ESP32 对该客户端切换为 0x05 批帧推送。
+ *   两种客户端可同时在线，各自独立协商。
  *============================================================================*/
 
 // 帧类型
@@ -66,6 +93,7 @@
 #define FRAME_CMD_RESP   0x02
 #define FRAME_CAN_PUSH   0x03
 #define FRAME_CAN_SEND   0x04
+#define FRAME_CAN_BATCH  0x05
 
 // 命令字
 #define CMD_CAN_SEND     0x0A0C
@@ -73,6 +101,7 @@
 #define CMD_QUERY_CAN    0x0A0F
 #define CMD_SET_CAN_RATE 0x0A10
 #define CMD_QUERY_RTC    0x0A11
+#define CMD_ENABLE_BATCH 0x0A13   // 0x0A12 预留给心跳看门狗
 
 /*============================================================================
  * 六、CAN 帧结构体（环形缓冲区条目）
