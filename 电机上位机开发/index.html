@@ -1,0 +1,2222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>脉塔电机调试上位机</title>
+<style>
+/* ============ 基础与配色(与现有 CAN 助手一致) ============ */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #1a1a2e; --card: #16213e; --border: #0f3460; --accent: #00d4ff;
+  --input: #0d1b36; --log: #0a1120; --text: #e0e6f0; --dim: #8aa0c0;
+  --ok: #22c55e; --warn: #eab308; --err: #ef4444; --info: #38bdf8;
+}
+body { background: var(--bg); color: var(--text);
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif; font-size: 13px; }
+button { font-family: inherit; cursor: pointer; border: none; border-radius: 6px;
+  padding: 7px 14px; font-size: 13px; color: #fff; background: #274a78; transition: .15s; }
+button:hover { filter: brightness(1.2); }
+button.primary { background: var(--accent); color: #06283d; font-weight: bold; }
+button.danger { background: #8b0000; }
+button.warn { background: #7a5b00; }
+button.small { padding: 4px 10px; font-size: 12px; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+input, select { font-family: inherit; font-size: 13px; color: var(--text);
+  background: var(--input); border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 8px; outline: none; }
+input:focus, select:focus { border-color: var(--accent); }
+input::placeholder { color: #5d6f8f; opacity: .85; }   /* 半透明隐式提示 */
+input[type=number] { width: 110px; }
+label { color: var(--dim); font-size: 12px; }
+
+/* ============ 布局 ============ */
+header { display: flex; align-items: center; gap: 14px; padding: 10px 18px;
+  border-bottom: 1px solid var(--border); background: #141c33; }
+header h1 { font-size: 17px; color: var(--accent); font-weight: bold; letter-spacing: 1px; }
+header .sub { color: var(--dim); font-size: 12px; }
+.badges { margin-left: auto; display: flex; gap: 8px; }
+.badge { padding: 3px 10px; border-radius: 12px; font-size: 12px; background: #333; }
+.badge.ok { background: #0d3a1f; color: var(--ok); }
+.badge.err { background: #3a0d0d; color: var(--err); }
+.badge.warn { background: #3a2e0d; color: var(--warn); }
+.badge.info { background: #0d2a3a; color: var(--info); }
+
+main { display: grid; grid-template-columns: 380px 1fr; gap: 12px; padding: 12px; max-width: 1560px; margin: 0 auto; }
+aside { display: flex; flex-direction: column; gap: 12px; }
+.right { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+.card h2 { font-size: 14px; color: var(--accent); margin-bottom: 10px; font-weight: bold; }
+.row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.row label { min-width: 58px; }
+.grow { flex: 1; }
+
+/* ============ 电机注册表 ============ */
+/* 表格化对齐:表头与每行共用同一套 grid 列宽,严格成列;总宽须小于左栏内容宽(380-24=356px) */
+.motor-grid-cols { display: grid;
+  grid-template-columns: 14px minmax(50px, 1fr) 32px 92px 44px 78px;
+  gap: 6px; align-items: center; }
+.motor-list-head { padding: 4px 10px; color: var(--dim); font-size: 11px; border-bottom: 1px solid var(--border); }
+.motor-list-head span { white-space: nowrap; }
+.motor-item { padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; background: #101c38; }
+.motor-item:hover { border-color: #1d4a80; }
+.motor-item.sel { border-color: var(--accent); background: #0d2447; box-shadow: 0 0 6px #00d4ff44; }
+.motor-item .name { font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.motor-item .meta { color: var(--dim); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.motor-c { text-align: center; font-family: Consolas, monospace; }
+.proto-badge { padding: 1px 7px; border-radius: 8px; font-size: 11px; white-space: nowrap; }
+.proto-v3 { background: #0d2a3a; color: var(--info); }
+.proto-v44 { background: #0d3a1f; color: var(--ok); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #555; display: inline-block; margin: 0 auto; }
+.dot.on { background: var(--ok); box-shadow: 0 0 5px var(--ok); }
+.motor-item.editing { border-color: #b45309; }
+.motor-ops { display: flex; gap: 4px; justify-content: center; }
+.motor-ops .small { padding: 2px 6px; font-size: 11px; }
+
+/* ============ 调试区页签 ============ */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 10px; flex-wrap: wrap; }
+.tab { padding: 7px 14px; border-radius: 8px 8px 0 0; background: transparent; color: var(--dim); }
+.tab.act { background: #0d2447; color: var(--accent); font-weight: bold; }
+.tabpanel { min-height: 150px; }
+.panel-title { font-size: 13px; color: var(--accent); margin-bottom: 8px; }
+.hint { color: var(--dim); font-size: 12px; margin: 4px 0 8px; }
+.hint.warn { color: var(--warn); }
+.hint.err { color: var(--err); }
+.kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 14px; margin-bottom: 10px; }
+.kv .k { color: var(--dim); font-size: 12px; }
+.kv .v { font-size: 15px; font-weight: bold; color: var(--accent); font-family: Consolas, monospace; }
+.errlist { font-size: 12px; margin-top: 4px; }
+.errlist .e { color: var(--err); margin-right: 8px; white-space: nowrap; }
+.errlist .none { color: var(--ok); }
+
+/* ============ 曲线 ============ */
+.chart-wrap { display: flex; gap: 10px; align-items: flex-start; }
+canvas.chart { background: var(--log); border: 1px solid var(--border); border-radius: 8px; }
+.chart-ctl { display: flex; flex-direction: column; gap: 8px; }
+.legend { display: flex; gap: 10px; margin-top: 6px; font-size: 12px; }
+.legend span { display: flex; align-items: center; gap: 4px; color: var(--dim); }
+.legend i { width: 12px; height: 3px; display: inline-block; border-radius: 2px; }
+
+/* ============ 日志 ============ */
+.logbox { background: var(--log); border: 1px solid var(--border); border-radius: 8px;
+  font-family: Consolas, "Courier New", monospace; font-size: 12px; height: 220px;
+  overflow-y: auto; padding: 8px; white-space: pre-wrap; word-break: break-all; }
+.logbox .tx { color: var(--accent); }
+.logbox .rx { color: var(--ok); }
+.logbox .sys { color: var(--dim); }
+.logbox .err { color: var(--err); }
+.logbox .warn { color: var(--warn); }
+
+/* ============ 弹窗 ============ */
+.modal-mask { position: fixed; inset: 0; background: #00000088; display: none;
+  align-items: center; justify-content: center; z-index: 999; }
+.modal { background: var(--card); border: 1px solid var(--accent); border-radius: 10px;
+  padding: 20px 24px; max-width: 460px; }
+.modal h3 { color: var(--warn); margin-bottom: 10px; font-size: 15px; }
+.modal p { margin-bottom: 14px; line-height: 1.7; color: var(--text); }
+.modal .btns { display: flex; justify-content: flex-end; gap: 10px; }
+
+/* 使能倒计时横幅 */
+.banner { display: none; align-items: center; gap: 10px; background: #3a2e0d;
+  border: 1px solid var(--warn); border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; }
+.banner.show { display: flex; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🤖 脉塔电机调试上位机</h1>
+  <span class="sub">V3.x / V4.4 双协议 · 动态电机注册表 · 全功能调试</span>
+  <div class="badges">
+    <span class="badge" id="badgeDev">设备:未打开</span>
+    <span class="badge" id="badgeBus">总线:—</span>
+    <span class="badge" id="badgeMode">模式:—</span>
+  </div>
+</header>
+
+<main>
+  <!-- ============ 左栏 ============ -->
+  <aside>
+    <!-- 连接卡 -->
+    <section class="card">
+      <h2>🔌 设备连接</h2>
+      <div class="row">
+        <label>设备型号</label>
+        <select id="selDev" class="grow"></select>
+      </div>
+      <div class="row">
+        <label>设备索引</label>
+        <input type="number" id="inpDevIdx" value="0" min="0" style="width:70px">
+        <label>通道</label>
+        <input type="number" id="inpCh" value="0" min="0" style="width:60px">
+      </div>
+      <div class="row">
+        <label>波特率</label>
+        <select id="selBaud">
+          <option value="1000" selected>1000 kbps(1M)</option>
+          <option value="500">500 kbps</option>
+          <option value="250">250 kbps</option>
+          <option value="125">125 kbps</option>
+          <option value="100">100 kbps</option>
+          <option value="50">50 kbps</option>
+        </select>
+      </div>
+      <div class="row">
+        <button class="primary" id="btnOpen" onclick="uiOpenDevice()">打开设备</button>
+        <button class="danger" id="btnClose" onclick="uiCloseDevice()" disabled>关闭设备</button>
+        <button class="small" onclick="uiListDevices()">刷新列表</button>
+      </div>
+      <div class="hint" id="connHint">脉塔官方 USBCAN 模块(USBCANFD-200U)插入后点击「打开设备」。</div>
+    </section>
+
+    <!-- 电机注册表 -->
+    <section class="card">
+      <h2>🤖 电机注册表 <button class="small" onclick="uiScanMotors()" id="btnScan" disabled>🔍 扫描在线电机</button></h2>
+      <div class="row">
+        <input type="text" id="inpName" placeholder="名称(如 基座Yaw)" style="width:108px">
+        <input type="number" id="inpId" placeholder="ID 1~32" min="1" max="32" title="电机 CAN 编号 1~32" style="width:96px">
+        <select id="inpProto" style="width:120px">
+          <option value="V3">V3(旧型号)</option>
+          <option value="V44" selected>V4(新型号)</option>
+        </select>
+      </div>
+      <div class="row">
+        <input type="number" id="inpGear" placeholder="减速比(如 6)" min="0.01" step="0.1" title="减速器输出轴:电机转子 = 1:N,如 X8-PRO 1:6 填 6" style="width:92px">
+        <select id="inpDir" style="width:102px" title="电机输出轴正方向:与协议正方向相反(如减速器反向的 X8-PRO)选反转">
+          <option value="1" selected>正转(协议)</option>
+          <option value="-1">反转</option>
+        </select>
+        <input type="text" id="inpNote" placeholder="备注(如 X8-PRO 1:6)" style="width:124px">
+        <button class="primary small" id="btnAddMotor" onclick="uiAddMotor()">➕ 添加</button>
+        <button class="small" id="btnCancelEdit" onclick="uiCancelEdit()" style="display:none">取消</button>
+      </div>
+      <div class="hint">协议版本:V3 = 旧型号(X8-PRO/X6-S2 等 RMD-X 系列),V4 = 新型号(X6-40/X2-7 等)。减速比 = 输出轴:转子,如 X8-PRO 1:6 填 <b>6</b>、X6-S2 填 <b>36</b>(V3 旧型号必填);V4 新型号固件通常已内置减速比,填 <b>1</b> 即可。<b>方向</b>:该关节正角度转向与协议相反时(如 X8-PRO 给正角度顺时针、其余电机逆时针)选「反转」,界面所有位置/速度/力矩自动按该方向映射。</div>
+      <div id="motorList" class="hint">注册表为空:请添加电机(名称 / ID 1~32 / 协议版本 / 减速比)。</div>
+    </section>
+
+    <!-- 多电机同步 -->
+    <section class="card">
+      <h2>🧪 多电机同步(0x280)</h2>
+      <div class="row">
+        <label>模式</label>
+        <select id="selSyncMode" onchange="uiSyncMode()">
+          <option value="v3">V3.x:指令广播</option>
+          <option value="v44">V4.4:指令广播</option>
+        </select>
+      </div>
+      <div id="syncPanelV44" style="display:none">
+        <div class="hint warn">⚠️ 广播前请先在「系统」页签执行 0x20 索引 0x02(失能编号滤波器),否则从机会忽略广播。<br>⚠️ 广播帧对总线上所有电机<b>原样发送</b>(不按各电机方向映射):方向相反的电机收到同一指令会反向动作,建议仅用于 0x80 停机等无方向指令,或对所有同向电机广播。</div>
+        <div class="row"><label>指令码</label><select id="syncCmd" onchange="uiSyncCmd()"></select></div>
+        <div id="syncCmdParams"></div>
+        <button class="primary" onclick="uiSyncSendV44()">广播发送(0x280)</button>
+      </div>
+    </section>
+
+    <!-- 手动发帧 -->
+    <section class="card">
+      <h2>✍️ 手动发帧</h2>
+      <div class="row">
+        <label>编号</label>
+        <input type="number" id="rawId" placeholder="1~32" min="1" max="32" style="width:70px">
+        <label style="min-width:0"><input type="checkbox" id="rawExtd"> 扩展帧</label>
+        <label style="min-width:0"><input type="checkbox" id="raw280"> 广播 0x280</label>
+      </div>
+      <div class="row">
+        <input type="text" id="rawData" class="grow" placeholder="十六进制数据,如 A4 00 14 00 A0 8C 00 00">
+      </div>
+      <div class="hint">手动模式<b>原样发送</b>十六进制帧,不按方向/减速比映射(协议原始字节)。</div>
+      <div class="row">
+        <button class="primary" onclick="uiRawSend()">🚀 发送</button>
+        <button class="small" onclick="uiQuick('80 00 00 00 00 00 00 00','0x80 关闭')">0x80 关闭</button>
+        <button class="small" onclick="uiQuick('9A 00 00 00 00 00 00 00','0x9A 读状态')">0x9A 读状态</button>
+      </div>
+    </section>
+  </aside>
+
+  <!-- ============ 右栏 ============ -->
+  <section class="right">
+    <!-- 调试区 -->
+    <section class="card">
+      <h2>🛠️ 电机调试区 <span id="dbgTitle" class="hint">——请先在左侧注册表选择一台电机</span></h2>
+      <div class="tabs" id="tabBar"></div>
+      <div class="tabpanel" id="tabPanel"></div>
+    </section>
+
+    <!-- 曲线 -->
+    <section class="card">
+      <h2>📈 实时曲线 <span class="hint" id="chartSrc">(数据源:选中电机的状态轮询)</span></h2>
+      <div class="chart-wrap">
+        <canvas class="chart" id="chart" width="860" height="200"></canvas>
+        <div class="chart-ctl">
+          <button class="small" id="btnPause" onclick="chartTogglePause()">⏸ 暂停</button>
+          <button class="small" onclick="chartClear()">🧹 清空</button>
+          <label style="min-width:0"><input type="checkbox" id="chkPos" checked onchange="chartDraw()"> <span style="color:#00d4ff">位置</span></label>
+          <label style="min-width:0"><input type="checkbox" id="chkSpd" checked onchange="chartDraw()"> <span style="color:#4ade80">速度</span></label>
+          <label style="min-width:0"><input type="checkbox" id="chkIq" checked onchange="chartDraw()"> <span style="color:#f59e0b">力矩电流</span></label>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i style="background:#00d4ff"></i>位置 °</span>
+        <span><i style="background:#4ade80"></i>速度 dps</span>
+        <span><i style="background:#f59e0b"></i>力矩电流 A</span>
+        <span style="color:#8aa0c0">(Y 轴量程随数据自动调整,刻度标注主轴;无数据时曲线停留不归零;鼠标悬停可读数)</span>
+      </div>
+    </section>
+
+    <!-- 日志 -->
+    <section class="card">
+      <h2>📥 收发日志
+        <button class="small" onclick="uiClearLog()">清空</button>
+        <label style="min-width:0; margin-left:8px"><input type="checkbox" id="chkScroll" checked> 自动滚动</label>
+      </h2>
+      <div class="logbox" id="logbox"></div>
+    </section>
+  </section>
+</main>
+
+<!-- 危险操作确认弹窗 -->
+<div class="modal-mask" id="modalMask">
+  <div class="modal">
+    <h3 id="modalTitle">⚠️ 危险操作确认</h3>
+    <p id="modalMsg"></p>
+    <div class="btns">
+      <button id="modalCancel" onclick="modalClose(false)">取消</button>
+      <button class="danger" id="modalOk" onclick="modalClose(true)">确认执行</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+ * 一、桥接层:pywebview js_api;浏览器打开时降级为 JS 模拟桥
+ * ===================================================================== */
+let bridge = null;
+let JS_MOCK = true;
+let booted = false;
+let bootTries = 0;
+
+/* JS 模拟桥:未检测到桌面程序桥接时使用(浏览器演示 / 注入失败兜底) */
+function createMockBridge() {
+  // 浏览器演示模式:JS 模拟设备,便于直接双击 index.html 预览界面
+  const _mock = {
+    opened: false, tx: 0, rx: 0, pos: {}, spd: {}, t0: Date.now(),
+    events: [], logs: [],
+    _push(ev) { this.events.push(ev); if (this.events.length > 2000) this.events.splice(0, 1000); },
+    list_devices() { return { ok: true, data: [{ type: 41, name: "模拟 USBCANFD-200U" }] }; },
+    open_device(t, i, c, b) { this.opened = true; this._log("已打开 模拟设备,通道 " + c + ",波特率 " + b + " kbps"); return { ok: true, msg: "已打开 模拟设备" }; },
+    close_device() { this.opened = false; this._log("设备已关闭"); return { ok: true, msg: "设备已关闭" }; },
+    _log(m, lv) { this.logs.push({ ts: Date.now(), level: lv || "info", msg: m, kind: "log" }); },
+    send_frame(id, extd, hexstr) {
+      if (!this.opened) return { ok: false, msg: "设备未打开" };
+      const data = hexstr.trim().split(/[\s,]+/).filter(Boolean).map(h => parseInt(h, 16));
+      while (data.length < 8) data.push(0);
+      this.tx++;
+      this._push({ kind: "frame", ts: Date.now(), dir: "tx", id, extd, dlc: 8, data: data.map(b => ("0" + b.toString(16).toUpperCase()).slice(-2)).join(" ") });
+      const n = id - 0x140;
+      const pushRx = (rid, rep) => {
+        this._push({ kind: "frame", ts: Date.now(), dir: "rx", id: rid, extd: 0, dlc: 8, data: rep.map(b => ("0" + b.toString(16).toUpperCase()).slice(-2)).join(" ") });
+        this.rx++;
+      };
+      if (!extd && id === 0x300 && data[0] === 0x79) {
+        // 0x79 读/写 ID:回复从 0x300 回(V3.8 协议第 4 章)
+        if (data[2] === 1) pushRx(0x300, [0x79, 0, 1, 0, 0, 0, 4, 0]);          // 读:回复 D6~7=uint16 当前 ID
+        else pushRx(0x300, [0x79, 0, 0, 0, 0, 0, 0, data[7]]);                // 写:回显
+      } else if (!extd && n >= 1 && n <= 32 && n <= 4) {
+        const cmd = data[0];
+        let rep = null;
+        if (cmd === 0x9A) rep = [0x9A, 40, 35, 1, 240, 0, 0, 0];
+        else if (cmd === 0x9C) { const a = (this.pos[n] || 0) / 100 % 360; rep = [0x9C, 40, 200, 0, 50, 0, a & 255, (a >> 8) & 255]; }
+        else if (cmd === 0x92 || cmd === 0x94) { rep = [cmd, 0, 0, 0, 0, 0, 0, 0]; rep[4] = ((this.pos[n] || 0) & 255); rep[5] = ((this.pos[n] || 0) >> 8) & 255; }
+        else if (cmd === 0xA4 || cmd === 0xA8) { this.pos[n] = ((data[7] << 24 | data[6] << 16 | data[5] << 8 | data[4]) | 0); rep = [0x9A, 40, 35, 1, 240, 0, 0, 0]; }
+        else if (cmd >= 0x30 && cmd <= 0x32) rep = [cmd, data[1], 0, 0, 0, 0, 128, 63];
+        else if (cmd === 0x70) rep = [0x70, 0, 0, 0, 0, 0, 0, 2];
+        else if (cmd === 0xB1) rep = [0xB1, 0, 0, 0, 1, 0, 0, 0];
+        else if (cmd === 0xB2) rep = [0xB2, 0, 0, 0, 0x8C, 0xA5, 0x35, 0x01];
+        else if (cmd !== 0x76) rep = [0x9A, 40, 35, 1, 240, 0, 0, 0];
+        if (rep) pushRx(0x240 + n, rep);
+      }
+      return { ok: true, msg: "已发送" };
+    },
+    get_pending() {
+      const out = { frames: this.events.splice(0, 800), logs: this.logs.splice(0, 200),
+        status: { opened: this.opened, mock: true, dev_type: 41, dev_index: 0, ch: 0, baud: 1000, online: this.opened, tx: this.tx, rx: this.rx, err: "" } };
+      return out;
+    },
+    get_status() { return { ok: true, data: { opened: this.opened, mock: true } }; },
+    get_registry() { return { ok: true, data: motors }; },   // 演示模式:注册表即 localStorage 内容
+    save_registry() { return { ok: true, msg: "已保存(演示模式:localStorage)" }; },
+  };
+  const _p = (f) => (...a) => { const r = _mock[f](...a); return (r instanceof Promise) ? r : Promise.resolve(r); };
+  const api = { list_devices: _p("list_devices"), open_device: _p("open_device"), close_device: _p("close_device"),
+                send_frame: _p("send_frame"), get_pending: _p("get_pending"), get_status: _p("get_status"),
+                get_registry: _p("get_registry"), save_registry: _p("save_registry") };
+  _mock._log("浏览器演示模式:未检测到桌面程序桥接,使用 JS 模拟设备(界面可全功能预览)", "warn");
+  return api;
+}
+
+/* 启动:pywebview 在页面加载后才注入 js_api,必须等 pywebviewready 再初始化,
+ * 否则 bridge 为 null 界面会误走 JS 模拟桥(表现为「已打开模拟设备」)。
+ * 兜底:最多重试 3 秒(30×100ms),超时按浏览器演示模式启动模拟桥。 */
+function boot() {
+  bridge = (typeof window.pywebview !== "undefined" && window.pywebview.api) ? window.pywebview.api : null;
+  if (booted) return;
+  if (!bridge && bootTries++ < 30) {
+    setTimeout(boot, 100);   // api 尚未注入,稍后重试
+    return;
+  }
+  JS_MOCK = !bridge;
+  if (JS_MOCK) bridge = createMockBridge();
+  booted = true;
+  init();
+}
+if (window.addEventListener) window.addEventListener("pywebviewready", () => { bootTries = 0; boot(); });
+boot();
+
+/* 桥接就绪防护:初始化期间点击任何操作按钮,给中文提示而不是静默崩溃 */
+function bridgeReady() {
+  if (booted) return true;
+  addLog("warn", "界面正在初始化(等待与主程序建立连接),请稍候再操作…");
+  return false;
+}
+
+/* =====================================================================
+ * 二、协议知识库(V2.4 / V4.4 双协议)
+ * ===================================================================== */
+const P = { V3: "V3(旧型号)", V44: "V4(新型号)" };
+
+const ERR_V44 = [
+  [0x0002, "电机堵转"], [0x0004, "低压保护"], [0x0008, "过压保护"], [0x0010, "相电流过流"],
+  [0x0040, "功率超限"], [0x0080, "标定参数写入错误"], [0x0100, "超速"], [0x0800, "元器件过温"],
+  [0x1000, "电机过温"], [0x2000, "编码器校准错误"], [0x4000, "编码器数据错误"],
+];
+const ERR_V3 = [
+  [0x0002, "电机堵转"], [0x0004, "低压保护"], [0x0008, "过压保护"], [0x0010, "过流保护"],
+  [0x0040, "功率超限"], [0x0100, "超速"], [0x1000, "电机过温"], [0x2000, "编码器校准错误"],
+];
+
+/* ---------- 字节工具 ---------- */
+function i16(b, o) { return (b[o] | b[o + 1] << 8) << 16 >> 16; }
+function u16(b, o) { return b[o] | b[o + 1] << 8; }
+function i32(b, o) { return (b[o] | b[o + 1] << 8 | b[o + 2] << 16 | b[o + 3] << 24) | 0; }
+function u32(b, o) { return (b[o] | b[o + 1] << 8 | b[o + 2] << 16 | b[o + 3] << 24) >>> 0; }
+function f32(b, o) { const dv = new DataView(Uint8Array.from(b.slice(o, o + 4)).buffer); return dv.getFloat32(0, true); }
+function pI16(v) { v = Math.max(-32768, Math.min(32767, Math.round(v))); return [(v & 255), (v >> 8) & 255]; }
+function pU16(v) { v = Math.max(0, Math.min(65535, Math.round(v))); return [(v & 255), (v >> 8) & 255]; }
+function pI32(v) { v = Math.max(-2147483648, Math.min(2147483647, Math.round(v))); return [(v & 255), (v >> 8) & 255, (v >> 16) & 255, (v >> 24) & 255]; }
+function pU32(v) { v = Math.max(0, Math.min(4294967295, Math.round(v))) >>> 0; return [(v & 255), (v >> 8) & 255, (v >> 16) & 255, (v >> 24) & 255]; }
+function pF32(v) { const b = new Uint8Array(4); new DataView(b.buffer).setFloat32(0, v, true); return Array.from(b); }
+function hx(arr) { return arr.map(b => ("0" + (b & 255).toString(16).toUpperCase()).slice(-2)).join(" "); }
+function pad8(arr) { while (arr.length < 8) arr.push(0); return arr.slice(0, 8); }
+
+/* ---------- V3.x(RMD-X 系列)组帧 ---------- */
+/* 与 V4.4 的差异:无 0x88 使能;PID 为六参数 uint8(0x30 读/0x31 写RAM/0x32 写ROM,一次读写全六参数);
+   加速度 0x42/0x43 索引式(uint32,1dps/s);0x79 编号在 D7(uint8);0x9C 回复 D6~7 为角度;
+   0x71 功率在 D6~7;0xA6 单圈位置(D1 方向 + D2~3 速度 uint16 + D4~5 角度 uint16)。 */
+const BUILD_V3 = {
+  Q(cmd) { return pad8([cmd]); },
+  // 0xA4 绝对位置 / 0xA8 增量位置:最大速度 dps,角度 0.01°(转子侧)
+  POS(cmd, spdDps, deg) { return pad8([cmd, 0, ...pU16(Math.round(spdDps)), ...pI32(Math.round(deg * 100))]); },
+  // 0xA6 单圈位置:D1 方向(0 顺/1 逆),D2~3 最大速度,D4~5 角度 0.01°(协议上限 0~35999,转子侧;超出固件行为异常,组帧前 clamp 到 35999)
+  POS1(dir, spdDps, deg) { return pad8([0xA6, dir & 255, ...pU16(Math.round(spdDps)), ...pU16(Math.max(0, Math.min(35999, Math.round(deg * 100)))), 0, 0]); },
+  SPEED(velDps) { return pad8([0xA2, 0, 0, 0, ...pI32(Math.round(velDps * 100))]); },   // 无最大力矩字段
+  TORQUE(amp) { return pad8([0xA1, 0, 0, 0, ...pI16(Math.round(amp * 100)), 0, 0]); },  // 0.01A/LSB
+  // PID 六参数:[电流KP,电流KI,速度KP,速度KI,位置KP,位置KI] uint8 0~255,一次写全
+  PIDW(cmd, arr) { return pad8([cmd, 0, ...arr.map(x => Math.max(0, Math.min(255, Math.round(x)))).slice(0, 6)]); },
+  ACC(cmd, idx, val) { return pad8([cmd, idx & 255, 0, 0, ...pI32(val)]); },           // 索引 0~3,1dps/s,100~60000
+  ZERO_OFF(val) { return pad8([0x63, 0, 0, 0, ...pI32(val)]); },
+  MODE(m) { return pad8([0x70, 0, 0, 0, 0, 0, 0, m]); },                              // 0x01 电流环/0x02 速度环/0x03 位置环
+  SETID(id) { return pad8([0x79, 0, 0, 0, 0, 0, 0, id & 255]); },                     // D2=0 写,D7=编号
+  READID() { return pad8([0x79, 0, 1, 0, 0, 0, 0, 0]); },                             // D2=1 读
+  B3(ms) { return pad8([0xB3, 0, 0, 0, ...pU32(ms)]); },
+  B4(idx) { return pad8([0xB4, 0, 0, 0, 0, 0, 0, idx]); },                            // 0=CAN 500K,1=CAN 1M
+  FUNC(idx, val) { return pad8([0x20, idx & 255, 0, 0, ...pI32(val)]); },
+};
+
+/* ---------- V4.4 组帧 ---------- */
+const BUILD_V44 = {
+  Q(cmd) { return pad8([cmd]); },
+  POS(cmd, spdDps, deg) { return pad8([cmd, 0, ...pU16(Math.round(spdDps)), ...pI32(Math.round(deg * 100))]); },
+  FORCE_POS(tqPct, spdDps, deg) { return pad8([0xA9, tqPct & 255, ...pU16(Math.round(spdDps)), ...pI32(Math.round(deg * 100))]); },
+  SPEED(tqMaxPct, velDps) { return pad8([0xA2, 0, tqMaxPct & 255, 0, ...pI32(Math.round(velDps * 100))]); },
+  TORQUE(amp) { return pad8([0xA1, 0, ...pI16(Math.round(amp * 100)), 0, 0, 0, 0]); },  // 0.01A
+  FF_SPD(spdDps, deg) { return pad8([0x72, 0, ...pI16(Math.round(spdDps)), ...pI32(Math.round(deg * 100))]); },
+  FF_TQ(tqPct, spdDps, deg) { return pad8([0x73, tqPct & 255, ...pI16(Math.round(spdDps)), ...pI32(Math.round(deg * 100))]); },
+  PID(cmd, idx, val) { return pad8([cmd, idx & 255, 0, 0, ...pF32(val)]); },
+  ACC(cmd, idx, val) { return pad8([cmd, idx & 255, 0, 0, ...pI32(val)]); },
+  ZERO_OFF(val) { return pad8([0x63, 0, 0, 0, ...pI32(val)]); },
+  MODE(m) { return pad8([0x70, 0, 0, 0, 0, 0, 0, m]); },
+  FUNC(idx, val) { return pad8([0x20, idx & 255, 0, 0, ...pI32(val)]); },  // 索引 6/7 角度可为负,按 int32 两补码写
+  B3(ms) { return pad8([0xB3, 0, 0, 0, ...pU32(ms)]); },
+  B4(idx) { return pad8([0xB4, 0, 0, 0, 0, 0, 0, idx]); },
+  B6(on) { return pad8([0xB6, 0, 0, 0, 0, 0, 0, on ? 1 : 0]); },
+};
+
+/* ---------- 回复解析 ---------- */
+function errText(code, proto) {
+  if (!code) return "无错误 ✅";
+  const tab = proto === "V3" ? ERR_V3 : ERR_V44;
+  // 完整码值精确匹配优先(V2.4 的 0x00Fx 通信类错误码是独立码,如 0x00F3 抱闸已锁)
+  const exact = tab.find(e => e[0] === code);
+  if (exact) return exact[1];
+  const hits = tab.filter(e => (code & e[0]) === e[0]).map(e => e[1]);
+  return hits.length ? hits.join(" + ") : "未知错误位 " + code.toString(16).toUpperCase();
+}
+
+function parseReply(proto, cid, bytes) {
+  /* 返回 { motorId, cmd, summary, values } */
+  let n = 0, broadcast = false, sys300 = false;
+  if (cid === 0x280) broadcast = true;
+  else if (cid === 0x300) sys300 = true;        // 0x79 读/写 ID 的系统地址,回复也从 0x300 回
+  else if (cid >= 0x140 && cid <= 0x15F) n = cid - 0x140;
+  else if (cid >= 0x240 && cid <= 0x25F) n = cid - 0x240;
+  if (!n && !broadcast && !sys300) return null;
+  const cmd = bytes[0];
+  const out = { motorId: n, broadcast, sys300, cmd, summary: "", values: {} };
+  // 方向映射用该回复归属电机的注册表配置(广播/0x300 无归属时退回当前选中电机)
+  const rm = motorById(n) || selMotor();
+  if (proto === "V3") {
+    switch (cmd) {
+      case 0x9A: {
+        const b = bytes[3];
+        // V3.x 的 D3 是抱闸释放命令状态(RlyCtrlRslt):1=已释放,0=已锁定
+        const brakeTxt = b === 1 ? "已释放" : (b === 0 ? "已锁定" : `未定义(0x${b.toString(16).toUpperCase().padStart(2, "0")},无抱闸型号属正常)`);
+        out.values = { temp: bytes[1], brake: brakeTxt, brakeRaw: b,
+          volt: u16(bytes, 4) / 10, err: u16(bytes, 6) };
+        out.summary = `温度 ${out.values.temp}℃ · 电压 ${out.values.volt === 0 ? "—(旧固件不回传,正常)" : out.values.volt.toFixed(1) + "V"} · 抱闸${out.values.brake} · ${errText(out.values.err, "V3")}`;
+        break;
+      }
+      case 0x9C: {
+        // V3.x 的 D6~7 是 16 位编码器脉冲(uint16,转子侧单圈 0~65535),不是角度!
+        // 曾误当 int16 角度 → 曲线在 ±32767 之间锯齿跳变(「溢出」)。角度请用 0x92 多圈角度。
+        out.values = { temp: bytes[1], iq: i16(bytes, 2) / 100, spd: i16(bytes, 4), enc: u16(bytes, 6) };
+        const q = dirOf(rm);
+        out.summary = `温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * q).toFixed(2)}A(输出轴) · 速度 ${rot2out(out.values.spd, rm).toFixed(2)}dps(输出轴) · 编码器 ${out.values.enc} 脉冲(转子侧原始)`;
+        break;
+      }
+      case 0x9D:
+        out.values = { ia: i16(bytes, 1) / 100, ib: i16(bytes, 3) / 100, ic: i16(bytes, 5) / 100 };
+        out.summary = `相电流 A ${out.values.ia.toFixed(1)}A · B ${out.values.ib.toFixed(1)}A · C ${out.values.ic.toFixed(1)}A`;
+        break;
+      case 0x30: case 0x31: case 0x32: {
+        // 六参数 uint8 一次读写:D2~D7 = 电流KP/KI、速度KP/KI、位置KP/KI
+        const pid = [bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7]];
+        out.values = { pid };
+        out.summary = `PID 六参数:电流KP ${pid[0]} KI ${pid[1]} · 速度KP ${pid[2]} KI ${pid[3]} · 位置KP ${pid[4]} KI ${pid[5]}${cmd !== 0x30 ? "(回显,写入成功)" : ""}`;
+        break;
+      }
+      case 0x42: case 0x43:
+        out.values = { idx: bytes[1], acc: i32(bytes, 4) };
+        out.summary = `加速度 ${V44_ACC_NAME[out.values.idx] || "索引" + out.values.idx} = ${out.values.acc} dps/s`;
+        break;
+      case 0x90:
+        out.values = { enc: u16(bytes, 2), raw: u16(bytes, 4), off: u16(bytes, 6) };
+        out.summary = `单圈编码器 ${out.values.enc}(原始 ${out.values.raw},零偏 ${out.values.off})脉冲`;
+        break;
+      case 0x92:
+        // ⚠️ 0x92 回复的 int32 角度在 D1~4 小端(2026-08-20 日志实证:
+        // 92 21 67 00 00 00 00 00 → i32(D1~4)=0x6721=264.01°,与 0x9C 相位 264.0 一致;
+        // 92 82 DA FF FF FF FF FF → i32(D1~4)=0xFFFFDA82=−95.98°)。此前读 D4~7 导致
+        // 264.01° 被当 0 忽略(「恒 0」误判)、负值错位——0x92 校准从未真正生效。
+        out.values = { pos: i32(bytes, 1) / 100 / gearOf(rm) * dirOf(rm) };
+        out.summary = `多圈角度 ${out.values.pos.toFixed(2)}°(输出轴${dirOf(rm) === -1 ? ",方向已映射" : ""})`;
+        break;
+      case 0x94:
+        out.values = { pos: u16(bytes, 6) / 100 / gearOf(rm) * dirOf(rm) };
+        out.summary = `单圈角度 ${out.values.pos.toFixed(2)}°(输出轴${dirOf(rm) === -1 ? ",方向已映射" : ""},0~359.99)`;
+        break;
+      case 0x60: case 0x61: case 0x62:
+        out.values = { enc: i32(bytes, 4) };
+        out.summary = `编码器 ${out.values.enc * dirOf(rm)} 脉冲(方向已映射;原始 ${out.values.enc})`;
+        break;
+      case 0x70:
+        out.values = { mode: bytes[7] };
+        out.summary = `运行模式 ${V3_MODE[out.values.mode] || out.values.mode.toString(16)}`;
+        break;
+      case 0x71:
+        out.values = { power: u16(bytes, 6) / 10 };   // V3.x 功率在 D6~7
+        out.summary = `功率 ${out.values.power.toFixed(1)}W`;
+        break;
+      case 0x79:
+        // D2=0 写:回复回显原命令,D7=新 ID;D2=1 读:回复 D6~7=uint16 当前 ID
+        out.values = { id: bytes[2] === 1 ? u16(bytes, 6) : bytes[7] };
+        out.summary = `电机 ID ${out.values.id}${bytes[2] === 1 ? "(当前值)" : "(写入回显,重启生效)"}`;
+        break;
+      case 0xB1:
+        out.values = { ms: u32(bytes, 4) };
+        out.summary = `运行时间 ${(out.values.ms / 1000).toFixed(1)}s`;
+        break;
+      case 0xB2:
+        out.values = { d: u32(bytes, 4) };
+        out.summary = `固件日期 ${out.values.d}`;
+        break;
+      case 0xB3:
+        out.values = { ms: u32(bytes, 4) };
+        out.summary = `通信中断保护 ${out.values.ms}ms`;
+        break;
+      case 0xB4:
+        out.values = { idx: bytes[7] };
+        out.summary = `波特率索引 ${out.values.idx}(` + { 0: "CAN 500K", 1: "CAN 1M", 2: "RS485 1M(CAN 无效)" }[out.values.idx] + ")";
+        break;
+      case 0xB5:
+        out.values = { text: String.fromCharCode(...bytes.slice(1, 8)) };
+        out.summary = `型号:${out.values.text}`;
+        break;
+      case 0x20: {
+        const fidx = bytes[1];
+        const fval = i32(bytes, 4);
+        out.values = { idx: fidx, val: fval };
+        out.summary = `功能控制 ${V3_FUNC_NAME[fidx] || ("索引" + fidx)} = ${fval}(回显,写入成功)`;
+        break;
+      }
+      case 0xA1: case 0xA2: case 0xA4: case 0xA6: case 0xA8: case 0x80: case 0x81: case 0x77: case 0x78:
+        out.values = { temp: bytes[1], iq: i16(bytes, 2) / 100, spd: i16(bytes, 4), enc: u16(bytes, 6) };
+        out.summary = `回复:温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A(输出轴) · 速度 ${rot2out(out.values.spd, rm).toFixed(2)}dps(输出轴) · 编码器 ${out.values.enc}`;
+        break;
+      default:
+        out.summary = "未识别的 V3.x 回复";
+    }
+  } else {
+    switch (cmd) {
+      case 0x9A:
+        out.values = { temp: bytes[1], mosTemp: bytes[2], brake: bytes[3] ? "已解锁" : "已锁定",
+          volt: u16(bytes, 4) / 10, err: u16(bytes, 6) };
+        out.summary = `温度 ${out.values.temp}℃(MOS ${out.values.mosTemp}℃) · 电压 ${out.values.volt.toFixed(1)}V · 抱闸${out.values.brake} · ${errText(out.values.err, "V44")}`;
+        break;
+      case 0x9C:
+        out.values = { temp: bytes[1], iq: i16(bytes, 2) / 100, spd: i16(bytes, 4), ang: i16(bytes, 6) };
+        out.summary = `温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A · 速度 ${rot2out(out.values.spd, rm)}dps · 角度 ${rot2out(out.values.ang, rm)}°(输出轴${dirOf(rm) === -1 ? ",方向已映射" : ""})`;
+        break;
+      case 0x9D:
+        out.values = { ia: i16(bytes, 1) / 100, ib: i16(bytes, 3) / 100, ic: i16(bytes, 5) / 100 };
+        out.summary = `相电流 A ${out.values.ia.toFixed(2)}A · B ${out.values.ib.toFixed(2)}A · C ${out.values.ic.toFixed(2)}A`;
+        break;
+      case 0x92: case 0x94:
+        out.values = { pos: i32(bytes, 4) / 100 * dirOf(rm) };
+        out.summary = `多圈角度 ${out.values.pos.toFixed(2)}°(输出轴${dirOf(rm) === -1 ? ",方向已映射" : ""})`;
+        break;
+      case 0x60: case 0x61: case 0x62:
+        out.values = { enc: i32(bytes, 4) };
+        out.summary = `编码器 ${out.values.enc * dirOf(rm)} 脉冲(方向已映射;原始 ${out.values.enc})`;
+        break;
+      case 0x30: case 0x31: case 0x32:
+        out.values = { idx: bytes[1], val: f32(bytes, 4) };
+        out.summary = `PID 索引 ${V44_PID_NAME[out.values.idx] || out.values.idx} = ${out.values.val.toFixed(5)}`;
+        break;
+      case 0x42: case 0x43:
+        out.values = { idx: bytes[1], acc: i32(bytes, 4) };
+        out.summary = `加速度 ${V44_ACC_NAME[out.values.idx] || "索引" + out.values.idx} = ${out.values.acc} dps/s`;
+        break;
+      case 0x70:
+        out.values = { mode: bytes[7] };
+        out.summary = `运行模式 ${V44_MODE[out.values.mode] || "未知"}`;
+        break;
+      case 0xB1:
+        out.values = { ms: u32(bytes, 4) };
+        out.summary = `运行时间 ${(out.values.ms / 1000).toFixed(1)}s`;
+        break;
+      case 0xB2:
+        out.values = { d: u32(bytes, 4) };
+        out.summary = `固件日期 ${out.values.d}`;
+        break;
+      case 0xB3:
+        out.values = { ms: u32(bytes, 4) };
+        out.summary = `通信中断保护 ${out.values.ms}ms`;
+        break;
+      case 0xB4:
+        out.values = { idx: bytes[7] };
+        out.summary = `波特率索引 ${out.values.idx}(` + { 0: "1M", 1: "500K", 2: "250K" }[out.values.idx] + ")";
+        break;
+      case 0xB5:
+        out.values = { part: bytes[1], text: String.fromCharCode(...bytes.slice(2, 7)) };
+        out.summary = `型号片段 ${out.values.part}:${out.values.text}`;
+        break;
+      case 0xB6:
+        out.values = { on: bytes[7] };
+        out.summary = `主动回复:${out.values.on ? "已开启" : "已关闭"}`;
+        break;
+      case 0x20: {
+        const fidx = bytes[1];
+        const fval = i32(bytes, 4);
+        out.values = { idx: fidx, val: fval };
+        let s = `功能控制 ${V44_FUNC_NAME[fidx] || ("索引" + fidx)} = ${fval}(回显,写入成功)`;
+        if (fidx === 6 || fidx === 7) {
+          const g = gearOf(selMotor());
+          s += `;输出轴 ${(fval / g / 100).toFixed(2)}°`;
+        }
+        out.summary = s;
+        break;
+      }
+      case 0x80: case 0x81: case 0x77: case 0x78:
+        out.values = { temp: bytes[1], iq: i16(bytes, 2) / 100, spd: i16(bytes, 4), ang: i16(bytes, 6) };
+        out.summary = `系统回复:温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A · 速度 ${rot2out(out.values.spd, rm)}dps · 角度 ${rot2out(out.values.ang, rm)}°`;
+        break;
+      case 0xA1: case 0xA2: case 0xA4: case 0xA8: case 0xA9: case 0x72: case 0x73:
+        out.values = { temp: bytes[1], iq: i16(bytes, 2) / 100, spd: i16(bytes, 4), ang: i16(bytes, 6) };
+        out.summary = `控制回复:温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A · 速度 ${rot2out(out.values.spd, rm)}dps · 角度 ${rot2out(out.values.ang, rm)}°`;
+        break;
+      default:
+        out.summary = "未识别的 V4.4 回复";
+    }
+  }
+  return out;
+}
+
+const V44_MODE = { 0x01: "电流环模式", 0x02: "位置环模式", 0x03: "速度环模式" };
+const V44_PID_NAME = { 0x01: "电流环KP", 0x02: "电流环KI", 0x04: "速度环KP", 0x05: "速度环KI",
+  0x07: "位置环KP", 0x08: "位置环KI", 0x09: "位置环KD" };
+const V44_ACC_NAME = { 0x00: "位置加速度", 0x01: "位置减速度", 0x02: "速度加速度", 0x03: "速度减速度" };
+const V44_FUNC_NAME = { 0x01: "清除多圈值", 0x02: "编号滤波器", 0x03: "错误主动上报", 0x04: "多圈掉电保存",
+  0x05: "设置电机编号", 0x06: "正向最大角度", 0x07: "反向最大角度", 0x08: "错误自动恢复" };
+const V3_MODE = { 0x01: "电流环", 0x02: "速度环", 0x03: "位置环" };
+const V3_PID_NAME = ["电流环KP", "电流环KI", "速度环KP", "速度环KI", "位置环KP", "位置环KI"];
+const V3_FUNC_NAME = { 0x01: "清除多圈值", 0x02: "编号滤波器" };
+
+/* =====================================================================
+ * 三、全局状态
+ * ===================================================================== */
+const LS_KEY = "myactuator_motors_v1";
+let motors = [];
+try { motors = JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch (e) { motors = []; }
+motors = motors.map(x => ({ ...x, dir: x.dir === -1 ? -1 : 1, E0: (typeof x.E0 === "number" && isFinite(x.E0)) ? x.E0 : null }));   // 旧注册表无方向/E0 字段:归一化默认正转、E0 未标定
+
+/* 桌面模式下注册表以 exe 同目录的「电机注册表.json」为准(打包版 localStorage 会随 WebView2 用户数据目录丢失);
+   浏览器演示模式(无桥)退回 localStorage。 */
+async function loadMotors() {
+  if (!bridgeReady()) return;
+  try {
+    const r = await bridge.get_registry();
+    if (r && r.ok && Array.isArray(r.data)) { motors = r.data.map(x => ({ ...x, dir: x.dir === -1 ? -1 : 1, E0: (typeof x.E0 === "number" && isFinite(x.E0)) ? x.E0 : null })); }
+  } catch (e) { /* 读文件失败则保留 localStorage 内容 */ }
+  renderMotors();
+}
+let selectedId = null;            // 选中电机编号
+let dev = { opened: false, mock: false, tx: 0, rx: 0, online: false };
+let lastRecv = {};                // 电机编号 → 最后收帧时间
+let logLines = [];
+let scanning = false;
+const pollMs = 500;
+
+function saveMotors() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(motors)); } catch (e) {}
+  if (bridgeReady()) {
+    bridge.save_registry(motors).then(() => {}, () => {});   // 静默写文件,失败不打断界面
+  }
+}
+function motorById(id) { return motors.find(m => m.id === id); }
+function selMotor() { return selectedId ? motorById(selectedId) : null; }
+
+/* 减速比换算:协议单位是电机转子侧(0.01°/0.01dps),输出轴 = 转子 ÷ 减速比。
+   界面输入/显示一律用输出轴单位,组帧前 ×减速比、解析后 ÷减速比。
+   方向映射:注册表每台电机可设 dir=-1(反转,如 X8-PRO 减速器输出与协议正方向相反),
+   角度/速度/力矩电流统一乘方向,保证各关节「正角度」旋转方向一致。 */
+function gearOf(m) { const g = parseFloat(m && m.gear); return g > 0 ? g : 1; }
+function dirOf(m) { return m && m.dir === -1 ? -1 : 1; }        // 1=正向(协议方向),-1=反转
+function out2rot(v, m) { return v * gearOf(m) * dirOf(m); }     // 输出轴角度/速度 → 协议侧(发帧用)
+function rot2out(v, m) { return v / gearOf(m) * dirOf(m); }     // 协议侧角度/速度 → 输出轴(显示用)
+function amp2rot(v, m) { return v * dirOf(m); }                 // 力矩电流(A):只映射方向,不乘减速比
+function spd2rot(v, m) { return Math.abs(out2rot(v, m)); }      // 无符号「上限速度」字段(0xA4/0xA6/0xA9 D2~3):只取幅度
+
+/* =====================================================================
+ * 四、日志
+ * ===================================================================== */
+function addLog(cls, text) {
+  const t = new Date();
+  const p = (x, n = 2) => String(x).padStart(n, "0");
+  const ts = `[${p(t.getHours())}:${p(t.getMinutes())}:${p(t.getSeconds())}.${p(t.getMilliseconds(), 3)}]`;
+  logLines.push(`<span class="${cls}">${ts} ${text}</span>`);
+  if (logLines.length > 500) logLines.splice(0, logLines.length - 500);
+  const box = document.getElementById("logbox");
+  const stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 10;
+  box.innerHTML = logLines.join("\n");
+  if (document.getElementById("chkScroll").checked && stick) box.scrollTop = box.scrollHeight;
+  // 2026-08-20:界面摘要同步写入文件日志(便于事后按帧+摘要分析,如 0x92 读数)
+  if (window.pywebview && window.pywebview.api && window.pywebview.api.log_line) {
+    try { window.pywebview.api.log_line(ts + " " + text.replace(/<[^>]*>/g, "")); } catch (e) {}
+  }
+}
+
+/* =====================================================================
+ * 五、发送与接收核心
+ * ===================================================================== */
+function hexToBytes(s) {
+  const b = s.replace(/0x/gi, "").split(/[\s,;]+/).filter(Boolean).map(h => parseInt(h, 16));
+  if (b.some(isNaN)) return null;
+  return pad8(b);
+}
+
+async function rawSend(canId, extd, hexStr, note, silent) {
+  if (!bridgeReady()) return false;
+  if (!dev.opened) { addLog("err", "设备未打开,请先打开设备"); return false; }
+  const r = await bridge.send_frame(canId, extd ? 1 : 0, hexStr);
+  if (!r.ok) { addLog("err", `发送失败:${r.msg}`); return false; }
+  if (!silent) addLog("tx", `→ 0x${canId.toString(16).toUpperCase().padStart(3, "0")}  ${hexStr}  ${note || ""}`);
+  return true;
+}
+
+function cmdHex(cmd, bytes) { return hx(pad8([cmd, 0, 0, 0].concat(bytes))); }
+
+/* 发往选中电机 */
+async function sendMotor(bytes, note) {
+  const m = selMotor();
+  if (!m) { addLog("err", "请先在左侧注册表选择电机"); return false; }
+  const hexStr = hx(pad8(bytes));
+  return await rawSend(0x140 + m.id, 0, hexStr, note ? `(${note})` : "");
+}
+
+/* 危险操作确认 */
+let modalResolve = null;
+function showConfirm(title, msg) {
+  document.getElementById("modalTitle").textContent = title;
+  document.getElementById("modalMsg").textContent = msg;
+  document.getElementById("modalMask").style.display = "flex";
+  return new Promise(res => { modalResolve = res; });
+}
+function modalClose(ok) {
+  document.getElementById("modalMask").style.display = "none";
+  if (modalResolve) { modalResolve(ok); modalResolve = null; }
+}
+
+/* =====================================================================
+ * 六、设备连接
+ * ===================================================================== */
+/* 设备类型号 → 中文型号描述(类型号是驱动内部编号,对人不友好,统一译为模块名) */
+const DEV_TYPE_NAME = {
+  41: "USBCANFD-200U(CANFD 新模块)",
+  76: "USBCANFD-200U(CANFD 新模块)",
+  21: "USBCAN-E-mini(CAN 模块)",
+  4: "USBCAN2(CAN 老模块)",
+  3: "USBCAN(CAN 老模块)",
+};
+function devTypeName(t, raw) {
+  return DEV_TYPE_NAME[t] || `未知模块(类型 ${t})${raw ? " — " + raw : ""}`;
+}
+async function uiListDevices() {
+  const sel = document.getElementById("selDev");
+  sel.innerHTML = "";
+  const r = await bridge.list_devices();
+  if (!r.ok || r.data.err) {
+    // 枚举失败(常见于老 VCI 体系模块):给出常用型号候选,可直接点「打开设备」自动回退适配
+    addLog("warn", "列设备失败:" + (r.data.err || r.msg || "未知") + "。已给出常用型号候选,直接点打开设备即可自动适配。");
+    const cands = [{ type: 41, name: "USBCANFD-200U(CANFD 新模块,推荐)" },
+                   { type: 76, name: "USBCANFD-200U(CANFD 新模块)" },
+                   { type: 4, name: "USBCAN2(CAN 老模块)" },
+                   { type: 3, name: "USBCAN(CAN 老模块)" }];
+    cands.forEach(d => {
+      const o = document.createElement("option");
+      o.value = d.type; o.textContent = d.name;
+      sel.appendChild(o);
+    });
+    return;
+  }
+  r.data.forEach(d => {
+    const o = document.createElement("option");
+    o.value = d.type; o.textContent = devTypeName(d.type, d.name);
+    sel.appendChild(o);
+  });
+  addLog("sys", `已刷新设备列表:${r.data.length} 项`);
+}
+async function uiOpenDevice() {
+  if (!bridgeReady()) return;
+  let r;
+  try {
+    r = await bridge.open_device(
+      parseInt(document.getElementById("selDev").value) || 41,
+      parseInt(document.getElementById("inpDevIdx").value) || 0,
+      parseInt(document.getElementById("inpCh").value) || 0,
+      parseInt(document.getElementById("selBaud").value) || 1000);
+  } catch (e) {
+    addLog("err", `打开设备时主程序异常:${e}`);
+    return;
+  }
+  addLog(r.ok ? "sys" : "err", r.msg);
+  if (r.ok) {
+    document.getElementById("btnOpen").disabled = true;
+    document.getElementById("btnClose").disabled = false;
+    document.getElementById("btnScan").disabled = false;
+    document.getElementById("connHint").textContent = "✅ 设备已打开,可开始调试(V3.x/V4.4 电机直接发闭环指令,无需使能)。";
+    // 2026-08-20:轮询默认自动开启(状态监控/曲线/收发显示应常驻,无需手动触发)
+    if (!pollOn) pollToggle(1);
+  }
+}
+async function uiCloseDevice() {
+  if (!bridgeReady()) return;
+  const r = await bridge.close_device();
+  addLog(r.ok ? "sys" : "err", r.msg);
+  document.getElementById("btnOpen").disabled = false;
+  document.getElementById("btnClose").disabled = true;
+  document.getElementById("btnScan").disabled = true;
+  document.getElementById("connHint").textContent = "设备已关闭。";
+}
+
+/* =====================================================================
+ * 七、电机注册表
+ * ===================================================================== */
+let editingId = null;   // 注册表编辑状态:非 null = 正在编辑该 ID 的电机
+
+function uiAddMotor() {
+  const name = document.getElementById("inpName").value.trim();
+  const id = parseInt(document.getElementById("inpId").value);
+  const proto = document.getElementById("inpProto").value;
+  const note = document.getElementById("inpNote").value.trim();
+  const gear = parseFloat(document.getElementById("inpGear").value) || 1;
+  const dir = parseInt(document.getElementById("inpDir").value) === -1 ? -1 : 1;
+  if (!name) { addLog("err", "请填写电机名称"); return; }
+  if (!id || id < 1 || id > 32) { addLog("err", "电机 ID 必须在 1~32 之间"); return; }
+  const other = motorById(id);
+  const dirTxt = dir === -1 ? "反转" : "正转";
+  if (editingId !== null) {
+    // 编辑模式:更新现有条目(名称/ID/协议/减速比/方向/备注均可改)
+    if (other && other.id !== editingId) { addLog("err", `ID ${id} 已被「${other.name}」占用,请换一个 ID`); return; }
+    const m = motorById(editingId);
+    if (m) Object.assign(m, { id, name, proto, note: note || "", gear: gear > 0 ? gear : 1, dir });
+    if (selectedId === editingId && id !== editingId) selectedId = id;
+    motors.sort((a, b) => a.id - b.id);
+    saveMotors(); renderMotors(); renderTabs(); uiCancelEdit(true);
+    addLog("sys", `已更新电机:${name}(ID ${id},${P[proto]},减速比 1:${m ? m.gear : gear},${dirTxt})`);
+    return;
+  }
+  if (other) { addLog("err", `ID ${id} 已存在,如需修改请点该行「编辑」`); return; }
+  const g = gear > 0 ? gear : 1;
+  motors.push({ id, name, proto, note: note || "", gear: g, dir });
+  motors.sort((a, b) => a.id - b.id);
+  saveMotors(); renderMotors();
+  addLog("sys", `已添加电机:${name}(ID ${id},${P[proto]},减速比 1:${g},${dirTxt})`);
+  if (proto === "V3" && g === 1) addLog("warn", `提示:${name} 为 V3(旧型号,如 X8-PRO/X6-S2),减速比填 1:1。若该电机带减速器(如 X8-PRO 1:6 填 6、X6-S2 填 36),请点该行「编辑」填实际值,否则角度/速度会差一个减速比。`);
+  if (proto === "V44" && g !== 1) addLog("sys", `提示:${name} 为 V4(新型号),固件通常已内置减速比(角度/速度均为输出轴单位),一般填 1:1;若实测角度偏小再填实际减速比。`);
+}
+function uiEditMotor(id) {
+  const m = motorById(id);
+  if (!m) return;
+  editingId = id;
+  document.getElementById("inpName").value = m.name;
+  document.getElementById("inpId").value = m.id;
+  document.getElementById("inpProto").value = m.proto;
+  document.getElementById("inpGear").value = m.gear;
+  document.getElementById("inpDir").value = m.dir === -1 ? "-1" : "1";
+  document.getElementById("inpNote").value = m.note || "";
+  document.getElementById("btnAddMotor").textContent = "💾 保存修改";
+  document.getElementById("btnCancelEdit").style.display = "";
+  renderMotors();
+  addLog("sys", `正在编辑电机:${m.name}(ID ${id})——修改表单后点「保存修改」,或点「取消」放弃`);
+}
+function uiCancelEdit(keepForm) {
+  editingId = null;
+  document.getElementById("btnAddMotor").textContent = "➕ 添加";
+  document.getElementById("btnCancelEdit").style.display = "none";
+  if (!keepForm) {
+    document.getElementById("inpName").value = "";
+    document.getElementById("inpId").value = "";
+    document.getElementById("inpGear").value = "";
+    document.getElementById("inpDir").value = "1";
+    document.getElementById("inpNote").value = "";
+  }
+  renderMotors();
+}
+function uiDelMotor(id) {
+  const m = motorById(id);
+  if (!m) return;
+  motors = motors.filter(x => x.id !== id);
+  if (selectedId === id) selectedId = null;
+  saveMotors(); renderMotors(); renderTabs();
+  addLog("sys", `已删除电机:${m.name}(ID ${id})`);
+}
+function uiSelMotor(id) {
+  selectedId = id;
+  renderMotors(); renderTabs();
+  addLog("sys", `已选中电机:${motorById(id).name}(ID ${id},${P[motorById(id).proto]})`);
+  // 2026-08-20:设备已打开且选中电机时,轮询自动保持开启(常驻,无需手动触发)
+  if (dev.opened && !pollOn) pollToggle(1);
+}
+
+async function uiScanMotors() {
+  if (scanning) return;
+  scanning = true;
+  const btn = document.getElementById("btnScan");
+  btn.textContent = "扫描中…"; btn.disabled = true;
+  addLog("sys", "开始扫描在线电机(逐 ID 1~32 全总线发 0x9A 探测,与注册表无关)…");
+  const target = []; for (let i = 1; i <= 32; i++) target.push(i);
+  const found = [];
+  let aborted = false;
+  for (const id of target) {
+    const m = motorById(id);
+    const before = lastRecv[id] || 0;
+    // silent:扫描探测帧与轮询帧同机制静默,日志栏只留结果(日志\ 子文件夹仍完整记录)
+    const ok = await rawSend(0x140 + id, 0, hx(pad8([0x9A])), `扫描 ID ${id}`, true);
+    if (!ok) {
+      // 发送失败 = 总线上无设备应答(电机未上电/CAN 线断开/波特率不符),继续扫下去也没有意义
+      aborted = true;
+      addLog("err", "扫描中止:发送失败——请检查电机 24V 是否上电、CAN 线是否接好、波特率是否一致");
+      break;
+    }
+    await new Promise(r => setTimeout(r, 100));
+    if ((lastRecv[id] || 0) > before) {
+      found.push(id);
+      addLog("sys", `✅ ID ${id} 在线${m ? "(" + m.name + ")" : ""}`);
+    }
+  }
+  if (!aborted) {
+    addLog("sys", `扫描完成:在线电机 ${found.length ? found.join("、") + " 号" : "无"}`);
+    const unreg = found.filter(id => !motorById(id));
+    if (unreg.length) {
+      addLog("warn", `检测到未注册的在线电机 ID ${unreg.join("、")}:请在注册表添加(旧款 X8/X6 选 V3(旧型号),新款选 V4(新型号))`);
+    }
+  }
+  scanning = false;
+  btn.textContent = "🔍 扫描在线电机"; btn.disabled = !dev.opened;
+}
+
+function renderMotors() {
+  const box = document.getElementById("motorList");
+  if (!motors.length) {
+    box.innerHTML = '<div class="hint">注册表为空:请添加电机(名称 / ID 1~32 / 协议版本 / 减速比)。</div>';
+    return;
+  }
+  box.innerHTML = `
+    <div class="motor-list-head motor-grid-cols">
+      <span>●</span><span>名称</span><span>ID</span><span>协议版本</span><span>减速比/方向</span><span>操作</span>
+    </div>`;
+  motors.forEach(m => {
+    const online = (lastRecv[m.id] || 0) > Date.now() - 2000;
+    const div = document.createElement("div");
+    div.className = "motor-item motor-grid-cols" + (m.id === selectedId ? " sel" : "") + (m.id === editingId ? " editing" : "");
+    div.onclick = () => uiSelMotor(m.id);
+    // 备注不占列:悬停名称可见(调试区标题也带备注),保证 380px 左栏内各列完整显示
+    div.innerHTML = `
+      <span class="dot ${online ? "on" : ""}"></span>
+      <span class="name" title="${esc(m.note ? m.name + "(" + m.note + ")" : m.name)}">${esc(m.name)}</span>
+      <span class="motor-c">${m.id}</span>
+      <span><span class="proto-badge proto-${m.proto === "V3" ? "v3" : "v44"}">${P[m.proto]}</span></span>
+      <span class="motor-c" title="${dirOf(m) === -1 ? "反转:正角度与协议方向相反,指令/读数已自动反向映射" : "正转(协议方向)"}">${gearOf(m) !== 1 ? "1:" + gearOf(m) : "1"}${dirOf(m) === -1 ? " ↺" : ""}</span>
+      <span class="motor-ops"><button class="small" onclick="event.stopPropagation();uiEditMotor(${m.id})">编辑</button><button class="small danger" onclick="event.stopPropagation();uiDelMotor(${m.id})">删除</button></span>`;
+    box.appendChild(div);
+  });
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+/* =====================================================================
+ * 八、调试区页签(按电机协议动态渲染)
+ * ===================================================================== */
+const TABS = ["状态监控", "启停与抱闸", "位置控制", "速度/力矩", "PID 参数", "编码器与零点", "系统"];
+let curTab = 0;
+
+function renderTabs() {
+  const m = selMotor();
+  const bar = document.getElementById("tabBar");
+  bar.innerHTML = "";
+  TABS.forEach((t, i) => {
+    const b = document.createElement("button");
+    b.className = "tab" + (i === curTab ? " act" : "");
+    b.textContent = t;
+    b.onclick = () => { curTab = i; renderTabs(); };
+    bar.appendChild(b);
+  });
+  document.getElementById("dbgTitle").textContent = m
+    ? `—— ${m.name}(编号 ${m.id},${P[m.proto]}${m.note ? "," + m.note : ""})`
+    : "——请先在左侧注册表选择一台电机";
+  document.getElementById("tabPanel").innerHTML = m ? TAB_RENDER[m.proto][curTab](m) : '<div class="hint">选择电机后显示调试面板。</div>';
+}
+
+/* ---------- 通用组件 ---------- */
+function btn(label, fn, cls = "") {
+  return `<button class="${cls}" onclick="${fn}">${label}</button>`;
+}
+function numInp(id, val, w = 110, step = "any") {
+  return `<input type="number" id="${id}" value="${val}" style="width:${w}px" step="${step}">`;
+}
+
+/* ---------- V3.x(RMD-X 系列)页签 ---------- */
+const TAB_RENDER_V3 = [
+  // 0 状态监控
+  () => `
+    <div class="panel-title">📊 实时状态(0x9A + 0x9C + 0x92 角度 轮询,${pollMs}ms)</div>
+    <div class="row">
+      <label>轮询</label>
+      <button class="small primary" onclick="pollToggle(1)">▶ 开始</button>
+      <button class="small" onclick="pollToggle(0)">⏹ 停止</button>
+      <label>间隔</label>
+      ${numInp("pollInt", pollMs, 80)} <span class="hint">ms</span>
+    </div>
+    <div class="kv" id="stKv"><div class="k">等待数据…</div></div>
+    <div class="errlist" id="stErr"></div>
+    <div class="hint" id="stMode"></div>`,
+  // 1 启停与抱闸
+  () => `
+    <div class="panel-title">⚡ 启停与抱闸(V3 旧型号)</div>
+    <div class="hint ok">✅ V3 旧型号电机<b>没有使能环节</b>:上电后直接发闭环指令(0xA1/A2/A4/A6/A8 等)即运行。</div>
+    <div class="row">
+      <button class="danger" onclick="sysCmd(0x80,'0x80 关闭')">0x80 关闭</button>
+      <button class="warn" onclick="sysCmd(0x81,'0x81 停止')">0x81 停止</button>
+    </div>
+    <div class="row">
+      <button onclick="sysCmd(0x77,'0x77 松抱闸')">0x77 松抱闸</button>
+      <button onclick="sysCmd(0x78,'0x78 锁抱闸')">0x78 锁抱闸</button>
+    </div>
+    <div class="hint">抱闸款电机在闭环运动前请先 0x77 释放抱闸。</div>`,
+  // 2 位置控制
+  () => `
+    <div class="panel-title">🎯 位置闭环控制</div>
+    <div class="hint">角度/速度均为<b>输出轴</b>单位(°、dps),发送时自动 ×减速比换算到转子侧(0.01°/LSB、1dps/LSB);力矩电流不换算。<b>旧款 X8/X6 的 0xA4 实为「单圈相位」固件闭环</b>(重复点击收敛同一位置):上位机发目标相位,固件内部闭环;唯一缺陷是「当前相位在跳变区」(输出轴 0°/60° 倍数附近)时方向判定不稳——上位机检测到跳变区会自动改用 <b>0xA8 增量离开</b>(方向定死,0xA8 实测稳定)。</div>
+    <div class="row">
+      <label>目标角度</label> ${numInp("pDeg", 0, 120)} <span class="hint">°(输出轴)</span>
+      <label>最大速度</label> ${numInp("pSpd", 60, 90)} <span class="hint">dps</span>
+      <button class="primary" onclick="v3Pos(0xA4)">0xA4 绝对位置</button>
+    </div>
+    <div class="row">
+      <label>增量角度</label> ${numInp("pDelta", 0, 120)} <span class="hint">°(相对,以当前位置为起点)</span>
+      <button class="primary" onclick="v3Pos(0xA8)">0xA8 增量位置</button>
+    </div>
+    <div class="panel-title" style="margin-top:12px">🔄 单圈位置(0xA6)</div>
+    <div class="row">
+      <label>方向</label>
+      <select id="a6dir"><option value="0">0 顺时针</option><option value="1">1 逆时针</option></select>
+      <label>单圈角度</label> ${numInp("a6Deg", 0, 100)} <span class="hint">°(输出轴)</span>
+      <label>最大速度</label> ${numInp("a6Spd", 60, 80)} <span class="hint">dps</span>
+      <button class="primary" onclick="v3Pos1()">0xA6 单圈位置</button>
+    </div>
+    <div class="hint warn">⚠️ 单圈位置按<b>转子单圈</b>工作,协议角度上限 0~359.99°(转子侧)。输出轴可发范围 = 0 ~ 359.99÷减速比(如 X8-PRO 1:6 即 0~60°),超出时电机行为异常,发送前会自动校验。</div>`,
+  // 3 速度/力矩
+  () => `
+    <div class="panel-title">🚀 速度 / 力矩闭环</div>
+    <div class="row">
+      <label>目标速度</label> ${numInp("vSpd", 0, 120)} <span class="hint">dps(输出轴)</span>
+      <button class="primary" onclick="v3Speed()">0xA2 速度闭环</button>
+    </div>
+    <div class="row">
+      <label>力矩电流</label> ${numInp("vIq", 0, 120)} <span class="hint">A(0.01A/LSB)</span>
+      <button class="primary" onclick="v3Torque()">0xA1 力矩闭环</button>
+    </div>
+    <div class="hint">V3.x 速度闭环(0xA2)无「最大力矩%」字段;力矩闭环(0xA1)单位 0.01A/LSB。</div>`,
+  // 4 PID
+  () => `
+    <div class="panel-title">📐 PID 六参数(uint8 0~255,一次读写)</div>
+    <div class="hint">0x30=读六参数(一次读全);0x31=写 RAM(断电丢失);0x32=写 ROM(永久保存)。<br>
+    ⚠️ 六参数(电流KP/KI、速度KP/KI、位置KP/KI)<b>一次读写全部</b>,不可只读写单个;先「读取」看当前值,再修改后写回。</div>
+    <div class="row">
+      <button class="small primary" onclick="v3PidRead()">📖 读取全部六参数(0x30)</button>
+    </div>
+    <div class="kv" id="pidKv"><div class="k">尚未读取:点击「读取全部六参数」。</div></div>
+    <div class="row">
+      <label>电流KP</label> ${numInp("v3pid0", 0, 70, 1)}
+      <label>电流KI</label> ${numInp("v3pid1", 0, 70, 1)}
+      <label>速度KP</label> ${numInp("v3pid2", 0, 70, 1)}
+    </div>
+    <div class="row">
+      <label>速度KI</label> ${numInp("v3pid3", 0, 70, 1)}
+      <label>位置KP</label> ${numInp("v3pid4", 0, 70, 1)}
+      <label>位置KI</label> ${numInp("v3pid5", 0, 70, 1)}
+    </div>
+    <div class="row">
+      <button class="primary" onclick="v3PidWrite(0)">0x31 写 RAM</button>
+      <button class="danger" onclick="v3PidWrite(1)">0x32 写 ROM</button>
+      <span class="hint">恢复参考:X8-PRO 出厂值 电流KP 100 / KI 100 · 速度KP 50 / KI 40 · 位置KP 50 / KI 50</span>
+    </div>
+    <div class="panel-title" style="margin-top:12px">⛔ 限幅说明</div>
+    <div class="hint">V3.x 协议<b>无角度限幅指令</b>。各限幅由闭环指令自带参数承担:<br>
+    ・角度限幅:无(位置运行无角度上下限,请谨慎设置目标值);<br>
+    ・速度限幅:位置/增量指令的「最大速度」参数(0xA4/0xA8/0xA6);<br>
+    ・电流限幅:力矩闭环「力矩电流」(0xA1,0.01A/LSB)。</div>`,
+  // 5 编码器与零点
+  () => `
+    <div class="panel-title">🔢 编码器与零点</div>
+    <div class="hint warn">⚠️ 实测:X8-PRO/X6-S2 固件<b>不响应 0x60/0x61/0x62/0x63/0x64</b>(发送后无回复属正常;旧款为<b>转子侧单圈绝对值编码器</b>,零点物理固定在编码器相位 0,不可改写)。请使用下方 ✅ 的 0x90/0x92/0x94 读取。</div>
+    <div class="row">
+      <button class="small primary" onclick="readCmd(0x90,'0x90 单圈编码器')">✅ 0x90 单圈编码器</button>
+      <button class="small primary" onclick="readCmd(0x92,'0x92 多圈角度')">✅ 0x92 多圈角度</button>
+      <button class="small primary" onclick="readCmd(0x94,'0x94 单圈角度')">✅ 0x94 单圈角度</button>
+    </div>
+    <div class="panel-title">📌 机械零点(E0)标定与归位</div>
+    <div class="hint">旧款为<b>转子侧单圈绝对值</b>:断电后相位(转子单圈 0~360°)保持精确,圈号丢失。机械零点用「凸点＋刻线」定位(结构线方案),标定一次后:位置显示以机械零点为 0°,上电可一键自动归位。</div>
+    <div class="row">
+      <button class="warn" onclick="v3RecordZero()">📌 记录机械零点(E0)</button>
+      <button class="primary" onclick="v3Home()">🏠 自动回机械零点</button>
+      ${numInp("homeSpd", 15, 90, 2)} <span class="hint">归位速度°/s(输出轴)</span>
+    </div>
+    <div class="hint">E0 标定步骤:① 电机失能/断电 → ② 人工把关节转到「凸点对齐」的机械零点 → ③ 点「记录机械零点」→ ④ 之后随时点「自动回机械零点」即回到该位置。E0 只存上位机注册表档案(0x63/0x64 对旧款无效,无法写入固件)。</div>
+    <div class="panel-title">🏃 加速度(0x42 读 / 0x43 写,索引 0~3)</div>
+    <div class="row">
+      <select id="accIdx">
+        <option value="0">0 位置加速度</option><option value="1">1 位置减速度</option>
+        <option value="2">2 速度加速度</option><option value="3">3 速度减速度</option>
+      </select>
+      ${numInp("accVal", 500, 110)} <span class="hint">dps/s(输出轴,100~60000)</span>
+      <button onclick="v3Acc(0x42,0)">读</button>
+      <button onclick="v3Acc(0x43,0)">写</button>
+    </div>`,
+  // 6 系统
+  () => `
+    <div class="panel-title">🆔 电机 ID(0x79,重要操作)</div>
+    <div class="row">
+      <button onclick="v3ReadId()">0x79 读当前 ID</button>
+      ${numInp("newId", 1, 80, 1)} <span class="hint">新 ID(1~32)</span>
+      <button class="danger" onclick="v3SetId()">0x79 修改 ID</button>
+    </div>
+    <div class="hint warn">⚠️ 0x79 命令发往固定地址 <b>0x300</b>(不是 0x140+ID),回复也从 0x300 回。修改前请确保总线上只有这一台电机通电(多台同时在线会一起被改)。修改保存 ROM,重启后生效,注册表中该电机的 ID 也需同步更新。<br>
+    ⚠️ <b>实验室旧款 X8/X6 的 ID 由外壳拨杆开关设置,0x79 对拨杆款无效(写了也不生效)</b>,ID 请以拨杆位置为准;0x79 仅适用于支持软件改 ID 的无拨杆型号。</div>
+    <div class="panel-title">⚙️ 运行模式(0x70)</div>
+    <div class="row">
+      <button onclick="readCmd(0x70,'0x70 读模式')">0x70 读模式</button>
+      <select id="modeSel">
+        <option value="1">电流环</option>
+        <option value="2">速度环</option>
+        <option value="3" selected>位置环</option>
+      </select>
+      <button class="warn" onclick="sysSend(BUILD_V3.MODE(parseInt(v('modeSel',3))),'0x70 写模式')">0x70 写模式</button>
+      <span class="hint">注:X8-PRO 固件实测不回复 0x70,无回显属正常。</span>
+    </div>
+    <div class="panel-title">📊 状态读取</div>
+    <div class="row">
+      <button onclick="readCmd(0x71,'0x71 读功率')">0x71 功率</button>
+      <button onclick="readCmd(0xB1,'0xB1 运行时间')">0xB1 运行时间</button>
+      <button onclick="readCmd(0xB2,'0xB2 固件日期')">0xB2 固件日期</button>
+      <button onclick="readCmd(0xB5,'0xB5 型号')">0xB5 型号</button>
+    </div>
+    <div class="panel-title">🛡️ 保护与复位</div>
+    <div class="row">
+      <label>保护时长</label> ${numInp("b3ms", 5000, 110)} <span class="hint">ms</span>
+      <button onclick="readCmd(0xB3,'0xB3 读保护')">0xB3 读</button>
+      <button onclick="sysSend(BUILD_V3.B3(v('b3ms',5000)),'0xB3 写保护')">0xB3 写</button>
+      <button class="danger" onclick="sysReset()">0x76 复位</button>
+    </div>
+    <div class="panel-title">📡 波特率(0xB4)</div>
+    <div class="row">
+      <button onclick="readCmd(0xB4,'0xB4 读波特率')">0xB4 读</button>
+      <select id="b4sel">
+        <option value="1" selected>索引 1:CAN 1M</option>
+        <option value="0">索引 0:CAN 500K</option>
+      </select>
+      <button class="danger" onclick="sysSend(BUILD_V3.B4(parseInt(v('b4sel',1))),'0xB4 写波特率')">0xB4 写</button>
+    </div>
+    <div class="hint warn">⚠️ 波特率修改后立即生效,总线所有设备与上位机必须同步调整,否则失联。</div>
+    <div class="panel-title">🧰 功能控制(0x20)</div>
+    <div class="row">
+      <select id="f20sel">
+        <option value="1">01 清除多圈值</option><option value="2">02 编号滤波器</option>
+      </select>
+      ${numInp("f20val", 0, 120)} <span class="hint">数值(索引2:0=失能 1=使能)</span>
+      <button class="danger" onclick="v3Func()">0x20 执行</button>
+    </div>
+    <div class="hint warn">⚠️ 索引 1 清除多圈值并保存,重启生效;索引 2 失能编号滤波器是多电机 0x280 广播的前提。</div>
+    <div class="panel-title">🔧 掉电位置恢复(旧款 X8/X6,单圈绝对值模型)</div>
+    <div class="hint warn">⚠️ <b>旧款 X8/X6(V3 固件)为转子侧单圈绝对值编码器</b>:断电后转子相位(单圈 0~360°)保持精确,多圈圈号丢失;0x20 索引 4「多圈掉电保存」在旧固件不存在,0x63/0x64 写 ROM 实测无效。恢复方案(推荐):先标定机械零点 E0(编码器与零点页),上电后点「🏠 自动回机械零点」——0xA4 发相位 E0,沿最短路径自动回位,圈号清零,之后位置完全绝对化。</div>
+    <div class="row">
+      <button class="warn" onclick="v3RecordZero()">📌 记录机械零点(E0)</button>
+      <button class="primary" onclick="v3Home()">🏠 自动回机械零点</button>
+      <button onclick="readCmd(0x92,'0x92 多圈角度')">0x92 读多圈角度</button>
+    </div>
+    <div class="hint">标准做法(每次上电):① 上电 → ② 确认机械零点已标定(未标定先转至凸点后点「记录机械零点」)→ ③ 点「🏠 自动回机械零点」(低速,回位后圈号清零)→ ④ 开始绝对位置控制(0xA4 相位 + 0xA8 补圈自动完成)。若不想自动回位,也可在已知圈数时直接发 0xA4/0xA8 指令,上位机会按当前相位自动拆分圈号。</div>`,
+];
+
+/* ---------- V4.4 页签 ---------- */
+const TAB_RENDER_V44 = [
+  // 0 状态监控
+  () => `
+    <div class="panel-title">📊 实时状态(0x9A + 0x9C 轮询,${pollMs}ms)</div>
+    <div class="row">
+      <label>轮询</label>
+      <button class="small primary" onclick="pollToggle(1)">▶ 开始</button>
+      <button class="small" onclick="pollToggle(0)">⏹ 停止</button>
+      <label>间隔</label>
+      ${numInp("pollInt", pollMs, 80)} <span class="hint">ms</span>
+    </div>
+    <div class="kv" id="stKv"><div class="k">等待数据…</div></div>
+    <div class="errlist" id="stErr"></div>
+    <div class="hint" id="stMode"></div>`,
+  // 1 启停与抱闸
+  () => `
+    <div class="panel-title">⚡ 启停与抱闸(V4 新型号)</div>
+    <div class="hint ok">✅ 新型号电机<b>没有使能环节</b>:上电后直接发闭环指令(0xA1/A2/A4/A8 等)即运行。</div>
+    <div class="row">
+      <button class="danger" onclick="sysCmd(0x80,'0x80 失能')">0x80 失能</button>
+      <button class="warn" onclick="sysCmd(0x81,'0x81 停止保持')">0x81 停止</button>
+    </div>
+    <div class="row">
+      <button onclick="sysCmd(0x77,'0x77 松抱闸')">0x77 松抱闸</button>
+      <button onclick="sysCmd(0x78,'0x78 锁抱闸')">0x78 锁抱闸</button>
+    </div>
+    <div class="hint">抱闸款电机在闭环运动前请先 0x77 释放抱闸。</div>`,
+  // 2 位置控制
+  () => `
+    <div class="panel-title">🎯 位置闭环控制</div>
+    <div class="hint">角度/速度均为<b>输出轴</b>单位(°、dps),发送时自动 ×减速比换算到转子侧(0.01°/LSB、1dps/LSB);力矩电流/%不换算。</div>
+    <div class="row">
+      <label>目标角度</label> ${numInp("pDeg", 0, 120)} <span class="hint">°</span>
+      <label>最大速度</label> ${numInp("pSpd", 60, 90)} <span class="hint">dps</span>
+      <button class="primary" onclick="v44Pos(0xA4)">0xA4 绝对位置</button>
+    </div>
+    <div class="row">
+      <label>增量角度</label> ${numInp("pDelta", 0, 120)} <span class="hint">°(相对)</span>
+      <button class="primary" onclick="v44PosInc()">0xA8 增量位置</button>
+    </div>
+    <div class="row">
+      <button onclick="v44Pos(0xA6)">0xA6 单圈位置</button>
+    </div>`,
+  // 3 速度/力矩
+  () => `
+    <div class="panel-title">🚀 速度 / 力矩闭环</div>
+    <div class="row">
+      <label>目标速度</label> ${numInp("vSpd", 0, 120)} <span class="hint">dps(输出轴)</span>
+      <label>最大力矩</label> ${numInp("vTqPct", 100, 80)} <span class="hint">%额定(电流限幅)</span>
+      <button class="primary" onclick="v44Speed()">0xA2 速度闭环</button>
+    </div>
+    <div class="row">
+      <label>力矩电流</label> ${numInp("vIq", 0, 120)} <span class="hint">A(0.01A/LSB)</span>
+      <button class="primary" onclick="v44Torque()">0xA1 力矩闭环</button>
+    </div>
+    <div class="panel-title" style="margin-top:12px">🎯 前馈位置控制</div>
+    <div class="row">
+      <label>位置</label> ${numInp("fPos", 0, 110)} <span class="hint">°(输出轴)</span>
+      <label>速度前馈</label> ${numInp("fSpd", 0, 90)} <span class="hint">dps(输出轴)</span>
+      <button class="primary" onclick="v44FFSpd()">0x72 速度前馈</button>
+    </div>
+    <div class="row">
+      <label>位置</label> ${numInp("fPos2", 0, 110)} <span class="hint">°(输出轴)</span>
+      <label>速度前馈</label> ${numInp("fSpd2", 0, 90)} <span class="hint">dps(输出轴)</span>
+      <label>力矩前馈</label> ${numInp("fTqPct", 0, 80)} <span class="hint">%额定</span>
+      <button class="primary" onclick="v44FFTq()">0x73 力矩前馈</button>
+    </div>
+    <div class="panel-title" style="margin-top:12px">🎯 力控位置(0xA9)</div>
+    <div class="row">
+      <label>位置</label> ${numInp("fpPos", 0, 110)} <span class="hint">°(输出轴)</span>
+      <label>速度</label> ${numInp("fpSpd", 60, 90)} <span class="hint">dps(输出轴)</span>
+      <label>力矩</label> ${numInp("fpTq", 50, 80)} <span class="hint">%额定</span>
+      <button class="primary" onclick="v44ForcePos()">0xA9 力控位置</button>
+    </div>`,
+  // 4 PID
+  () => `
+    <div class="panel-title">📐 PID 七参数(float32)</div>
+    <div class="hint">索引:01 电流环KP / 02 电流环KI / 04 速度环KP / 05 速度环KI / 07 位置环KP / 08 位置环KI / 09 位置环KD。
+    读:0x30;写 RAM:0x31;写 ROM:0x32(需失能,永久保存)。</div>
+    <div class="row">
+      <select id="pidIdx">
+        <option value="1">01 电流环KP</option><option value="2">02 电流环KI</option>
+        <option value="4">04 速度环KP</option><option value="5">05 速度环KI</option>
+        <option value="7">07 位置环KP</option><option value="8">08 位置环KI</option><option value="9">09 位置环KD</option>
+      </select>
+      ${numInp("pidVal", 0, 140)}
+      <button onclick="v44Pid(0x30,0)">读</button>
+      <button onclick="v44Pid(0x31,0)">写 RAM</button>
+      <button class="danger" onclick="v44Pid(0x32,1)">写 ROM</button>
+    </div>
+    <div class="row">
+      <button class="small primary" onclick="v44PidReadAll()">📖 读取全部七参数</button>
+    </div>
+    <div class="kv" id="pidKv"><div class="k">尚未读取。</div></div>
+    <div class="panel-title" style="margin-top:12px">⛔ 限幅设置(0x20)</div>
+    <div class="hint">角度限幅:0x20 索引 6(正向)/7(反向)位置运行最大角度,0.01°/LSB,保存 ROM <b>立即生效</b>;输入按<b>输出轴</b>,发送时自动 ×减速比。0x20 无读回指令(回复=回显)。<br>
+    速度限幅 = 闭环指令「最大速度」参数(位置页 0xA4 D2~3、速度页 0xA2);电流限幅 = 速度页 0xA2「最大力矩%」与 0xA1「力矩电流」。</div>
+    <div class="row">
+      <label>正向最大角</label> ${numInp("limPos", 360, 100)} <span class="hint">°(输出轴)</span>
+      <button class="danger" onclick="v44LimitWrite(6)">0x20 索引6 写</button>
+    </div>
+    <div class="row">
+      <label>反向最大角</label> ${numInp("limNeg", -360, 100)} <span class="hint">°(输出轴)</span>
+      <button class="danger" onclick="v44LimitWrite(7)">0x20 索引7 写</button>
+    </div>`,
+  // 5 编码器与零点
+  () => `
+    <div class="panel-title">🔢 编码器与零点</div>
+    <div class="row">
+      <button onclick="readCmd(0x60,'0x60 多圈位置')">0x60 多圈位置</button>
+      <button onclick="readCmd(0x61,'0x61 原始位置')">0x61 原始位置</button>
+      <button onclick="readCmd(0x62,'0x62 零偏')">0x62 零偏</button>
+      <button class="small primary" onclick="readCmd(0x92,'0x92 多圈角度')">0x92 多圈角度</button>
+      <button class="small" onclick="readCmd(0x94,'0x94 单圈角度')">0x94 单圈角度</button>
+    </div>
+    <div class="row">
+      <label>零偏值</label> ${numInp("zoVal", 0, 140)} <span class="hint">脉冲</span>
+      <button onclick="sendMotor(BUILD_V44.ZERO_OFF(v('zoVal',0)),'0x63 写零偏')">0x63 写零偏</button>
+      <button class="danger" onclick="v44SetZero()">0x64 当前位置设零</button>
+    </div>
+    <div class="hint warn">⚠️ 0x63 重启生效;0x64 按钮已自动完成「0x80 失能 → 0x64 写 ROM → 0x76 复位」三步(协议要求:失能时才能写 ROM,写后需复位才生效);勿高频写 ROM。</div>
+    <div class="panel-title">🏃 加速度(0x42 读 / 0x43 写,索引 0~3)</div>
+    <div class="row">
+      <select id="accIdx">
+        <option value="0">0 位置加速度</option><option value="1">1 位置减速度</option>
+        <option value="2">2 速度加速度</option><option value="3">3 速度减速度</option>
+      </select>
+      ${numInp("accVal", 500, 110)} <span class="hint">dps/s(输出轴,100~60000)</span>
+      <button onclick="v44Acc(0x42,0)">读</button>
+      <button onclick="v44Acc(0x43,0)">写</button>
+    </div>`,
+  // 6 系统
+  () => `
+    <div class="panel-title">⚙️ 系统功能</div>
+    <div class="row">
+      <button onclick="readCmd(0x70,'0x70 读模式')">0x70 读模式</button>
+      <select id="modeSel">
+        <option value="1">电流环模式</option>
+        <option value="2" selected>位置环模式</option>
+        <option value="3">速度环模式</option>
+      </select>
+      <button class="warn" onclick="sysSend(BUILD_V44.MODE(parseInt(v('modeSel',2))),'0x70 写模式')">0x70 写模式</button>
+    </div>
+    <div class="row">
+      <button onclick="readCmd(0xB1,'0xB1 运行时间')">0xB1 运行时间</button>
+      <button onclick="readCmd(0xB2,'0xB2 固件日期')">0xB2 固件日期</button>
+      <button onclick="readCmd(0xB5,'0xB5 型号')">0xB5 型号</button>
+    </div>
+    <div class="row">
+      <label>保护时长</label> ${numInp("b3ms", 5000, 110)} <span class="hint">ms</span>
+      <button onclick="readCmd(0xB3,'0xB3 读保护')">0xB3 读</button>
+      <button onclick="sysSend(BUILD_V44.B3(v('b3ms',5000)),'0xB3 写保护')">0xB3 写</button>
+      <button class="danger" onclick="sysReset()">0x76 复位</button>
+    </div>
+    <div class="panel-title">📡 波特率(0xB4)</div>
+    <div class="row">
+      <button onclick="readCmd(0xB4,'0xB4 读波特率')">0xB4 读</button>
+      <select id="b4sel">
+        <option value="0">索引 0:1M</option>
+        <option value="1">索引 1:500K</option>
+        <option value="2">索引 2:250K</option>
+      </select>
+      <button class="danger" onclick="sysSend(BUILD_V44.B4(parseInt(v('b4sel',0))),'0xB4 写波特率')">0xB4 写</button>
+    </div>
+    <div class="hint warn">⚠️ 波特率修改后立即生效,总线所有设备与上位机必须同步调整,否则失联。</div>
+    <div class="panel-title">🧰 功能控制(0x20)</div>
+    <div class="row">
+      <select id="f20sel">
+        <option value="1">01 清除多圈值</option><option value="2">02 编号滤波器</option>
+        <option value="3">03 错误主动上报</option><option value="4">04 多圈掉电保存</option>
+        <option value="5">05 设置电机编号</option><option value="6">06 正向最大角度</option>
+        <option value="7">07 反向最大角度</option><option value="8">08 错误自动恢复</option>
+      </select>
+      ${numInp("f20val", 0, 120)} <span class="hint">数值(0 或 1;索引 5 填新编号)</span>
+      <button class="danger" onclick="v44Func()">0x20 执行</button>
+    </div>
+    <div class="panel-title">🔋 掉电记忆(多圈掉电保存,0x20 索引 4)</div>
+    <div class="row">
+      <button class="primary" onclick="v44FuncQuick(4, 1)">🔋 开启掉电记忆</button>
+      <button onclick="v44FuncQuick(4, 0)">关闭(单圈模式)</button>
+    </div>
+    <div class="hint">开启后<b>掉电前固件自动把当前多圈值保存到 FLASH,重新上电恢复断电前的位置</b>;关闭 = 系统默认单圈模式(掉电丢多圈)。写入需在电机失能时进行,<b>重启生效</b>。</div>
+    <div class="hint warn">⚠️ 索引 5 修改编号保存 ROM、重启生效;索引 2 失能编号滤波器是多电机 0x280 广播的前提。</div>
+    <div class="panel-title">📡 主动回复(0xB6)</div>
+    <div class="row">
+      <button onclick="readCmd(0xB6,'0xB6 读主动回复')">0xB6 读</button>
+      <button onclick="sysSend(BUILD_V44.B6(true),'0xB6 开启主动回复')">开启</button>
+      <button onclick="sysSend(BUILD_V44.B6(false),'0xB6 关闭主动回复')">关闭</button>
+    </div>`,
+];
+const TAB_RENDER = { V3: TAB_RENDER_V3, V44: TAB_RENDER_V44 };
+
+/* =====================================================================
+ * 九、调试动作函数
+ * ===================================================================== */
+function v(id, dft) {
+  const el = document.getElementById(id);
+  return (el && el.value !== "") ? parseFloat(el.value) : dft;
+}
+async function sysCmd(cmd, note) { await sendMotor(pad8([cmd]), note); }
+async function readCmd(cmd, note) { await sendMotor(pad8([cmd]), note); }
+async function sysSend(bytes, note) { await sendMotor(bytes, note); }
+/* 0x76 系统复位:固件不回复;重启后数秒内不响应。此前按钮无实现(死按钮),2026-08-16 补上 */
+async function sysReset() {
+  const ok = await showConfirm("⚠️ 0x76 复位确认",
+    "即将发送 0x76 系统复位:电机重启系统(数秒内不响应,相当于重新上电,抱闸恢复默认锁定)。\n继续调试前需重新发闭环指令/松抱闸。是否继续?");
+  if (!ok) return;
+  await sendMotor(pad8([0x76]), "0x76 系统复位");
+}
+
+/* V3.x(RMD-X 系列) */
+async function v3Pos(cmd) {
+  const m = selMotor();
+  const gear = gearOf(m);
+  if (cmd === 0xA8) {
+    // 0xA8 增量位置:转子增量直发,指令积分推进 rotDeg(协议侧)
+    const deg = v("pDelta", 0);
+    v3TrackOf(m).rotDeg += out2rot(deg, m);
+    await sendMotor(BUILD_V3.POS(cmd, spd2rot(v("pSpd", 60), m), out2rot(deg, m)), "0xA8 增量位置闭环");
+    return;
+  }
+  /* 0xA4 绝对位置(2026-08-20 终版,全部实测收敛):
+     X8/X6-S2 固件 0xA4 = 「单圈相位」闭环——固件内部闭环到目标相位,重复点击
+     收敛同一位置(旧版实测的稳定行为,不依赖上位机积分状态);唯一缺陷是
+     「当前相位在跳变区」(相位 0±5°= 输出轴 0°/60° 倍数,编码器 65535↔0)时
+     最短路径判定方向不稳。方案:当前相位在跳变区 → 0xA8 整段增量离开
+     (方向由符号定死,0xA8 实测稳定);否则 0xA4 单帧发目标相位,固件闭环。
+     注意:0xA8 整段方案曾全面试用,因运动期间 0x9C 回读滞后污染 rotDeg,
+     快速连点时增量乱跳(效果更差),已废弃,仅保留跳变区场景。 */
+  const deg = v("pDeg", 0);
+  const t = v3TrackOf(m);
+  if (t.lastEnc === null) {
+    addLog("err", "绝对位置需要当前相位回读(0x9C/0x90),请稍候轮询到数据后重试");
+    return;
+  }
+  /* ⚠️ 终版定论(2026-08-20 手册 + 日志双重确认):
+     —— 0xA4 = 多圈绝对角目标(int32 0.01°/LSB,手册 2.21 原文),固件按
+       「目标−当前」差值直接执行(非最短路径;手册原文「direction determined
+       by the difference between target and current position」);
+     —— 固件内部维护多圈角(0x92 可读,手册 2.12),会被 0xA8 增量污染成 ±360N;
+     —— 因此:上位机必须用 0x92 把 rotDeg 校准到与固件角一致(轮询已加 0x92),
+       然后 0xA4 直接发「多圈目标角」R_t——固件差值 = R_t − 固件角 精确执行。
+       此前所有弯路(单帧/拆分/整段/跳变区规避)均源于未识别「0xA4=多圈直接差」;
+       「发 180° 不动」「发指令乱动」= 单圈折叠与固件角污染的直接后果;
+       跳变区问题随「直接差」语义消失(差值由上位机算死,固件无最短路径判定)。 */
+  const R_t = Math.round(((t.E0 === null ? 0 : t.E0) + out2rot(deg, m)) * 100) / 100;   // 目标多圈转子角
+  // ⚠️ 不做「最近邻折算」:180° 与 0° 同相位,折算会把 180° 目标折回当前圈(电机不动),
+  // 破坏用户输入的圈号语义。固件角(0x92)可能因 0xA8 增量漂移 ±360N——此时发目标
+  // 会带整圈转动(如标定后发 0° 转一圈回凸点,到位正确、视觉似「乱动」)——这是固件
+  // 多圈角漂移的固有行为,上位机无法清除(0x20 索引 1 清多圈需重启);重启电机后
+  // 固件角归零,指令不再带整圈。到位位置始终正确。
+  await sendMotor(BUILD_V3.POS(0xA4, spd2rot(v("pSpd", 60), m), R_t),
+    `0xA4 绝对位置(多圈目标 ${R_t.toFixed(1)}°,固件差值执行)`);
+  t.rotDeg = R_t;   // 0x92 轮询校准会把 rotDeg 拉回固件实际角(保持一致)
+}
+async function v3Pos1() {
+  const m = selMotor();
+  const g = gearOf(m);
+  const degOut = v("a6Deg", 0);
+  let rotDeg = out2rot(degOut, m);                // 转子侧角度(°,0.01°/LSB 上限 35999)
+  let dirSel = parseInt(document.getElementById("a6dir").value);
+  if (rotDeg < 0) { rotDeg = -rotDeg; dirSel = dirSel ? 0 : 1; }   // 反转电机:角度取正、运动方向翻转
+  if (degOut < 0 || rotDeg > 359.99) {
+    addLog("err", `单圈位置角度超范围:输出轴 0~${(359.99 / g).toFixed(2)}°(转子侧单圈上限 359.99°,当前减速比 1:${g},输入 ${degOut}°)。请减小角度或改用 0xA4 绝对位置。`);
+    return;
+  }
+  await sendMotor(BUILD_V3.POS1(dirSel, spd2rot(v("a6Spd", 60), m), rotDeg), "0xA6 单圈位置");
+}
+async function v3Speed() { const m = selMotor(); await sendMotor(BUILD_V3.SPEED(out2rot(v("vSpd", 0), m)), "0xA2 速度闭环"); }
+async function v3Torque() { const m = selMotor(); await sendMotor(BUILD_V3.TORQUE(amp2rot(v("vIq", 0), m)), "0xA1 力矩闭环"); }
+function v3PidVals() {
+  return [v("v3pid0", 0), v("v3pid1", 0), v("v3pid2", 0), v("v3pid3", 0), v("v3pid4", 0), v("v3pid5", 0)];
+}
+async function v3PidRead() {
+  await sendMotor(pad8([0x30]), "0x30 读PID六参数");
+  addLog("sys", "已发送 0x30 读取请求;回复帧到达后自动填入下方六个输入框");
+}
+async function v3PidWrite(rom) {
+  const vals = v3PidVals();
+  const desc = vals.map((x, i) => `${V3_PID_NAME[i]}=${x}`).join("、");
+  if (rom) {
+    const ok = await showConfirm("⚠️ 写 ROM 确认",
+      `即将把六参数永久写入电机 ROM(0x32):\n${desc}\n断电后依然生效,请确认数值无误。`);
+    if (!ok) return;
+  }
+  await sendMotor(BUILD_V3.PIDW(rom ? 0x32 : 0x31, vals), `0x${rom ? "32" : "31"} 写${rom ? " ROM" : " RAM"}(六参数一次写全)`);
+}
+/* V3 旧款机械零点标定:0x63/0x64 实测无效(写 ROM 被固件砍掉),零点物理固定在
+   编码器相位 0 不可改写 → 改为「记录机械零点相位 E0」:人工对凸点后点击,
+   读当前相位存注册表档案;显示角 = (相位−E0)/gear + 圈号×span,上电自动回
+   机械零点即发 0xA4 相位 E0(短边最短路径)。 */
+async function v3RecordZero() {
+  const m = selMotor();
+  if (!m) return;
+  const t = v3TrackOf(m);
+  if (t.lastEnc === null) {
+    addLog("err", "尚未收到相位回读(0x9C/0x90),请稍候再记录机械零点");
+    return;
+  }
+  const ok = await showConfirm("📌 记录机械零点(E0)确认",
+    `将把当前相位记录为该电机的机械零点相位 E0 = ${phaseOf(m, t.lastEnc).toFixed(1)}°(转子侧,脉冲 ${t.lastEnc})。\n`
+    + "操作方式(无需断电/手动推——减速器自锁推不动):用「位置控制」页的低速指令"
+    + "(绝对位置小角度步进 + 增量位置 ±1° 微调)把关节转到「凸点对齐」的机械零点位置,"
+    + "电机停在凸点上(闭环保持)后直接点本按钮。\n"
+    + "此操作只写上位机注册表档案(0x63/0x64 实测对旧款 X8/X6 无效,无法写入固件),之后:"
+    + "① 位置显示以机械零点为 0°;② 「自动回机械零点」可一键归位。是否继续?");
+  if (!ok) return;
+  // ⚠️ 2026-08-20 最终定论:E0 必须存「凸点的固件角(0x92 绝对转子角,含圈号)」,
+  // 不能存「相位」——固件角可能漂移 ±360N(0xA8 增量造成),存相位会导致发 0° 时
+  // 固件差值 = 360N,电机到位「同相位的另一圈」,物理偏 60°(用户实测「标定无效、
+  // 偏 60°、回到一开始零点」的根源)。存固件角后:发 0° 目标 = 凸点固件角,
+  // 固件差值 0 直接到位;重启后固件角归零,差值执行到凸点绝对角,依然正确。
+  m.E0 = Math.round(t.rotDeg * 100) / 100;   // 当前固件角(rotDeg 已被 0x92 校准)
+  m.E0Date = new Date().toISOString().slice(0, 10);
+  saveMotors();
+  t.E0 = m.E0;                             // 同步 v3Track 缓存(否则显示基准仍是旧值)
+  t.rotDeg = m.E0;                         // 机械零点 = 固件角 E0,显示 0°
+  t.lastEnc = Math.round((((m.E0 % 360) + 360) % 360) / 360 * 65536);   // 同步相位基准
+  addLog("sys", `✅ 机械零点 E0=${m.E0.toFixed(1)}°(固件角)已记录(${m.name},ID${m.id}),注册表档案已保存`);
+  renderMotors();
+}
+/* 上电自动归位:发 0xA4 目标相位 E0(原始相位,固件直达),回到机械零点,圈号清零 */
+async function v3Home() {
+  const m = selMotor();
+  if (!m) return;
+  const t = v3TrackOf(m);
+  if (t.E0 === null) {
+    addLog("err", "尚未标定机械零点(E0)。请先人工对凸点后点「记录机械零点」");
+    return;
+  }
+  if (t.lastEnc === null) {
+    addLog("err", "尚未收到相位回读,请稍候重试");
+    return;
+  }
+  const ok = await showConfirm("🏠 自动回机械零点确认",
+    `将发送 0xA4 目标相位 E0=${t.E0.toFixed(1)}°(低速 ${v("homeSpd", 15)}°/s),电机沿最短路径回到凸点机械零点,圈号清零。\n⚠️ 无抱闸电机请先确认路径上无障碍。是否继续?`);
+  if (!ok) return;
+  const E0q = Math.round(t.E0 * 100) / 100;               // 0.01° 取整防截断
+  await sendMotor(BUILD_V3.POS(0xA4, spd2rot(v("homeSpd", 15), m), E0q), "0xA4 回机械零点(相位 E0)");
+  t.rotDeg = E0q;                          // 到位后 = 原始相位 E0,显示 0°
+  addLog("sys", "🏠 已发送回机械零点指令(0xA4 相位 E0);到位后 0x9C 回读相位应为 E0");
+}
+async function v3Acc(cmd, rom) {
+  const idx = parseInt(document.getElementById("accIdx").value);
+  const m = selMotor();
+  await sendMotor(BUILD_V3.ACC(cmd, idx, out2rot(v("accVal", 500), m)), `0x${cmd.toString(16).toUpperCase()} 加速度${cmd === 0x43 ? " 写" : " 读"} 索引${idx}`);
+}
+/* 0x79 读/写 ID:命令必须发往固定地址 0x300(不是 0x140+ID),回复也从 0x300 回(V3.8 协议第 4 章) */
+async function v3ReadId() {
+  await rawSend(0x300, 0, hx(BUILD_V3.READID()), "0x79 读当前 ID(发至 0x300)");
+}
+async function v3SetId() {
+  const id = Math.round(v("newId", 1));
+  if (id < 1 || id > 32) { addLog("err", "新 ID 需在 1~32"); return; }
+  const ok = await showConfirm("⚠️ 修改电机 ID 确认",
+    `即将把本电机 ID 修改为 ${id}(0x79 写 ROM,发往 0x300),重启后生效。\n⚠️ 请确保总线上只有这一台电机通电,否则多台电机都会被修改!\n⚠️ 若电机为拨杆开关设置 ID 的旧款 X8/X6,0x79 无效,请直接用外壳拨杆设置。\n修改后注册表中该电机的 ID 也需同步更新。是否继续?`);
+  if (!ok) return;
+  await rawSend(0x300, 0, hx(BUILD_V3.SETID(id)), "0x79 修改 ID(发至 0x300)");
+}
+async function v3Func() {
+  const idx = parseInt(document.getElementById("f20sel").value);
+  const val = Math.round(v("f20val", 0));
+  if (idx === 1) {
+    const ok = await showConfirm("⚠️ 清除多圈值确认",
+      "即将通过 0x20 索引 1 清除电机多圈值并更新零点(保存 ROM,重启生效)。是否继续?");
+    if (!ok) return;
+  } else if (idx === 2) {
+    const ok = await showConfirm("⚠️ 编号滤波器确认",
+      `即将把编号滤波器设为 ${val}(0=失能 1=使能)。\n多电机 0x280 广播前必须失能。是否继续?`);
+    if (!ok) return;
+  }
+  await sendMotor(BUILD_V3.FUNC(idx, val), `0x20 索引${idx} = ${val}`);
+}
+
+/* V4.4 */
+async function v44Pos(cmd) { const m = selMotor(); await sendMotor(BUILD_V44.POS(cmd, spd2rot(v("pSpd", 60), m), out2rot(v("pDeg", 0), m)), `0x${cmd.toString(16).toUpperCase()} 位置闭环`); }
+async function v44PosInc() { const m = selMotor(); await sendMotor(BUILD_V44.POS(0xA8, spd2rot(v("pSpd", 60), m), out2rot(v("pDelta", 0), m)), "0xA8 增量位置"); }
+async function v44Speed() { const m = selMotor(); await sendMotor(BUILD_V44.SPEED(v("vTqPct", 100), out2rot(v("vSpd", 0), m)), "0xA2 速度闭环"); }
+async function v44Torque() { const m = selMotor(); await sendMotor(BUILD_V44.TORQUE(amp2rot(v("vIq", 0), m)), "0xA1 力矩闭环"); }
+async function v44FFSpd() { const m = selMotor(); await sendMotor(BUILD_V44.FF_SPD(out2rot(v("fSpd", 0), m), out2rot(v("fPos", 0), m)), "0x72 速度前馈位置"); }
+async function v44FFTq() { const m = selMotor(); await sendMotor(BUILD_V44.FF_TQ(amp2rot(v("fTqPct", 0), m), out2rot(v("fSpd2", 0), m), out2rot(v("fPos2", 0), m)), "0x73 力矩前馈位置"); }
+async function v44ForcePos() { const m = selMotor(); await sendMotor(BUILD_V44.FORCE_POS(amp2rot(v("fpTq", 50), m), spd2rot(v("fpSpd", 60), m), out2rot(v("fpPos", 0), m)), "0xA9 力控位置"); }
+async function v44Pid(cmd, rom) {
+  const idx = parseInt(document.getElementById("pidIdx").value);
+  const val = v("pidVal", 0);
+  if (rom) {
+    const ok = await showConfirm("⚠️ 写 ROM 确认",
+      `即将把 ${V44_PID_NAME[idx]} = ${val} 永久写入电机 ROM(0x32)。\n断电后依然生效,请确认数值无误。`);
+    if (!ok) return;
+  }
+  await sendMotor(BUILD_V44.PID(cmd, idx, val), `0x${cmd.toString(16).toUpperCase()} PID${rom ? " 写ROM" : (cmd === 0x31 ? " 写RAM" : " 读")} 索引${idx}`);
+}
+async function v44PidReadAll() {
+  for (const idx of [1, 2, 4, 5, 7, 8, 9]) {
+    await sendMotor(BUILD_V44.PID(0x30, idx, 0), `0x30 读索引${idx}`);
+    await new Promise(r => setTimeout(r, 300));
+  }
+  addLog("sys", "✅ 七参数读取完成;若个别参数未显示,说明该帧回复超时丢失,再点一次即可");
+}
+/* V4.4 0x64 当前位置设零:协议要求「电机失能时才能写 ROM」且「写后需 0x76 复位重启才生效」。
+   做成 0x80→0x64→0x76 三步自动流程——只发 0x64 的话,ROM 写不进去或新零点不加载,
+   表现就是「设零没生效、断电重启还是旧零点」 */
+async function v44SetZero() {
+  const ok = await showConfirm("⚠️ 0x64 当前位置设零(失能 + 写 ROM + 复位)",
+    "将依次自动执行三步:①0x80 失能——⚠️ 电机失去输出力,关节可能因重力下落,请先做好机械防护!②0x64 把当前多圈位置写入 ROM 作为新零点;③0x76 复位重启系统(数秒内不响应,相当于重新上电,抱闸恢复默认锁定)。\n请确认当前机械位置就是要设的零点。是否继续?");
+  if (!ok) return;
+  await sendMotor(pad8([0x80]), "0x80 失能(0x64 写 ROM 前置条件)");
+  await sendMotor(pad8([0x64]), "0x64 当前位置设零(写 ROM)");
+  await sendMotor(pad8([0x76]), "0x76 复位重启(使新零点生效)");
+  addLog("sys", "✅ 零点流程完成(0x80→0x64→0x76):多圈角从新零点起计,可读 0x92 验证;复位后电机相当于重新上电,继续调试前按需重新发闭环指令/松抱闸");
+}
+async function v44Acc(cmd, rom) {
+  const idx = parseInt(document.getElementById("accIdx").value);
+  const m = selMotor();
+  await sendMotor(BUILD_V44.ACC(cmd, idx, out2rot(v("accVal", 500), m)), `0x${cmd.toString(16).toUpperCase()} 加速度${cmd === 0x43 ? " 写" : " 读"} 索引${idx}`);
+}
+async function v44Func() {
+  const idx = parseInt(document.getElementById("f20sel").value);
+  const m = selMotor();
+  let val = Math.round(v("f20val", 0));
+  // 索引 6/7 为正/负最大角度限幅(0.01°),按输出轴换算
+  if (idx === 6 || idx === 7) val = Math.round(out2rot(val, m));
+  if (idx === 5) {
+    const ok = await showConfirm("⚠️ 修改电机编号确认",
+      `即将通过 0x20 索引 5 把本电机编号修改为 ${val}(保存 ROM,重启生效)。\n修改后注册表中该电机的编号也需同步更新。是否继续?`);
+    if (!ok) return;
+  } else if (idx === 2) {
+    const ok = await showConfirm("⚠️ 编号滤波器确认",
+      `即将把编号滤波器设为 ${val}(0=使能 1=失能)。\n多电机 0x280 广播前必须失能。是否继续?`);
+    if (!ok) return;
+  }
+  await sendMotor(BUILD_V44.FUNC(idx, val), `0x20 索引${idx} = ${val}`);
+}
+/* V4.4 掉电记忆一键开关:0x20 索引 4(0=关/单圈模式,1=开,重启生效,无需确认) */
+async function v44FuncQuick(idx, val) {
+  await sendMotor(BUILD_V44.FUNC(idx, val), `0x20 索引${idx}(多圈掉电保存)= ${val}`);
+  addLog("sys", val ? "🔋 已发送「开启掉电记忆」:掉电前固件将自动保存多圈值(重启生效)" : "已发送「关闭掉电记忆」:恢复单圈模式,掉电丢多圈(重启生效)");
+}
+async function v44LimitWrite(idx) {
+  const m = selMotor();
+  const inp = idx === 6 ? "limPos" : "limNeg";
+  const name = idx === 6 ? "正向最大角度" : "反向最大角度";
+  const outDeg = v(inp, 0);
+  const val = Math.round(out2rot(outDeg, m));
+  const ok = await showConfirm("⚠️ 角度限幅确认",
+    `即将把${name}限幅写为 ${outDeg}°(输出轴;转子侧 ${val}×0.01°),保存 ROM 立即生效。是否继续?`);
+  if (!ok) return;
+  await sendMotor(BUILD_V44.FUNC(idx, val), `0x20 索引${idx} ${name} = ${val}`);
+}
+
+/* =====================================================================
+ * 十、状态轮询与状态面板
+ * ===================================================================== */
+let pollOn = false;
+let pollTimer = null;
+function pollToggle(on) {
+  pollOn = on;
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  if (on) {
+    const iv = () => {
+      const m = selMotor();
+      if (m && dev.opened) { pollStep(m); }
+    };
+    iv();
+    pollTimer = setInterval(iv, Math.max(100, v("pollInt", pollMs)));
+  }
+}
+async function pollStep(m) {
+  const id = 0x140 + m.id;
+  // 轮询帧静默发送(不写收发日志);0x70 已从轮询中移除:X8-PRO 固件实测不回复,且运行模式无需高频查询
+  await rawSend(id, 0, hx(pad8([0x9A])), "轮询 0x9A", true);
+  await rawSend(id, 0, hx(pad8([0x9C])), "轮询 0x9C", true);
+  // V3 轮询 0x92(2026-08-20 终版定论):0x92 = 固件多圈绝对角(int32,0.01°/LSB,
+  // 手册 2.12 原文)。0xA4 目标 = 多圈角、固件按差值直接执行——上位机 rotDeg 必须
+  // 与固件角一致(0x92 校准),否则发 0xA4 时固件差值 = ±360N 空转。
+  if (m.proto === "V3") {
+    await rawSend(id, 0, hx(pad8([0x92])), "轮询 0x92", true);
+  }
+}
+let lastAngle = {};    // 电机编号 → 最近输出轴角度(°):双来源模型(相位+圈号)优先,0x92 校准兜底
+let lastAngleSrc = {}; // 该角度的来源:"0x92" | "0x9C"
+/* V3 旧款(X8-PRO/X6-S2)单圈绝对值编码器模型(用户实测 2026-08-16):
+   —— 转子侧「单圈绝对值」编码器:相位 0~360° 断电保持精确,无多圈计数(圈号丢失);
+   —— 0xA4 实为「转子单圈相位控制,最短路径」;0x63/0x64/0x60/61/62 实测全部无效
+      (写 ROM 类指令被固件砍掉,零点物理固定在编码器相位 0,不可改写);
+   —— 位置 = (相位 − E0)/gear + 圈号×span,span = 360/gear(输出轴单圈跨度:
+      X8 1:6 → 60°、X6-S2 1:36 → 10°);E0 = 机械零点(凸点)对应相位,由
+      「记录机械零点」按钮标定存注册表档案;圈号由上位机指令积分维护,
+      相位回读用「最近邻校准」修正(相位精度直接继承,圈号误差 ≤±1 圈,
+      云台场景转子 ≤6 圈,配合上电自动回机械零点即可完全恢复绝对角)。 */
+const v3Track = {};   // V3 电机编号 → { E0, rotDeg, lastEnc }
+let v3_92info = { rel: null, raw: null, fw: null, turn: null };   // 0x92 读数缓存(状态面板常驻显示)
+/* 状态面板的 0x92 常驻行(相对零点角度/原始 0x92/固件角/圈号)——0x92 帧不直接改面板
+   (会被同周期 0x9A/0x9C 帧覆盖),而是缓存后由 0x9A/0x9C 面板追加显示 */
+function v3_92row() {
+  return `
+    <div><div class="k">角度(相对零点)</div><div class="v">${v3_92info.rel.toFixed(2)} °</div></div>
+    <div><div class="k">0x92 原始</div><div class="v">${v3_92info.raw.toFixed(2)} °</div></div>
+    <div><div class="k">固件角(转子)</div><div class="v">${v3_92info.fw.toFixed(1)} °</div></div>
+    <div><div class="k">当前圈号</div><div class="v">${v3_92info.turn}</div></div>`;
+}
+function v3TrackOf(m) {
+  let t = v3Track[m.id];
+  if (!t) {
+    t = v3Track[m.id] = { E0: typeof m.E0 === "number" ? m.E0 : null, rotDeg: 0, lastEnc: null };
+  }
+  return t;
+}
+/* 16 位编码器脉冲 0~65535 → 转子相位 0~360°(原始坐标系) */
+function phaseOf(m, enc) {
+  return ((enc % 65536) + 65536) % 65536 / 65536 * 360;
+}
+/* ⚠️ 坐标系定论(2026-08-20):固件/编码器没有 dir——编码器只有原始相位 0~360°,
+   dir(反转)只是「输入→发送值」与「rotDeg→显示」两端的符号约定,不得进入内部
+   坐标系。内部 rotDeg 一律为「编码器原始转子角」(0 = 编码器相位 0,方向 = 机械
+   协议正);机械零点 E0 为原始相位;显示 = (rotDeg−E0)/gear×dir;发送相位 =
+   (E0 + out2rot(deg)) mod 360。此前把 dir 镜像(phaseProto)乘进 E0/rotDeg 导致
+   dir=−1 时目标错位与显示反号(用户 C 实验不稳定根源),已全部移除。 */
+/* 收到 0x9C/0x90 相位回读:最近邻校准 rotDeg(编码器原始转子角,°)。首次:
+   圈号未知,rotDeg=当前相位;之后 rotDeg 与相位回读保持一致(±180° 内),
+   相位精度(编码器绝对)直接继承。 */
+function v3OnPhase(m, enc) {
+  const t = v3TrackOf(m);
+  const Ep = phaseOf(m, enc);                // 编码器原始相位
+  if (t.lastEnc === null) {
+    t.rotDeg = Ep;
+  } else {
+    t.rotDeg = Math.round((t.rotDeg - Ep) / 360) * 360 + Ep;   // 最近邻校准
+  }
+  t.lastEnc = enc;
+  return t.rotDeg;
+}
+/* V3 输出轴当前角(双来源):显示 = (rotDeg − E0)/gear × dir,机械零点为 0°;
+   未标定 E0 时退化为以编码器相位 0 为基准(仍乘 dir,与输入语义一致)。 */
+function v3PosDual(m) {
+  const t = v3TrackOf(m);
+  if (t.lastEnc === null) return null;
+  return (t.rotDeg - (t.E0 === null ? 0 : t.E0)) / gearOf(m) * dirOf(m);
+}
+function updateStatusPanel(pr) {
+  const m = selMotor();
+  if (!m) return;
+  /* —— 曲线喂数据:与当前页签无关,任何页签下都持续更新 —— */
+  if (pr.cmd === 0x9C) {
+    if (m.proto === "V44") {
+      chart.feed({ pos: rot2out(pr.values.ang, m), spd: rot2out(pr.values.spd, m), iq: pr.values.iq * dirOf(m) });
+    } else {
+      // V3.x:单圈绝对值双来源模型——0x9C 编码器脉冲回读相位,最近邻校准 rotDeg
+      const rot = v3OnPhase(m, pr.values.enc);
+      const a = v3PosDual(m);               // 显示 = (rotDeg−E0)/gear×dir
+      if (lastAngleSrc[m.id] !== "0x92") { lastAngle[m.id] = a; lastAngleSrc[m.id] = "0x9C"; }
+      chart.feed({ pos: a, spd: rot2out(pr.values.spd, m), iq: pr.values.iq * dirOf(m) });
+    }
+  } else if (pr.cmd === 0x90 && m.proto === "V3") {
+    // 0x90 单圈编码器脉冲回读(手动读):同样喂给双来源模型,更新位置显示
+    v3OnPhase(m, pr.values.enc);
+    const a = v3PosDual(m);
+    lastAngle[m.id] = a;
+    lastAngleSrc[m.id] = "0x9C";
+  } else if (pr.cmd === 0x92 || pr.cmd === 0x94) {
+    // 0x92 = 固件多圈绝对角(手册 2.12 int32 0.01°/LSB,与 rotDeg 同基准)。
+    // rotDeg 直接校准到 0x92 值——0xA4 发送依赖「上位机角 ≈ 固件角」,
+    // 否则固件差值 = ±360N 空转(2026-08-20 日志实证:发目标=当前相位仍转一圈)。
+    const a = pr.values.pos;
+    if (a !== 0) {
+      v3TrackOf(m).rotDeg = a * gearOf(m) * dirOf(m);
+      // ⚠️ 显示统一用「相对机械零点」(v3PosDual):0x92 原始角度是相对编码器 0 的
+      // (标定后显示 −49° 等非 0 值,用户误判「标定无效」);相对零点后 0° 即显示 0。
+      const rel = v3PosDual(m);
+      lastAngle[m.id] = rel;
+      lastAngleSrc[m.id] = "0x92";
+      chart.feed({ pos: rel, spd: null, iq: null });
+      // 0x92 读数缓存:由 0x9A/0x9C 面板常驻显示(0x92 帧若直接改面板会被同周期
+      // 0x9A/0x9C 帧覆盖,用户看不到——2026-08-20 实测教训)
+      v3_92info = { rel, raw: a, fw: a * gearOf(m) * dirOf(m), turn: Math.round(v3TrackOf(m).rotDeg / 360) };
+    }
+    // a===0:忽略(不覆盖 0x9C 的角度)
+  } else if (pr.cmd === 0x9A) {
+    chart.feed({ iq: null, spd: null, pos: null });  // 状态帧只刷面板
+  }
+  /* —— 状态面板:仅状态监控页签存在时渲染 —— */
+  const kv = document.getElementById("stKv");
+  const errBox = document.getElementById("stErr");
+  if (!kv) return;
+  if (pr.cmd === 0x9A) {
+    // V3 旧固件不回传电压(实测恒 0,属正常);V4 若为 0 才是真异常
+    const voltTxt = m.proto === "V3"
+      ? (pr.values.volt === 0 ? "—(固件不回传,正常)" : pr.values.volt.toFixed(1) + " V")
+      : pr.values.volt.toFixed(1) + " V" + (pr.values.volt === 0 ? " ⚠️ 查 24V 动力电" : "");
+    kv.innerHTML = `
+      <div><div class="k">温度</div><div class="v">${pr.values.temp} ℃</div></div>
+      <div><div class="k">电压</div><div class="v">${voltTxt}</div></div>
+      <div><div class="k">抱闸</div><div class="v">${pr.values.brake}</div></div>
+      ${m.proto === "V44" ? `<div><div class="k">MOS 温度</div><div class="v">${pr.values.mosTemp} ℃</div></div>` : ""}
+      <div><div class="k">错误码</div><div class="v">0x${pr.values.err.toString(16).toUpperCase().padStart(4, "0")}</div></div>
+      ${v3_92info.rel !== null ? v3_92row() : ""}`;
+    const errs = (m.proto === "V3" ? ERR_V3 : ERR_V44).filter(e => (pr.values.err & e[0]) === e[0]);
+    errBox.innerHTML = errs.length
+      ? errs.map(e => `<span class="e">⚠ ${e[1]}</span>`).join("")
+      : '<span class="none">✅ 无错误</span>';
+    // 抱闸字段非 0/1:无抱闸型号的固件残留值,不作故障提示
+  } else if (pr.cmd === 0x9C) {
+    const g = gearOf(m);
+    const spdOut = rot2out(pr.values.spd, m);
+    // V3.x:0x9C 无角度字段(只有编码器脉冲),角度取 lastAngle(0x92 绝对优先、0x9C 累积兜底);V4:0x9C 自带角度
+    const angOut = m.proto === "V3" ? lastAngle[m.id] : rot2out(pr.values.ang, m);
+    const angCell = m.proto === "V3"
+      ? (angOut !== undefined && !isNaN(angOut) ? angOut.toFixed(2) + " °" : "等待数据…")
+      : angOut.toFixed(2) + " °";
+    const angSrc = m.proto === "V3" ? (lastAngleSrc[m.id] === "0x9C" ? "(0x9C 相对)" : "(0x92)") : "";
+    kv.innerHTML = `
+      <div><div class="k">温度</div><div class="v">${pr.values.temp} ℃</div></div>
+      <div><div class="k">力矩电流</div><div class="v">${(pr.values.iq * dirOf(m)).toFixed(2)} A</div></div>
+      <div><div class="k">速度${g !== 1 ? "(输出轴)" : ""}</div><div class="v">${spdOut.toFixed(g !== 1 ? 2 : 0)} dps</div></div>
+      <div><div class="k">角度${g !== 1 ? "(输出轴)" : ""}${angSrc}</div>
+           <div class="v">${angCell}</div></div>
+      ${v3_92info.rel !== null ? v3_92row() : ""}`;
+  } else if (pr.cmd === 0x70 && m.proto === "V3") {
+    const el = document.getElementById("stMode");
+    const modeTxt = V3_MODE[pr.values.mode];
+    if (el) el.innerHTML = modeTxt
+      ? `运行模式:${modeTxt}(0x${pr.values.mode.toString(16).toUpperCase()})`
+      : `运行模式:未知(0x${pr.values.mode.toString(16).toUpperCase()})`;
+  } else if (pr.cmd === 0x30 && m.proto === "V44") {
+    const pk = document.getElementById("pidKv");
+    if (pk) pk.innerHTML += `<div><div class="k">${V44_PID_NAME[pr.values.idx] || "索引" + pr.values.idx}</div><div class="v">${pr.values.val.toFixed(5)}</div></div>`;
+  } else if ((pr.cmd === 0x30 || pr.cmd === 0x31 || pr.cmd === 0x32) && m.proto === "V3") {
+    const pk = document.getElementById("pidKv");
+    if (pk && !pk.dataset.v3) { pk.dataset.v3 = "1"; pk.innerHTML = ""; }
+    if (pk) pk.innerHTML += pr.values.pid.map((x, i) => `<div><div class="k">${V3_PID_NAME[i]}</div><div class="v">${x}</div></div>`).join("");
+    pr.values.pid.forEach((x, i) => { const el = document.getElementById("v3pid" + i); if (el) el.value = x; });
+  }
+}
+
+/* =====================================================================
+ * 十一、帧分发
+ * ===================================================================== */
+function handleFrame(ev) {
+  const cid = ev.id;
+  let n = 0;
+  if (cid >= 0x140 && cid <= 0x15F) n = cid - 0x140;
+  else if (cid >= 0x240 && cid <= 0x25F) n = cid - 0x240;
+  else if (cid === 0x280) n = 0;
+  const bytes = ev.data.split(/[\s,]+/).filter(Boolean).map(h => parseInt(h, 16));
+  if (cid === 0x300) {
+    // 0x79 读/写 ID 的系统地址回复:归属当前选中电机(0x300 不带 ID 信息)
+    const m = selMotor();
+    const pr = m ? parseReply(m.proto, cid, bytes) : null;
+    addLog("rx", `← 0x300  ${ev.data}  ${m ? m.name + " " : ""}${pr ? pr.summary : "0x79 回复"}`);
+    return;
+  }
+  if (!n || bytes.length === 0) {
+    // 广播回复或异常:按当前选中电机协议尝试解析摘要
+    const m = selMotor();
+    if (m && cid === 0x280) {
+      const pr = parseReply(m.proto, cid, bytes);
+      addLog("rx", `← 0x${cid.toString(16).toUpperCase()}  ${ev.data}  广播回复${pr ? ":" + pr.summary : ""}`);
+    }
+    return;
+  }
+  lastRecv[n] = Date.now();
+  const m = motorById(n);
+  const proto = m ? m.proto : "V44";
+  const pr = parseReply(proto, cid, bytes);
+  const note = pr ? pr.summary : "";
+  const cmd = bytes[0];
+  // 状态轮询帧(0x9A/0x9C/0x92)不写收发日志,避免刷屏;面板与曲线照常更新
+  const silent = pollOn && m && m.id === selectedId && (cmd === 0x9A || cmd === 0x9C || cmd === 0x92);
+  if (!silent) addLog("rx", `← 0x${cid.toString(16).toUpperCase()}  ${ev.data}  ${m ? "#" + n + " " + m.name : "未注册 #" + n}  ${note}`);
+  if (m && m.id === selectedId) {
+    updateStatusPanel(pr);
+  }
+}
+
+/* =====================================================================
+ * 十二、主循环:拉取事件 + 徽章
+ * ===================================================================== */
+async function tick() {
+  try {
+    const pend = await bridge.get_pending();
+    if (pend) {
+      (pend.logs || []).forEach(l => {
+        addLog(l.level === "err" ? "err" : (l.level === "warn" ? "warn" : "sys"), l.msg);
+      });
+      (pend.frames || []).forEach(ev => {
+        if (ev.dir === "tx") {
+          // 状态轮询帧(0x9A/0x9C/0x92)同样不写收发日志:Python 侧回显了发送帧,这里必须再静默一次,否则轮询仍刷屏
+          const tcmd = parseInt((ev.data || "").split(/[\s,]+/)[0], 16);
+          const silentTx = pollOn && selectedId != null && ev.id === 0x140 + selectedId &&
+            (tcmd === 0x9A || tcmd === 0x9C || tcmd === 0x92);
+          if (!silentTx) {
+            addLog("tx", `→ 0x${ev.id.toString(16).toUpperCase().padStart(3, "0")}  ${ev.data}`);
+          }
+        } else {
+          handleFrame(ev);
+        }
+      });
+      if (pend.status) {
+        dev = pend.status;
+        const bd = document.getElementById("badgeDev");
+        const bb = document.getElementById("badgeBus");
+        const bm = document.getElementById("badgeMode");
+        if (dev.opened) {
+          bd.textContent = `设备:已打开(${devTypeName(dev.dev_type)})`; bd.className = "badge ok";
+          bb.textContent = `总线:${dev.online ? "在线" : "检查中"}`; bb.className = "badge " + (dev.online ? "ok" : "warn");
+        } else {
+          bd.textContent = "设备:未打开"; bd.className = "badge";
+          bb.textContent = "总线:—"; bb.className = "badge";
+        }
+        bm.textContent = `模式:${dev.mock ? "模拟" : "真机"} · 收 ${dev.rx} 发 ${dev.tx}`;
+        bm.className = "badge " + (dev.mock ? "warn" : "info");
+      }
+    }
+  } catch (e) { /* 桥接暂时不可用时静默 */ }
+}
+
+/* =====================================================================
+ * 十三、曲线(Canvas 手绘,环形缓冲;MATLAB 式:轴框/刻度/数字/悬停读数)
+ * ===================================================================== */
+const chart = {
+  buf: { pos: [], spd: [], iq: [] }, ts: [],
+  max: 300, paused: false, hover: -1,
+  feed(s) {
+    if (this.paused) return;
+    this.ts.push(Date.now());
+    if (this.ts.length > this.max) this.ts.shift();
+    for (const k of ["pos", "spd", "iq"]) {
+      const v = s[k];
+      if (v === null || v === undefined) { this.buf[k].push(NaN); }
+      else { this.buf[k].push(Number(v)); }
+      if (this.buf[k].length > this.max) this.buf[k].shift();
+    }
+    chartDraw();
+  },
+};
+function chartTogglePause() {
+  chart.paused = !chart.paused;
+  document.getElementById("btnPause").textContent = chart.paused ? "▶ 继续" : "⏸ 暂停";
+}
+function chartClear() {
+  chart.buf = { pos: [], spd: [], iq: [] };
+  chart.ts = []; chart.hover = -1;
+  chartDraw();
+}
+/* 通道定义:scale = 满量程(±);顺序即 Y 轴主轴优先级 */
+function chartChans() {
+  return [
+    { k: "pos", color: "#00d4ff", name: "位置", unit: "°", scale: 360, on: document.getElementById("chkPos").checked },
+    { k: "spd", color: "#4ade80", name: "速度", unit: "dps", scale: 200, on: document.getElementById("chkSpd").checked },
+    { k: "iq", color: "#f59e0b", name: "力矩电流", unit: "A", scale: 10, on: document.getElementById("chkIq").checked },
+  ];
+}
+/* 自动量程(Vofa+ 式):按当前窗口有效数据 ±15% 余量;无有效数据时用通道默认满量程。
+   最小量程地板 = 满量程 2%:数据波动小于地板时不放大到满屏(否则零位附近 ±0.5° 噪声
+   也会被拉到全屏来回穿零,看起来像「周期性置零/震荡」)。 */
+function chartAutoScale(arr, def) {
+  let mn = Infinity, mx = -Infinity;
+  for (const v of arr) {
+    if (isNaN(v)) continue;
+    if (v < mn) mn = v;
+    if (v > mx) mx = v;
+  }
+  const floor = def * 0.02;
+  if (mn === Infinity) { mn = -def; mx = def; }
+  else if (mn === mx) { mn -= floor / 2; mx += floor / 2; }
+  else {
+    const span = mx - mn;
+    if (span < floor) { const mid = (mn + mx) / 2; mn = mid - floor / 2; mx = mid + floor / 2; }
+    else { const pad = span * 0.15; mn -= pad; mx += pad; }
+  }
+  return [mn, mx];
+}
+/* 刻度数字精度随量程自适应:大范围取整,小范围加小数位 */
+function chartFmt(span) {
+  if (span >= 100) return v => String(Math.round(v));
+  if (span >= 10) return v => v.toFixed(1);
+  if (span >= 1) return v => v.toFixed(2);
+  return v => v.toFixed(3);
+}
+function chartDraw() {
+  const cv = document.getElementById("chart");
+  if (!cv) return;
+  const ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  const L = 58, R = 14, T = 10, B = 24;   // 左轴区 / 右缘 / 顶缘 / 底部时间轴区
+  const pw = W - L - R, ph = H - T - B;
+  const cx = L, cy = T + ph / 2;
+  ctx.clearRect(0, 0, W, H);
+
+  const chans = chartChans();
+  const main = chans.find(c => c.on) || null;   // 主轴:首个启用通道
+  const N = chart.ts.length;
+
+  /* —— 各通道自动量程(Vofa+ 式:量程随当前窗口数据自适应) —— */
+  const scales = {};
+  chans.forEach(c => {
+    const [lo, hi] = chartAutoScale(chart.buf[c.k], c.scale);
+    scales[c.k] = { lo, hi, mid: (lo + hi) / 2, half: (hi - lo) / 2 };
+  });
+  const Yof = (k, v) => cy - (v - scales[k].mid) / scales[k].half * (ph / 2 - 6);
+
+  /* —— 坐标轴与刻度(MATLAB 式) —— */
+  ctx.font = "11px Consolas, monospace";
+  ctx.lineWidth = 1;
+  if (main) {
+    // Y 轴刻度:5 档(自动量程下限 ~ 上限),带数字;主轴名称与当前量程写在左上角
+    const { lo, hi } = scales[main.k];
+    const fmt = chartFmt(hi - lo);
+    for (let i = 0; i <= 4; i++) {
+      const v = hi - (i / 4) * (hi - lo);
+      const y = T + (i / 4) * ph;
+      ctx.strokeStyle = i === 2 ? "#ffffff44" : "#0f346055";
+      ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(W - R, y); ctx.stroke();
+      ctx.fillStyle = main.color;
+      ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      ctx.fillText(fmt(v), L - 6, y);
+    }
+    ctx.fillStyle = main.color;
+    ctx.textAlign = "left"; ctx.textBaseline = "top";
+    ctx.fillText(`Y轴:${main.name}(${main.unit}) [${fmt(lo)}, ${fmt(hi)}]`, L + 2, T + 2);
+  }
+  // X 轴刻度:6 档,标注相对当前的时间(秒)
+  const now = Date.now();
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  for (let i = 0; i <= 5; i++) {
+    const x = L + (i / 5) * pw;
+    ctx.strokeStyle = "#0f346055";
+    ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, T + ph); ctx.stroke();
+    ctx.fillStyle = "#8aa0c0";
+    let label;
+    if (N < 2) label = "0s";
+    else {
+      const t = chart.ts[Math.min(N - 1, Math.round((i / 5) * (N - 1)))];
+      const dt = Math.round((t - now) / 100) / 10;
+      label = `${dt}s`;
+    }
+    ctx.fillText(label, x, T + ph + 4);
+  }
+  ctx.fillStyle = "#8aa0c0"; ctx.textAlign = "right"; ctx.textBaseline = "top";
+  ctx.fillText("X轴:时间", W - R, T + ph + 4);
+  // 轴框
+  ctx.strokeStyle = "#0f3460";
+  ctx.beginPath(); ctx.moveTo(L, T); ctx.lineTo(L, T + ph); ctx.lineTo(W - R, T + ph); ctx.stroke();
+
+  /* —— 曲线:无数据点停留在上一有效值(不归零) —— */
+  chans.forEach(c => {
+    if (!c.on) return;
+    const arr = chart.buf[c.k];
+    if (arr.length < 2) return;
+    ctx.strokeStyle = c.color; ctx.lineWidth = 1.6; ctx.beginPath();
+    let lastY = null, started = false;
+    for (let i = 0; i < arr.length; i++) {
+      const v = arr[i];
+      const x = cx + (i / Math.max(1, chart.max - 1)) * pw;
+      let y;
+      if (isNaN(v)) {
+        if (lastY === null) continue;   // 尚无有效数据:跳过,不画零线
+        y = lastY;                      // 无数据:停留在上一有效值
+      } else {
+        y = Yof(c.k, v);
+        lastY = y;
+      }
+      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  });
+
+  /* —— 悬停读数:十字线 + 数值面板 —— */
+  if (chart.hover >= 0 && N >= 2) {
+    const i = Math.max(0, Math.min(N - 1, chart.hover));
+    const x = cx + (i / Math.max(1, N - 1)) * pw;
+    ctx.strokeStyle = "#ffffff55"; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, T + ph); ctx.stroke();
+    ctx.setLineDash([]);
+    const t = chart.ts[i];
+    const dt = Math.round((t - now) / 100) / 10;
+    const lines = [`时间 ${dt}s`];
+    chans.forEach(c => {
+      const v = chart.buf[c.k][i];
+      lines.push(`${c.name} ${isNaN(v) ? "—" : (Number.isInteger(v) ? v : v.toFixed(2)) + " " + c.unit}`);
+    });
+    ctx.font = "12px Consolas, monospace";
+    const tw = Math.max(...lines.map(s => ctx.measureText(s).width)) + 16;
+    const th = lines.length * 17 + 8;
+    const bx = Math.min(W - R - tw - 4, Math.max(L + 4, x + 10));
+    const by = T + 6;
+    ctx.fillStyle = "#0a1120dd";
+    ctx.fillRect(bx, by, tw, th);
+    ctx.strokeStyle = "#0f3460"; ctx.strokeRect(bx, by, tw, th);
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    lines.forEach((s, li) => {
+      ctx.fillStyle = li === 0 ? "#e0e6f0" : (chans[li - 1] ? chans[li - 1].color : "#e0e6f0");
+      ctx.fillText(s, bx + 8, by + 12 + li * 17);
+    });
+  }
+}
+
+/* =====================================================================
+ * 十四、多电机同步(0x280)
+ * ===================================================================== */
+function uiSyncMode() {
+  const mode = document.getElementById("selSyncMode").value;
+  document.getElementById("syncPanelV44").style.display = (mode === "v3" || mode === "v44") ? "" : "none";
+  if (mode === "v3" || mode === "v44") uiSyncCmd();
+}
+function uiSyncCmd() {
+  const sel = document.getElementById("syncCmd");
+  sel.innerHTML = "";
+  const cmds = [["0x80", "0x80 失能"], ["0x81", "0x81 停止"], ["0x77", "0x77 松抱闸"], ["0x78", "0x78 锁抱闸"],
+    ["0xA4", "0xA4 绝对位置(最大速度+角度)"], ["0xA8", "0xA8 增量位置(最大速度+角度)"],
+    ["0xA2", "0xA2 速度(最大力矩%+速度)"], ["0xA1", "0xA1 力矩(电流A)"]];
+  cmds.forEach(([v2, t]) => {
+    const o = document.createElement("option"); o.value = v2; o.textContent = t;
+    sel.appendChild(o);
+  });
+  renderSyncParams();
+}
+function renderSyncParams() {
+  const mode = document.getElementById("selSyncMode").value;
+  const cmd = parseInt(document.getElementById("syncCmd").value);
+  const box = document.getElementById("syncCmdParams");
+  if (cmd === 0xA4 || cmd === 0xA8) {
+    box.innerHTML = `<div class="row"><label>最大速度</label>${numInp("scSpd", 60, 90)}<span class="hint">dps</span>
+      <label>角度</label>${numInp("scDeg", 0, 110)}<span class="hint">°</span></div>`;
+  } else if (cmd === 0xA2) {
+    if (mode === "v3") {
+      box.innerHTML = `<div class="row"><label>速度</label>${numInp("scSpd", 0, 90)}<span class="hint">dps(V3.x 无最大力矩字段)</span></div>`;
+    } else {
+      box.innerHTML = `<div class="row"><label>最大力矩</label>${numInp("scTqPct", 100, 80)}<span class="hint">%额定</span>
+        <label>速度</label>${numInp("scSpd", 0, 90)}<span class="hint">dps</span></div>`;
+    }
+  } else if (cmd === 0xA1) {
+    box.innerHTML = `<div class="row"><label>电流</label>${numInp("scIq", 0, 90)}<span class="hint">A(0.01A/LSB)</span></div>`;
+  } else {
+    box.innerHTML = `<div class="hint">该指令无参数,点击「广播发送」即向总线上所有${mode === "v3" ? "V3.x" : "新协议"}电机发送。</div>`;
+  }
+}
+async function uiSyncSendV44() {
+  const mode = document.getElementById("selSyncMode").value;
+  const B = mode === "v3" ? BUILD_V3 : BUILD_V44;
+  const cmd = parseInt(document.getElementById("syncCmd").value);
+  let bytes;
+  if (cmd === 0xA4 || cmd === 0xA8) bytes = B.POS(cmd, v("scSpd", 60), v("scDeg", 0));
+  else if (cmd === 0xA2) bytes = mode === "v3" ? B.SPEED(v("scSpd", 0)) : B.SPEED(v("scTqPct", 100), v("scSpd", 0));
+  else if (cmd === 0xA1) bytes = B.TORQUE(v("scIq", 0));
+  else bytes = pad8([cmd]);
+  await rawSend(0x280, 0, hx(bytes), `0x280 广播(${mode === "v3" ? "V3.x" : "V4.4"})`);
+}
+
+/* =====================================================================
+ * 十五、手动发帧
+ * ===================================================================== */
+async function uiRawSend() {
+  const dataHex = document.getElementById("rawData").value.trim();
+  const bytes = hexToBytes(dataHex);
+  if (!bytes) { addLog("err", "数据格式错误:请输入十六进制字节(空格分隔,不足 8 字节自动补 0)"); return; }
+  let cid;
+  if (document.getElementById("raw280").checked) {
+    cid = 0x280;
+  } else {
+    const id = parseInt(document.getElementById("rawId").value);
+    if (!id || id < 1 || id > 32) { addLog("err", "编号需在 1~32(或勾选广播 0x280)"); return; }
+    cid = 0x140 + id;
+  }
+  const extd = document.getElementById("rawExtd").checked;
+  await rawSend(cid, extd, hx(bytes));
+}
+async function uiQuick(hexStr, note) {
+  document.getElementById("rawData").value = hexStr;
+  const bytes = hexToBytes(hexStr);
+  let cid;
+  if (document.getElementById("raw280").checked) cid = 0x280;
+  else {
+    const id = parseInt(document.getElementById("rawId").value);
+    if (!id || id < 1 || id > 32) { addLog("err", "编号需在 1~32(或勾选广播 0x280)"); return; }
+    cid = 0x140 + id;
+  }
+  await rawSend(cid, document.getElementById("rawExtd").checked, hx(bytes), note);
+}
+
+/* =====================================================================
+ * 十六、日志清空(日志文件由主程序自动写入「日志\调试日志_时间戳.txt」,单次运行一个文件,界面只保留清空)
+ * ===================================================================== */
+function uiClearLog() { logLines = []; document.getElementById("logbox").innerHTML = ""; }
+
+/* =====================================================================
+ * 十七、初始化
+ * ===================================================================== */
+function init() {
+  renderMotors();
+  loadMotors();   // 桌面模式:从 exe 同目录 电机注册表.json 载入(异步,完成后重绘)
+  renderTabs();
+  uiListDevices();
+  addLog("sys", `脉塔电机调试上位机已启动(${JS_MOCK ? "浏览器演示模式,JS 模拟设备" : "桌面程序模式"});双协议:V3(旧型号 X8-PRO/X6-S2 等)/V4(新型号 X6-40/X2-7 等),均无使能环节,上电后直接发闭环指令`);
+  setInterval(tick, 50);
+  setInterval(renderMotors, 1000);  // 在线圆点刷新
+  setInterval(chartDraw, 250);      // 曲线重绘
+  // 曲线悬停读数
+  const cv = document.getElementById("chart");
+  cv.addEventListener("mousemove", (e) => {
+    const rect = cv.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (cv.width / rect.width) - 58;
+    chart.hover = chart.ts.length < 2 ? -1 : Math.round(x / Math.max(1, (cv.width - 58 - 14) / (chart.ts.length - 1)));
+    chartDraw();
+  });
+  cv.addEventListener("mouseleave", () => { chart.hover = -1; chartDraw(); });
+}
+/* 由 boot() 统一启动(等 pywebviewready),见文件开头桥接层 */
+</script>
+</body>
+</html>
