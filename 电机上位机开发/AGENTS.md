@@ -11,10 +11,10 @@
 - 双协议脉塔伺服电机 CAN 调试上位机:pywebview 桌面 exe + index.html 全中文界面。
 - **V3.91 协议**(RMD-X:X8-PRO、X6-S2,**旧款**)/ **V4.4 协议**(新款:X6-40、X2-7)。
 - 32 位 Python 3.12(`E:\Program Files\Python312-32`) + PyInstaller 6.22.0 onedir 打包,双击 exe 即用。
-- 根目录:`上位机\`
+- 根目录:`电机上位机开发\`
 
 ```
-上位机\
+电机上位机开发\
 ├── main.py            # pywebview 窗口 + js_api(Api 类)+ zlgcan ctypes 封装 + 接收线程
 ├── index.html         # 界面源码(单文件:HTML+CSS+JS,双协议知识库,全部逻辑在此)
 ├── 启动上位机.bat      # 开发模式(32 位 Python 直跑,可选模拟模式)

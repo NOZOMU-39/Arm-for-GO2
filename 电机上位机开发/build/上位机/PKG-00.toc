@@ -1,5 +1,5 @@
 ('E:\\Work and Study Project\\Program for Work and Study\\Arm for '
- 'GO2\\上位机\\build\\上位机\\上位机.pkg',
+ 'GO2\\电机上位机开发\\build\\上位机\\上位机.pkg',
  {'BINARY': True,
   'DATA': True,
   'EXECUTABLE': True,
@@ -12,27 +12,27 @@
  [('pyi-contents-directory _internal', '', 'OPTION'),
   ('PYZ-00.pyz',
    'E:\\Work and Study Project\\Program for Work and Study\\Arm for '
-   'GO2\\上位机\\build\\上位机\\PYZ-00.pyz',
+   'GO2\\电机上位机开发\\build\\上位机\\PYZ-00.pyz',
    'PYZ'),
   ('struct',
    'E:\\Work and Study Project\\Program for Work and Study\\Arm for '
-   'GO2\\上位机\\build\\上位机\\localpycs\\struct.pyc',
+   'GO2\\电机上位机开发\\build\\上位机\\localpycs\\struct.pyc',
    'PYMODULE'),
   ('pyimod01_archive',
    'E:\\Work and Study Project\\Program for Work and Study\\Arm for '
-   'GO2\\上位机\\build\\上位机\\localpycs\\pyimod01_archive.pyc',
+   'GO2\\电机上位机开发\\build\\上位机\\localpycs\\pyimod01_archive.pyc',
    'PYMODULE'),
   ('pyimod02_importers',
    'E:\\Work and Study Project\\Program for Work and Study\\Arm for '
-   'GO2\\上位机\\build\\上位机\\localpycs\\pyimod02_importers.pyc',
+   'GO2\\电机上位机开发\\build\\上位机\\localpycs\\pyimod02_importers.pyc',
    'PYMODULE'),
   ('pyimod03_ctypes',
    'E:\\Work and Study Project\\Program for Work and Study\\Arm for '
-   'GO2\\上位机\\build\\上位机\\localpycs\\pyimod03_ctypes.pyc',
+   'GO2\\电机上位机开发\\build\\上位机\\localpycs\\pyimod03_ctypes.pyc',
    'PYMODULE'),
   ('pyimod04_pywin32',
    'E:\\Work and Study Project\\Program for Work and Study\\Arm for '
-   'GO2\\上位机\\build\\上位机\\localpycs\\pyimod04_pywin32.pyc',
+   'GO2\\电机上位机开发\\build\\上位机\\localpycs\\pyimod04_pywin32.pyc',
    'PYMODULE'),
   ('pyiboot01_bootstrap',
    'E:\\Program '
@@ -56,7 +56,7 @@
    'PYSOURCE'),
   ('main',
    'E:\\Work and Study Project\\Program for Work and Study\\Arm for '
-   'GO2\\上位机\\main.py',
+   'GO2\\电机上位机开发\\main.py',
    'PYSOURCE')],
  'python312.dll',
  True,

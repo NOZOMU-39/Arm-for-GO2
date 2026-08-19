@@ -43,7 +43,7 @@
   ('_wmi.pyd', 'E:\\Program Files\\Python312-32\\DLLs\\_wmi.pyd', 'EXTENSION'),
   ('base_library.zip',
    'E:\\Work and Study Project\\Program for Work and Study\\Arm for '
-   'GO2\\上位机\\build\\上位机\\base_library.zip',
+   'GO2\\电机上位机开发\\build\\上位机\\base_library.zip',
    'DATA'),
   ('clr_loader\\ffi\\dlls\\amd64\\ClrLoader.dll',
    'E:\\Program '
@@ -55,7 +55,7 @@
    'BINARY'),
   ('index.html',
    'E:\\Work and Study Project\\Program for Work and Study\\Arm for '
-   'GO2\\上位机\\index.html',
+   'GO2\\电机上位机开发\\index.html',
    'DATA'),
   ('libcrypto-3.dll',
    'E:\\Program Files\\Python312-32\\DLLs\\libcrypto-3.dll',
@@ -533,5 +533,5 @@
    'BINARY'),
   ('上位机.exe',
    'E:\\Work and Study Project\\Program for Work and Study\\Arm for '
-   'GO2\\上位机\\build\\上位机\\上位机.exe',
+   'GO2\\电机上位机开发\\build\\上位机\\上位机.exe',
    'EXECUTABLE')],)

@@ -1,5 +1,5 @@
 ('E:\\Work and Study Project\\Program for Work and Study\\Arm for '
- 'GO2\\上位机\\build\\上位机\\PYZ-00.pyz',
+ 'GO2\\电机上位机开发\\build\\上位机\\PYZ-00.pyz',
  [('__future__',
    'E:\\Program Files\\Python312-32\\Lib\\__future__.py',
    'PYMODULE'),
