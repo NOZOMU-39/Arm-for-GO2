@@ -127,6 +127,8 @@ canvas.chart { background: var(--log); border: 1px solid var(--border); border-r
 /* ============ 弹窗 ============ */
 .modal-mask { position: fixed; inset: 0; background: #00000088; display: none;
   align-items: center; justify-content: center; z-index: 999; }
+/* 危险操作确认框永远在最上层(否则会被限幅报警弹窗盖住按不到) */
+#modalMask { z-index: 1001; }
 .modal { background: var(--card); border: 1px solid var(--accent); border-radius: 10px;
   padding: 20px 24px; max-width: 460px; }
 .modal h3 { color: var(--warn); margin-bottom: 10px; font-size: 15px; }
@@ -1780,13 +1782,13 @@ function limitZeroPanel(m) {
     </div>
     <div class="panel-title" data-nocollapse="1">⛔ 软件限幅(所有指令共用)</div>
     <div class="row">
-      <label>角度下限</label> ${numInp("limMinDeg", lim("limMinDeg"), 85)} <span class="hint">°</span>
-      <label>角度上限</label> ${numInp("limMaxDeg", lim("limMaxDeg"), 85)} <span class="hint">°</span>
-      <label>最大速度</label> ${numInp("limMaxSpd", lim("limMaxSpd"), 85)} <span class="hint">dps</span>
-      <label>最大电流</label> ${numInp("limMaxIq", lim("limMaxIq"), 85)} <span class="hint">A</span>
-      <button class="primary" onclick="saveLimits()">💾 保存限幅</button>
+      <label>角度下限</label> ${numInp("limMinDeg", lim("limMinDeg"), 85).replace(">", ' onchange="saveLimits()">')} <span class="hint">°</span>
+      <label>角度上限</label> ${numInp("limMaxDeg", lim("limMaxDeg"), 85).replace(">", ' onchange="saveLimits()">')} <span class="hint">°</span>
+      <label>最大速度</label> ${numInp("limMaxSpd", lim("limMaxSpd"), 85).replace(">", ' onchange="saveLimits()">')} <span class="hint">dps</span>
+      <label>最大电流</label> ${numInp("limMaxIq", lim("limMaxIq"), 85).replace(">", ' onchange="saveLimits()">')} <span class="hint">A</span>
+      <span class="hint" style="min-width:0">改动即自动保存到注册表(重启不丢);清空=取消该限幅</span>
     </div>
-    <div class="hint">软件限幅为<b>所有控制方式(位置/速度/力矩/前馈)的硬上限</b>:①发送前校验目标,超限拦截;②<b>运行中监控</b>——轮询反馈角度越过限幅立即报警并自动发送 0x81 停止(回到限幅内 2° 后解除);保存到电机注册表(重启不丢),显示值 = 注册表当前值,未设置则留空放行。</div>
+    <div class="hint">软件限幅为<b>所有控制方式(位置/速度/力矩/前馈)的硬上限</b>:①发送前校验目标,超限拦截;②<b>运行中监控</b>——轮询反馈的角度/速度/电流任一越过限幅立即报警并自动发送 0x81 停止(回到限幅内自动解除);显示值 = 注册表当前值,未设置则留空放行。</div>
     ${fw}`;
 }
 function saveLimits() {
@@ -1877,7 +1879,7 @@ async function limitModalHome() {
   const warn = zeroInLimit ? "" : "\n⚠️ 当前角度限幅不包含 0°:归零到位后仍会越限报警,建议归零后调整限幅。";
   const ok = await showConfirm("🏠 自动归零确认",
     `即将低速自动回到机械零点(0°);归位过程仍在限幅监控下(从限幅外向回走为恢复方向)。\n⚠️ 请确认归零路径上无障碍。${warn}是否继续?`);
-  if (!ok) { limitModalClose(); return; }
+  if (!ok) { return; }   // 取消:保持报警弹窗,用户可改选失能/关闭
   limitModalClose();
   if (m.proto === "V3") {
     await v3Home();   // v3Home 自带确认与低速归位(E0)
