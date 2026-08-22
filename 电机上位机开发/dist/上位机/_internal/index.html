@@ -1791,12 +1791,21 @@ function saveLimits() {
   if (typeof m.limMaxIq === "number" && m.limMaxIq <= 0) warns.push("最大电流需 > 0");
   if (warns.length) addLog("warn", "⛔ 限幅保存提醒:" + warns.join(";"));
   saveMotors();
+  delete limitAlarm[m.id];   // 用户主动调整限幅 = 授权,清除越限锁定
+  limitBannerHide();
   addLog("sys", `⛔ 限幅已保存(${m.name}):下限 ${m.limMinDeg ?? "—"}° 上限 ${m.limMaxDeg ?? "—"}° 最大速度 ${m.limMaxSpd ?? "—"} dps 最大电流 ${m.limMaxIq ?? "—"} A`);
   renderMotors();
 }
-/* 发送前限幅校验:vals = {deg, spd, iq}(输出轴单位);返回 true=放行,false=拦截 */
+/* 发送前限幅校验:vals = {deg, spd, iq}(输出轴单位);返回 true=放行,false=拦截。
+   ⚠️ 越限锁定中(limitAlarm 任一维度)拦截所有运动指令——防止手动绕过继续越限运行;
+   解锁途径:①角度自动回落限幅内(死区) ②用户主动调整限幅(saveLimits 清除锁定)。 */
 function limitBlock(m, vals) {
   if (!m) return true;
+  const st = limitAlarm[m.id];
+  if (st && (st.ang || st.spd || st.iq)) {
+    addLog("err", `⛔ 限幅越限锁定中(${m.name}):已拦截运动指令。请先使电机回到限幅内(角度回落后自动解锁),或调整限幅设置;安全指令(0x80/0x81/0x77/0x78 等)不受限。`);
+    return false;
+  }
   const d = k => (typeof m[k] === "number" && isFinite(m[k])) ? m[k] : null;
   const msgs = [];
   if (vals.deg !== undefined) {
