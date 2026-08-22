@@ -54,7 +54,7 @@ aside { display: flex; flex-direction: column; gap: 12px; }
 /* ============ 电机注册表 ============ */
 /* 表格化对齐:表头与每行共用同一套 grid 列宽,严格成列;总宽须小于左栏内容宽(380-24=356px) */
 .motor-grid-cols { display: grid;
-  grid-template-columns: 14px minmax(50px, 1fr) 32px 92px 44px 78px;
+  grid-template-columns: 14px minmax(50px, 1fr) 32px 68px 58px 88px;
   gap: 6px; align-items: center; }
 .motor-list-head { padding: 4px 10px; color: var(--dim); font-size: 11px; border-bottom: 1px solid var(--border); }
 .motor-list-head span { white-space: nowrap; }
@@ -248,19 +248,13 @@ canvas.chart { background: var(--log); border: 1px solid var(--border); border-r
 
   <!-- ============ 右栏 ============ -->
   <section class="right">
-    <!-- 调试区:三大块(控制参数 / 基础参数 / 协议自测独立) -->
+    <!-- 调试区:三大块(横向页签切换,未选中隐藏) -->
     <section class="card">
       <h2>🛠️ 电机调试区 <span id="dbgTitle" class="hint">——请先在左侧注册表选择一台电机</span></h2>
-      <div class="block-title" id="blockTitleCtrl">🎛️ 控制参数设置</div>
+      <div class="tabs" id="tabBar"></div>
       <div id="blockCtrl"><div class="hint">选择电机后显示控制参数面板。</div></div>
-      <div class="block">
-        <div class="block-title" id="blockTitleBase">⚙️ 电机基础参数设置</div>
-        <div id="blockBase"><div class="hint">选择电机后显示基础参数面板。</div></div>
-      </div>
-      <div class="block">
-        <div class="block-title" id="blockTitleProto">🧪 协议版本自测</div>
-        <div id="blockProto"><div class="hint">选择电机后可进行协议版本自测。</div></div>
-      </div>
+      <div id="blockBase" style="display:none"><div class="hint">选择电机后显示基础参数面板。</div></div>
+      <div id="blockProto" style="display:none"><div class="hint">选择电机后可进行协议版本自测。</div></div>
     </section>
 
     <!-- 实时显示(块2,整块可开关) -->
@@ -1118,15 +1112,29 @@ function guardPendingPanel(m, panel) {
   });
 }
 
-/* 三大块渲染:块1 控制参数(限幅与零点置顶) / 块3 基础参数 / 协议自测独立;块2 实时显示常驻 */
+/* 三大块横向页签:控制参数设置 / 电机基础参数设置 / 协议版本自测;未选中隐藏;块2 实时显示常驻 */
+const TABS = ["控制参数设置", "电机基础参数设置", "协议版本自测"];
+let curTab = 0;
 function renderBlocks() {
   const m = selMotor();
   document.getElementById("dbgTitle").textContent = m
     ? `—— ${m.name}(编号 ${m.id},${P[m.proto]}${m.note ? "," + m.note : ""})`
     : "——请先在左侧注册表选择一台电机";
+  const bar = document.getElementById("tabBar");
+  bar.innerHTML = "";
+  TABS.forEach((t, i) => {
+    const b = document.createElement("button");
+    b.className = "tab" + (i === curTab ? " act" : "");
+    b.textContent = t;
+    b.onclick = () => { curTab = i; renderBlocks(); };
+    bar.appendChild(b);
+  });
   const ctrl = document.getElementById("blockCtrl");
   const base = document.getElementById("blockBase");
   const proto = document.getElementById("blockProto");
+  ctrl.style.display = curTab === 0 ? "" : "none";
+  base.style.display = curTab === 1 ? "" : "none";
+  proto.style.display = curTab === 2 ? "" : "none";
   const monitor = document.getElementById("monitorPanel");
   if (!m) {
     ctrl.innerHTML = '<div class="hint">选择电机后显示控制参数面板。</div>';
@@ -1140,8 +1148,8 @@ function renderBlocks() {
   base.innerHTML = R.base(m);
   proto.innerHTML = TAB_RENDER_PROTO(m);
   monitor.innerHTML = R.monitor(m);
-  guardPendingPanel(m, ctrl);
-  guardPendingPanel(m, base);
+  if (curTab === 0) guardPendingPanel(m, ctrl);
+  else if (curTab === 1) guardPendingPanel(m, base);
 }
 /* 块2「实时显示」整块收起/展开(可开关的图像与日志窗口) */
 let monitorCollapsed = false;

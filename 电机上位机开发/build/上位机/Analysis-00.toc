@@ -1491,13 +1491,13 @@
   ('clr',
    'E:\\Program Files\\Python312-32\\Lib\\site-packages\\clr.py',
    'PYMODULE'),
-  ('_py_abc', 'E:\\Program Files\\Python312-32\\Lib\\_py_abc.py', 'PYMODULE'),
   ('stringprep',
    'E:\\Program Files\\Python312-32\\Lib\\stringprep.py',
    'PYMODULE'),
   ('tracemalloc',
    'E:\\Program Files\\Python312-32\\Lib\\tracemalloc.py',
    'PYMODULE'),
+  ('_py_abc', 'E:\\Program Files\\Python312-32\\Lib\\_py_abc.py', 'PYMODULE'),
   ('webview',
    'E:\\Program Files\\Python312-32\\Lib\\site-packages\\webview\\__init__.py',
    'PYMODULE'),
@@ -1532,289 +1532,105 @@
   ('json.scanner',
    'E:\\Program Files\\Python312-32\\Lib\\json\\scanner.py',
    'PYMODULE')],
- [('pythonnet\\runtime\\System.IO.Compression.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.IO.Compression.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Net.Primitives.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.Primitives.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Threading.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Threading.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Xml.XmlSerializer.dll',
+ [('pythonnet\\runtime\\System.Xml.XmlSerializer.dll',
    'E:\\Program '
    'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Xml.XmlSerializer.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Reflection.Primitives.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Reflection.Primitives.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Security.Cryptography.Encoding.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Security.Cryptography.Encoding.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Runtime.CompilerServices.VisualC.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Runtime.CompilerServices.VisualC.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Linq.Parallel.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Linq.Parallel.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Text.Encoding.Extensions.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Text.Encoding.Extensions.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Net.WebHeaderCollection.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.WebHeaderCollection.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Linq.Expressions.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Linq.Expressions.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Security.Cryptography.Primitives.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Security.Cryptography.Primitives.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Runtime.InteropServices.RuntimeInformation.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Runtime.InteropServices.RuntimeInformation.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Diagnostics.Contracts.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Diagnostics.Contracts.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Diagnostics.TextWriterTraceListener.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Diagnostics.TextWriterTraceListener.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Net.Sockets.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.Sockets.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Threading.ThreadPool.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Threading.ThreadPool.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Security.Principal.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Security.Principal.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Linq.Queryable.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Linq.Queryable.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Security.Cryptography.X509Certificates.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Security.Cryptography.X509Certificates.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.ValueTuple.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.ValueTuple.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Xml.XPath.XDocument.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Xml.XPath.XDocument.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.IO.MemoryMappedFiles.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.IO.MemoryMappedFiles.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Threading.Tasks.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Threading.Tasks.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\Microsoft.Win32.Primitives.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\Microsoft.Win32.Primitives.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Resources.ResourceManager.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Resources.ResourceManager.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Collections.Concurrent.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Collections.Concurrent.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.AppContext.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.AppContext.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Collections.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Collections.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.ComponentModel.EventBasedAsync.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.ComponentModel.EventBasedAsync.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Net.Http.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.Http.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Net.Requests.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.Requests.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Globalization.Extensions.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Globalization.Extensions.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Xml.XPath.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Xml.XPath.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Security.Cryptography.Algorithms.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Security.Cryptography.Algorithms.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Diagnostics.Debug.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Diagnostics.Debug.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Globalization.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Globalization.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Runtime.Serialization.Primitives.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Runtime.Serialization.Primitives.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.IO.FileSystem.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.IO.FileSystem.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Runtime.Numerics.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Runtime.Numerics.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Collections.NonGeneric.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Collections.NonGeneric.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Text.Encoding.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Text.Encoding.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Globalization.Calendars.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Globalization.Calendars.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Threading.Timer.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Threading.Timer.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\Python.Runtime.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\Python.Runtime.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Threading.Overlapped.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Threading.Overlapped.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Reflection.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Reflection.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.IO.FileSystem.Primitives.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.IO.FileSystem.Primitives.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Console.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Console.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Diagnostics.Process.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Diagnostics.Process.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.IO.FileSystem.Watcher.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.IO.FileSystem.Watcher.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Security.Cryptography.Csp.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Security.Cryptography.Csp.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.IO.Pipes.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.IO.Pipes.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Text.RegularExpressions.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Text.RegularExpressions.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Net.NetworkInformation.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.NetworkInformation.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.ObjectModel.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.ObjectModel.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Runtime.Serialization.Xml.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Runtime.Serialization.Xml.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Drawing.Primitives.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Drawing.Primitives.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Runtime.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Runtime.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Dynamic.Runtime.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Dynamic.Runtime.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.IO.UnmanagedMemoryStream.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.IO.UnmanagedMemoryStream.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Net.NameResolution.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.NameResolution.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.ComponentModel.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.ComponentModel.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Diagnostics.StackTrace.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Diagnostics.StackTrace.dll',
    'BINARY'),
   ('pythonnet\\runtime\\System.Net.Security.dll',
    'E:\\Program '
    'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.Security.dll',
    'BINARY'),
-  ('pythonnet\\runtime\\System.IO.FileSystem.DriveInfo.dll',
+  ('pythonnet\\runtime\\System.Reflection.Primitives.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.IO.FileSystem.DriveInfo.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Reflection.Primitives.dll',
    'BINARY'),
-  ('pythonnet\\runtime\\System.Threading.Thread.dll',
+  ('pythonnet\\runtime\\System.IO.FileSystem.Watcher.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Threading.Thread.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.IO.FileSystem.Watcher.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Threading.Timer.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Threading.Timer.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Console.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Console.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Reflection.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Reflection.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Linq.Parallel.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Linq.Parallel.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Resources.Writer.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Resources.Writer.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Collections.NonGeneric.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Collections.NonGeneric.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Linq.Queryable.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Linq.Queryable.dll',
    'BINARY'),
   ('pythonnet\\runtime\\System.Runtime.Serialization.Formatters.dll',
    'E:\\Program '
    'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Runtime.Serialization.Formatters.dll',
    'BINARY'),
-  ('pythonnet\\runtime\\System.Diagnostics.TraceSource.dll',
+  ('pythonnet\\runtime\\System.ValueTuple.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Diagnostics.TraceSource.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.ValueTuple.dll',
    'BINARY'),
-  ('pythonnet\\runtime\\System.ComponentModel.Primitives.dll',
+  ('pythonnet\\runtime\\System.IO.FileSystem.Primitives.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.ComponentModel.Primitives.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.IO.FileSystem.Primitives.dll',
    'BINARY'),
-  ('pythonnet\\runtime\\System.Xml.XmlDocument.dll',
+  ('pythonnet\\runtime\\System.Collections.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Xml.XmlDocument.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Collections.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Globalization.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Globalization.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Net.WebHeaderCollection.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.WebHeaderCollection.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.IO.Compression.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.IO.Compression.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Runtime.Numerics.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Runtime.Numerics.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Text.RegularExpressions.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Text.RegularExpressions.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.IO.MemoryMappedFiles.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.IO.MemoryMappedFiles.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Text.Encoding.Extensions.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Text.Encoding.Extensions.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Net.WebSockets.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.WebSockets.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Linq.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Linq.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.IO.Pipes.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.IO.Pipes.dll',
    'BINARY'),
   ('pythonnet\\runtime\\System.Data.Common.dll',
    'E:\\Program '
@@ -1824,77 +1640,213 @@
    'E:\\Program '
    'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.IO.IsolatedStorage.dll',
    'BINARY'),
-  ('pythonnet\\runtime\\System.Linq.dll',
+  ('pythonnet\\runtime\\System.Net.NetworkInformation.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Linq.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.NetworkInformation.dll',
    'BINARY'),
-  ('pythonnet\\runtime\\System.Runtime.Extensions.dll',
+  ('pythonnet\\runtime\\System.Collections.Concurrent.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Runtime.Extensions.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Net.WebSockets.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.WebSockets.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Runtime.Serialization.Json.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Runtime.Serialization.Json.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Diagnostics.Tools.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Diagnostics.Tools.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.IO.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.IO.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Collections.Concurrent.dll',
    'BINARY'),
   ('pythonnet\\runtime\\System.Runtime.Handles.dll',
    'E:\\Program '
    'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Runtime.Handles.dll',
    'BINARY'),
-  ('pythonnet\\runtime\\System.Xml.ReaderWriter.dll',
+  ('pythonnet\\runtime\\System.Diagnostics.TraceSource.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Xml.ReaderWriter.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Diagnostics.TraceSource.dll',
    'BINARY'),
-  ('pythonnet\\runtime\\System.Security.Claims.dll',
+  ('pythonnet\\runtime\\System.Threading.ThreadPool.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Security.Claims.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Threading.ThreadPool.dll',
    'BINARY'),
-  ('pythonnet\\runtime\\System.Net.Ping.dll',
+  ('pythonnet\\runtime\\System.Linq.Expressions.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.Ping.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Linq.Expressions.dll',
    'BINARY'),
-  ('pythonnet\\runtime\\System.Net.WebSockets.Client.dll',
+  ('pythonnet\\runtime\\System.Runtime.InteropServices.RuntimeInformation.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.WebSockets.Client.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Runtime.InteropServices.RuntimeInformation.dll',
    'BINARY'),
-  ('pythonnet\\runtime\\System.Diagnostics.FileVersionInfo.dll',
+  ('pythonnet\\runtime\\System.Threading.Tasks.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Diagnostics.FileVersionInfo.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Threading.Tasks.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Net.Sockets.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.Sockets.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.ObjectModel.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.ObjectModel.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Text.Encoding.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Text.Encoding.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Runtime.Serialization.Primitives.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Runtime.Serialization.Primitives.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.ComponentModel.EventBasedAsync.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.ComponentModel.EventBasedAsync.dll',
    'BINARY'),
   ('pythonnet\\runtime\\System.ComponentModel.TypeConverter.dll',
    'E:\\Program '
    'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.ComponentModel.TypeConverter.dll',
    'BINARY'),
+  ('pythonnet\\runtime\\System.Drawing.Primitives.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Drawing.Primitives.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Xml.XmlDocument.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Xml.XmlDocument.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Security.Claims.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Security.Claims.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Runtime.Serialization.Json.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Runtime.Serialization.Json.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.IO.FileSystem.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.IO.FileSystem.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Globalization.Calendars.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Globalization.Calendars.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Xml.XDocument.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Xml.XDocument.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Runtime.Extensions.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Runtime.Extensions.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.ComponentModel.Primitives.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.ComponentModel.Primitives.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Diagnostics.TextWriterTraceListener.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Diagnostics.TextWriterTraceListener.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Runtime.InteropServices.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Runtime.InteropServices.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Diagnostics.Tools.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Diagnostics.Tools.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Net.Http.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.Http.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Xml.ReaderWriter.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Xml.ReaderWriter.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Diagnostics.Tracing.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Diagnostics.Tracing.dll',
+   'BINARY'),
   ('pythonnet\\runtime\\System.Threading.Tasks.Parallel.dll',
    'E:\\Program '
    'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Threading.Tasks.Parallel.dll',
-   'BINARY'),
-  ('pythonnet\\runtime\\System.Reflection.Extensions.dll',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Reflection.Extensions.dll',
    'BINARY'),
   ('pythonnet\\runtime\\netstandard.dll',
    'E:\\Program '
    'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\netstandard.dll',
    'BINARY'),
-  ('pythonnet\\runtime\\System.Security.SecureString.dll',
+  ('pythonnet\\runtime\\System.Threading.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Security.SecureString.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Threading.dll',
    'BINARY'),
-  ('pythonnet\\runtime\\System.Diagnostics.Tracing.dll',
+  ('pythonnet\\runtime\\System.Diagnostics.Contracts.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Diagnostics.Tracing.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Diagnostics.Contracts.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Xml.XPath.XDocument.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Xml.XPath.XDocument.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Globalization.Extensions.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Globalization.Extensions.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Xml.XPath.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Xml.XPath.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Resources.ResourceManager.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Resources.ResourceManager.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Collections.Specialized.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Collections.Specialized.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Runtime.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Runtime.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Security.Cryptography.Primitives.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Security.Cryptography.Primitives.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Runtime.Serialization.Xml.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Runtime.Serialization.Xml.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Reflection.Extensions.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Reflection.Extensions.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Security.Cryptography.Csp.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Security.Cryptography.Csp.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Net.NameResolution.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.NameResolution.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Threading.Thread.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Threading.Thread.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\Microsoft.Win32.Primitives.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\Microsoft.Win32.Primitives.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Dynamic.Runtime.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Dynamic.Runtime.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Security.Cryptography.Encoding.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Security.Cryptography.Encoding.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.IO.FileSystem.DriveInfo.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.IO.FileSystem.DriveInfo.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.ComponentModel.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.ComponentModel.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Diagnostics.FileVersionInfo.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Diagnostics.FileVersionInfo.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Diagnostics.Debug.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Diagnostics.Debug.dll',
    'BINARY'),
   ('pythonnet\\runtime\\System.Resources.Reader.dll',
    'E:\\Program '
@@ -1904,29 +1856,73 @@
    'E:\\Program '
    'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.IO.Compression.ZipFile.dll',
    'BINARY'),
-  ('pythonnet\\runtime\\System.Runtime.InteropServices.dll',
+  ('pythonnet\\runtime\\System.Security.Cryptography.Algorithms.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Runtime.InteropServices.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Security.Cryptography.Algorithms.dll',
    'BINARY'),
-  ('pythonnet\\runtime\\System.Resources.Writer.dll',
+  ('pythonnet\\runtime\\System.Runtime.CompilerServices.VisualC.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Resources.Writer.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Runtime.CompilerServices.VisualC.dll',
    'BINARY'),
-  ('pythonnet\\runtime\\System.Xml.XDocument.dll',
+  ('pythonnet\\runtime\\System.Net.Primitives.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Xml.XDocument.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.Primitives.dll',
    'BINARY'),
-  ('pythonnet\\runtime\\System.Collections.Specialized.dll',
+  ('pythonnet\\runtime\\System.AppContext.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Collections.Specialized.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.AppContext.dll',
    'BINARY'),
-  ('webview\\lib\\Microsoft.Web.WebView2.Core.dll',
+  ('pythonnet\\runtime\\Python.Runtime.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\webview\\lib\\Microsoft.Web.WebView2.Core.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\Python.Runtime.dll',
    'BINARY'),
-  ('webview\\lib\\runtimes\\win-x86\\native\\WebView2Loader.dll',
+  ('pythonnet\\runtime\\System.IO.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\webview\\lib\\runtimes\\win-x86\\native\\WebView2Loader.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.IO.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Threading.Overlapped.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Threading.Overlapped.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Net.Ping.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.Ping.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Security.Principal.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Security.Principal.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Diagnostics.StackTrace.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Diagnostics.StackTrace.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Security.SecureString.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Security.SecureString.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Net.WebSockets.Client.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.WebSockets.Client.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Security.Cryptography.X509Certificates.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Security.Cryptography.X509Certificates.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.IO.UnmanagedMemoryStream.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.IO.UnmanagedMemoryStream.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Net.Requests.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Net.Requests.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\System.Diagnostics.Process.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\System.Diagnostics.Process.dll',
+   'BINARY'),
+  ('webview\\lib\\Microsoft.Web.WebView2.WinForms.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\webview\\lib\\Microsoft.Web.WebView2.WinForms.dll',
    'BINARY'),
   ('webview\\lib\\runtimes\\win-x64\\native\\WebView2Loader.dll',
    'E:\\Program '
@@ -1936,26 +1932,30 @@
    'E:\\Program '
    'Files\\Python312-32\\Lib\\site-packages\\webview\\lib\\runtimes\\win-arm64\\native\\WebView2Loader.dll',
    'BINARY'),
-  ('webview\\lib\\Microsoft.Web.WebView2.WinForms.dll',
+  ('webview\\lib\\runtimes\\win-x86\\native\\WebView2Loader.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\webview\\lib\\Microsoft.Web.WebView2.WinForms.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\webview\\lib\\runtimes\\win-x86\\native\\WebView2Loader.dll',
    'BINARY'),
-  ('webview\\lib\\WebBrowserInterop.x64.dll',
+  ('webview\\lib\\Microsoft.Web.WebView2.Core.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\webview\\lib\\WebBrowserInterop.x64.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\webview\\lib\\Microsoft.Web.WebView2.Core.dll',
    'BINARY'),
   ('webview\\lib\\WebBrowserInterop.x86.dll',
    'E:\\Program '
    'Files\\Python312-32\\Lib\\site-packages\\webview\\lib\\WebBrowserInterop.x86.dll',
    'BINARY'),
-  ('python312.dll', 'E:\\Program Files\\Python312-32\\python312.dll', 'BINARY'),
-  ('clr_loader\\ffi\\dlls\\amd64\\ClrLoader.dll',
+  ('webview\\lib\\WebBrowserInterop.x64.dll',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\clr_loader\\ffi\\dlls\\amd64\\ClrLoader.dll',
+   'Files\\Python312-32\\Lib\\site-packages\\webview\\lib\\WebBrowserInterop.x64.dll',
    'BINARY'),
+  ('python312.dll', 'E:\\Program Files\\Python312-32\\python312.dll', 'BINARY'),
   ('clr_loader\\ffi\\dlls\\x86\\ClrLoader.dll',
    'E:\\Program '
    'Files\\Python312-32\\Lib\\site-packages\\clr_loader\\ffi\\dlls\\x86\\ClrLoader.dll',
+   'BINARY'),
+  ('clr_loader\\ffi\\dlls\\amd64\\ClrLoader.dll',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\clr_loader\\ffi\\dlls\\amd64\\ClrLoader.dll',
    'BINARY'),
   ('_decimal.pyd',
    'E:\\Program Files\\Python312-32\\DLLs\\_decimal.pyd',
@@ -2037,10 +2037,6 @@
    'E:\\Program '
    'Files\\Python312-32\\Lib\\site-packages\\pythonnet\\runtime\\Python.Runtime.deps.json',
    'DATA'),
-  ('webview\\js\\lib\\dom_json.js',
-   'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\webview\\js\\lib\\dom_json.js',
-   'DATA'),
   ('webview\\lib\\pywebview-android.jar',
    'E:\\Program '
    'Files\\Python312-32\\Lib\\site-packages\\webview\\lib\\pywebview-android.jar',
@@ -2048,82 +2044,47 @@
   ('webview\\js\\state.js',
    'E:\\Program Files\\Python312-32\\Lib\\site-packages\\webview\\js\\state.js',
    'DATA'),
-  ('webview\\js\\finish.js',
+  ('webview\\js\\lib\\dom_json.js',
    'E:\\Program '
-   'Files\\Python312-32\\Lib\\site-packages\\webview\\js\\finish.js',
-   'DATA'),
-  ('webview\\js\\api.js',
-   'E:\\Program Files\\Python312-32\\Lib\\site-packages\\webview\\js\\api.js',
+   'Files\\Python312-32\\Lib\\site-packages\\webview\\js\\lib\\dom_json.js',
    'DATA'),
   ('webview\\js\\lib\\polyfill.js',
    'E:\\Program '
    'Files\\Python312-32\\Lib\\site-packages\\webview\\js\\lib\\polyfill.js',
    'DATA'),
+  ('webview\\js\\api.js',
+   'E:\\Program Files\\Python312-32\\Lib\\site-packages\\webview\\js\\api.js',
+   'DATA'),
   ('webview\\js\\customize.js',
    'E:\\Program '
    'Files\\Python312-32\\Lib\\site-packages\\webview\\js\\customize.js',
+   'DATA'),
+  ('webview\\js\\finish.js',
+   'E:\\Program '
+   'Files\\Python312-32\\Lib\\site-packages\\webview\\js\\finish.js',
    'DATA'),
   ('base_library.zip',
    'E:\\Work and Study Project\\Program for Work and Study\\Arm for '
    'GO2\\电机上位机开发\\build\\上位机\\base_library.zip',
    'DATA')],
- [('re._parser',
-   'E:\\Program Files\\Python312-32\\Lib\\re\\_parser.py',
-   'PYMODULE'),
-  ('re._constants',
-   'E:\\Program Files\\Python312-32\\Lib\\re\\_constants.py',
-   'PYMODULE'),
-  ('re._compiler',
-   'E:\\Program Files\\Python312-32\\Lib\\re\\_compiler.py',
-   'PYMODULE'),
-  ('re._casefix',
-   'E:\\Program Files\\Python312-32\\Lib\\re\\_casefix.py',
-   'PYMODULE'),
-  ('re', 'E:\\Program Files\\Python312-32\\Lib\\re\\__init__.py', 'PYMODULE'),
-  ('sre_compile',
-   'E:\\Program Files\\Python312-32\\Lib\\sre_compile.py',
-   'PYMODULE'),
-  ('_weakrefset',
-   'E:\\Program Files\\Python312-32\\Lib\\_weakrefset.py',
-   'PYMODULE'),
-  ('keyword', 'E:\\Program Files\\Python312-32\\Lib\\keyword.py', 'PYMODULE'),
-  ('io', 'E:\\Program Files\\Python312-32\\Lib\\io.py', 'PYMODULE'),
-  ('abc', 'E:\\Program Files\\Python312-32\\Lib\\abc.py', 'PYMODULE'),
-  ('weakref', 'E:\\Program Files\\Python312-32\\Lib\\weakref.py', 'PYMODULE'),
-  ('traceback',
-   'E:\\Program Files\\Python312-32\\Lib\\traceback.py',
-   'PYMODULE'),
-  ('operator', 'E:\\Program Files\\Python312-32\\Lib\\operator.py', 'PYMODULE'),
-  ('codecs', 'E:\\Program Files\\Python312-32\\Lib\\codecs.py', 'PYMODULE'),
-  ('posixpath',
-   'E:\\Program Files\\Python312-32\\Lib\\posixpath.py',
-   'PYMODULE'),
-  ('heapq', 'E:\\Program Files\\Python312-32\\Lib\\heapq.py', 'PYMODULE'),
-  ('reprlib', 'E:\\Program Files\\Python312-32\\Lib\\reprlib.py', 'PYMODULE'),
-  ('locale', 'E:\\Program Files\\Python312-32\\Lib\\locale.py', 'PYMODULE'),
-  ('linecache',
-   'E:\\Program Files\\Python312-32\\Lib\\linecache.py',
-   'PYMODULE'),
-  ('stat', 'E:\\Program Files\\Python312-32\\Lib\\stat.py', 'PYMODULE'),
-  ('enum', 'E:\\Program Files\\Python312-32\\Lib\\enum.py', 'PYMODULE'),
-  ('copyreg', 'E:\\Program Files\\Python312-32\\Lib\\copyreg.py', 'PYMODULE'),
-  ('collections.abc',
+ [('collections.abc',
    'E:\\Program Files\\Python312-32\\Lib\\collections\\abc.py',
    'PYMODULE'),
   ('collections',
    'E:\\Program Files\\Python312-32\\Lib\\collections\\__init__.py',
    'PYMODULE'),
-  ('functools',
-   'E:\\Program Files\\Python312-32\\Lib\\functools.py',
+  ('enum', 'E:\\Program Files\\Python312-32\\Lib\\enum.py', 'PYMODULE'),
+  ('sre_constants',
+   'E:\\Program Files\\Python312-32\\Lib\\sre_constants.py',
    'PYMODULE'),
-  ('ntpath', 'E:\\Program Files\\Python312-32\\Lib\\ntpath.py', 'PYMODULE'),
-  ('genericpath',
-   'E:\\Program Files\\Python312-32\\Lib\\genericpath.py',
+  ('linecache',
+   'E:\\Program Files\\Python312-32\\Lib\\linecache.py',
    'PYMODULE'),
-  ('_collections_abc',
-   'E:\\Program Files\\Python312-32\\Lib\\_collections_abc.py',
-   'PYMODULE'),
-  ('types', 'E:\\Program Files\\Python312-32\\Lib\\types.py', 'PYMODULE'),
+  ('codecs', 'E:\\Program Files\\Python312-32\\Lib\\codecs.py', 'PYMODULE'),
+  ('reprlib', 'E:\\Program Files\\Python312-32\\Lib\\reprlib.py', 'PYMODULE'),
+  ('locale', 'E:\\Program Files\\Python312-32\\Lib\\locale.py', 'PYMODULE'),
+  ('copyreg', 'E:\\Program Files\\Python312-32\\Lib\\copyreg.py', 'PYMODULE'),
+  ('heapq', 'E:\\Program Files\\Python312-32\\Lib\\heapq.py', 'PYMODULE'),
   ('encodings.zlib_codec',
    'E:\\Program Files\\Python312-32\\Lib\\encodings\\zlib_codec.py',
    'PYMODULE'),
@@ -2490,11 +2451,50 @@
   ('encodings',
    'E:\\Program Files\\Python312-32\\Lib\\encodings\\__init__.py',
    'PYMODULE'),
-  ('sre_constants',
-   'E:\\Program Files\\Python312-32\\Lib\\sre_constants.py',
+  ('warnings', 'E:\\Program Files\\Python312-32\\Lib\\warnings.py', 'PYMODULE'),
+  ('weakref', 'E:\\Program Files\\Python312-32\\Lib\\weakref.py', 'PYMODULE'),
+  ('types', 'E:\\Program Files\\Python312-32\\Lib\\types.py', 'PYMODULE'),
+  ('re._parser',
+   'E:\\Program Files\\Python312-32\\Lib\\re\\_parser.py',
    'PYMODULE'),
+  ('re._constants',
+   'E:\\Program Files\\Python312-32\\Lib\\re\\_constants.py',
+   'PYMODULE'),
+  ('re._compiler',
+   'E:\\Program Files\\Python312-32\\Lib\\re\\_compiler.py',
+   'PYMODULE'),
+  ('re._casefix',
+   'E:\\Program Files\\Python312-32\\Lib\\re\\_casefix.py',
+   'PYMODULE'),
+  ('re', 'E:\\Program Files\\Python312-32\\Lib\\re\\__init__.py', 'PYMODULE'),
+  ('operator', 'E:\\Program Files\\Python312-32\\Lib\\operator.py', 'PYMODULE'),
   ('sre_parse',
    'E:\\Program Files\\Python312-32\\Lib\\sre_parse.py',
    'PYMODULE'),
-  ('warnings', 'E:\\Program Files\\Python312-32\\Lib\\warnings.py', 'PYMODULE'),
+  ('functools',
+   'E:\\Program Files\\Python312-32\\Lib\\functools.py',
+   'PYMODULE'),
+  ('ntpath', 'E:\\Program Files\\Python312-32\\Lib\\ntpath.py', 'PYMODULE'),
+  ('sre_compile',
+   'E:\\Program Files\\Python312-32\\Lib\\sre_compile.py',
+   'PYMODULE'),
+  ('stat', 'E:\\Program Files\\Python312-32\\Lib\\stat.py', 'PYMODULE'),
+  ('keyword', 'E:\\Program Files\\Python312-32\\Lib\\keyword.py', 'PYMODULE'),
+  ('io', 'E:\\Program Files\\Python312-32\\Lib\\io.py', 'PYMODULE'),
+  ('abc', 'E:\\Program Files\\Python312-32\\Lib\\abc.py', 'PYMODULE'),
+  ('traceback',
+   'E:\\Program Files\\Python312-32\\Lib\\traceback.py',
+   'PYMODULE'),
+  ('_collections_abc',
+   'E:\\Program Files\\Python312-32\\Lib\\_collections_abc.py',
+   'PYMODULE'),
+  ('posixpath',
+   'E:\\Program Files\\Python312-32\\Lib\\posixpath.py',
+   'PYMODULE'),
+  ('_weakrefset',
+   'E:\\Program Files\\Python312-32\\Lib\\_weakrefset.py',
+   'PYMODULE'),
+  ('genericpath',
+   'E:\\Program Files\\Python312-32\\Lib\\genericpath.py',
+   'PYMODULE'),
   ('os', 'E:\\Program Files\\Python312-32\\Lib\\os.py', 'PYMODULE')])
