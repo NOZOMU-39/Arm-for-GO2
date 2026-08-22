@@ -48,7 +48,7 @@
 - **切换保留输入/折叠状态**:内容只在「选中电机变化」时重渲染(renderBlocks 用 renderedFor 缓存),tab 切换只调 showTab 改显隐——输入框值、折叠状态全部保留,不回到默认;面板二级标题(panel-title)默认折叠(initCollapse,点击展开,限幅与零点模块 data-nocollapse 豁免)。
 - 三套协议独立渲染:`BLOCK_RENDER = { V3, V43, V44 }`(V43 于 2026-08-22 从 V44 拆出独立表 `TAB_RENDER_V43`);**新协议只需加一套渲染表 + BLOCK_RENDER 条目**。面板指令集以 `Database\电机\` 三版中文协议为准:文档没有的指令不在 UI 显示。
 - 面板差异速查:V3.9 独有 0x71 功率/0x90 单圈编码器/六参数 PID;V4.3 独有 0x79(0x300);V4.4 独有 0x72/0x73 前馈/0x20 索引 8;V4.4 删 0x90/0x79。0x94 解析按协议分叉(V3/V4.3 两字节 D6~D7 0~35999;V4.4 int32 D4~D7 ±180°)。
-- **⛔ 限幅与零点模块**(控制参数页签置顶):注册表每电机字段 `limMinDeg/limMaxDeg/limMaxSpd/limMaxIq`(输出轴单位,未设则空);`saveLimits()` 保存即写注册表;`limitBlock(m,{deg,spd,iq})` 在全部闭环发送函数发送前校验,超限 alert 拦截;**`monitorLimit(m,angOut)` 运行时硬上限监控**(2026-08-22):轮询反馈角度越过角度限幅立即 addLog 报警 + alert + 自动发 0x81 停止(limitAlarm 锁定,回到限幅内 2° 死区后解锁)——限幅是所有控制方式(位置/速度/力矩/前馈)的上限,不止目标值校验。设零按钮「📍 设置当前位置为零点」不露指令名:V3 走 v3RecordZero(E0 档案),V4 走 v44SetZero(0x80→0x64→0x76 三步)。V4 固件限幅(0x20 索引 6/7)也在该模块,标注「X6-40 限位语义待确认」。
+- **⛔ 限幅与零点模块**(控制参数页签置顶):注册表每电机字段 `limMinDeg/limMaxDeg/limMaxSpd/limMaxIq`(输出轴单位,未设则空);`saveLimits()` 保存即写注册表;`limitBlock(m,{deg,spd,iq})` 在全部闭环发送函数发送前校验,超限 alert 拦截;**`monitorLimit(m,ang,spd,iq)` 运行时硬上限监控**(2026-08-22):轮询反馈的**角度/速度/电流任一**越过对应限幅 → **先同步发出 0x81 停止保持(停在当前位置,非 0x80 失能掉力)、再报警**(红色横幅 limitBanner + 日志,⚠️ 轮询路径禁用 alert 弹窗——阻塞主线程会卡住 0x81 发送);limitAlarm 按维度锁定,角度回限幅内 2°、速度/电流回落限幅内即解锁——限幅是所有控制方式(位置/速度/力矩/前馈)的上限,不止目标值校验。设零按钮「📍 设置当前位置为零点」不露指令名:V3 走 v3RecordZero(E0 档案),V4 走 v44SetZero(0x80→0x64→0x76 三步)。V4 固件限幅(0x20 索引 6/7)也在该模块,标注「X6-40 限位语义待确认」。
 - 状态面板分流:0x92 仅 V3 走多圈角校准(v3TrackOf),V4 只同步 lastAngle;0x94 全部协议只更新 lastAngle(单圈无圈号)。
 
 ## 4. 方向映射架构(index.html,本轮 2026-08-15 实现)
