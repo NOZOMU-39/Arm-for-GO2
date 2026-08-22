@@ -67,6 +67,7 @@ aside { display: flex; flex-direction: column; gap: 12px; }
 .motor-c { text-align: center; font-family: Consolas, monospace; }
 .proto-badge { padding: 1px 7px; border-radius: 8px; font-size: 11px; white-space: nowrap; }
 .proto-v3 { background: #0d2a3a; color: var(--info); }
+.proto-v43 { background: #3a2e0d; color: var(--warn); }
 .proto-v44 { background: #0d3a1f; color: var(--ok); }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; display: inline-block; margin: 0 auto; }
 .dot.on { background: var(--ok); box-shadow: 0 0 5px var(--ok); }
@@ -74,15 +75,24 @@ aside { display: flex; flex-direction: column; gap: 12px; }
 .motor-ops { display: flex; gap: 4px; justify-content: center; }
 .motor-ops .small { padding: 2px 6px; font-size: 11px; }
 
-/* ============ 调试区页签 ============ */
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 10px; flex-wrap: wrap; }
-.tab { padding: 7px 14px; border-radius: 8px 8px 0 0; background: transparent; color: var(--dim); }
-.tab.act { background: #0d2447; color: var(--accent); font-weight: bold; }
-.tabpanel { min-height: 150px; }
+/* ============ 调试区(三大块) ============ */
+.block { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 12px; }
+.block-title { font-size: 14px; color: var(--accent); font-weight: bold; margin: 2px 0 10px;
+  padding-left: 8px; border-left: 3px solid var(--accent); }
+.block-title.warn { color: var(--warn); border-left-color: var(--warn); }
+.block-title.ok { color: var(--ok); border-left-color: var(--ok); }
 .panel-title { font-size: 13px; color: var(--accent); margin-bottom: 8px; }
 .hint { color: var(--dim); font-size: 12px; margin: 4px 0 8px; }
 .hint.warn { color: var(--warn); }
 .hint.err { color: var(--err); }
+.proto-result { display: grid; gap: 6px; margin-top: 8px; }
+.proto-result .proto-line { display: flex; justify-content: space-between; gap: 12px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: #101c38; }
+.proto-result .proto-label { color: var(--dim); }
+.proto-result .proto-value { color: var(--text); text-align: right; }
+.proto-result .proto-final { border-color: var(--accent); color: var(--accent); font-weight: bold; }
+.proto-help { margin-top: 10px; color: var(--dim); font-size: 12px; }
+.proto-help summary { cursor: pointer; color: var(--info); }
+.proto-help ul { margin: 6px 0 0 18px; padding: 0; line-height: 1.6; }
 .kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 14px; margin-bottom: 10px; }
 .kv .k { color: var(--dim); font-size: 12px; }
 .kv .v { font-size: 15px; font-weight: bold; color: var(--accent); font-family: Consolas, monospace; }
@@ -92,7 +102,8 @@ aside { display: flex; flex-direction: column; gap: 12px; }
 
 /* ============ 曲线 ============ */
 .chart-wrap { display: flex; gap: 10px; align-items: flex-start; }
-canvas.chart { background: var(--log); border: 1px solid var(--border); border-radius: 8px; }
+canvas.chart { background: var(--log); border: 1px solid var(--border); border-radius: 8px; max-width: 100%; height: auto; }
+.monitor-toggle { float: right; }
 .chart-ctl { display: flex; flex-direction: column; gap: 8px; }
 .legend { display: flex; gap: 10px; margin-top: 6px; font-size: 12px; }
 .legend span { display: flex; align-items: center; gap: 4px; color: var(--dim); }
@@ -127,7 +138,7 @@ canvas.chart { background: var(--log); border: 1px solid var(--border); border-r
 
 <header>
   <h1>🤖 脉塔电机调试上位机</h1>
-  <span class="sub">V3.x / V4.4 双协议 · 动态电机注册表 · 全功能调试</span>
+  <span class="sub">V3.9 / V4.3 / V4.4 三协议 · 动态电机注册表 · 全功能调试</span>
   <div class="badges">
     <span class="badge" id="badgeDev">设备:未打开</span>
     <span class="badge" id="badgeBus">总线:—</span>
@@ -176,9 +187,10 @@ canvas.chart { background: var(--log); border: 1px solid var(--border); border-r
       <div class="row">
         <input type="text" id="inpName" placeholder="名称(如 基座Yaw)" style="width:108px">
         <input type="number" id="inpId" placeholder="ID 1~32" min="1" max="32" title="电机 CAN 编号 1~32" style="width:96px">
-        <select id="inpProto" style="width:120px">
+        <select id="inpProto" style="width:130px">
           <option value="V3">V3(旧型号)</option>
-          <option value="V44" selected>V4(新型号)</option>
+          <option value="V43">V4.3(新款V2系,如X6-40)</option>
+          <option value="V44" selected>V4.4(最新款)</option>
         </select>
       </div>
       <div class="row">
@@ -236,41 +248,50 @@ canvas.chart { background: var(--log); border: 1px solid var(--border); border-r
 
   <!-- ============ 右栏 ============ -->
   <section class="right">
-    <!-- 调试区 -->
+    <!-- 调试区:三大块(控制参数 / 基础参数 / 协议自测独立) -->
     <section class="card">
       <h2>🛠️ 电机调试区 <span id="dbgTitle" class="hint">——请先在左侧注册表选择一台电机</span></h2>
-      <div class="tabs" id="tabBar"></div>
-      <div class="tabpanel" id="tabPanel"></div>
+      <div class="block-title" id="blockTitleCtrl">🎛️ 控制参数设置</div>
+      <div id="blockCtrl"><div class="hint">选择电机后显示控制参数面板。</div></div>
+      <div class="block">
+        <div class="block-title" id="blockTitleBase">⚙️ 电机基础参数设置</div>
+        <div id="blockBase"><div class="hint">选择电机后显示基础参数面板。</div></div>
+      </div>
+      <div class="block">
+        <div class="block-title" id="blockTitleProto">🧪 协议版本自测</div>
+        <div id="blockProto"><div class="hint">选择电机后可进行协议版本自测。</div></div>
+      </div>
     </section>
 
-    <!-- 曲线 -->
+    <!-- 实时显示(块2,整块可开关) -->
     <section class="card">
-      <h2>📈 实时曲线 <span class="hint" id="chartSrc">(数据源:选中电机的状态轮询)</span></h2>
-      <div class="chart-wrap">
-        <canvas class="chart" id="chart" width="860" height="200"></canvas>
-        <div class="chart-ctl">
-          <button class="small" id="btnPause" onclick="chartTogglePause()">⏸ 暂停</button>
-          <button class="small" onclick="chartClear()">🧹 清空</button>
-          <label style="min-width:0"><input type="checkbox" id="chkPos" checked onchange="chartDraw()"> <span style="color:#00d4ff">位置</span></label>
-          <label style="min-width:0"><input type="checkbox" id="chkSpd" checked onchange="chartDraw()"> <span style="color:#4ade80">速度</span></label>
-          <label style="min-width:0"><input type="checkbox" id="chkIq" checked onchange="chartDraw()"> <span style="color:#f59e0b">力矩电流</span></label>
+      <h2>📊 实时显示 <button class="small monitor-toggle" id="btnMonitorToggle" onclick="monitorToggle()">🔼 收起</button></h2>
+      <div id="blockMonitor">
+        <div class="panel-title">📈 实时曲线 <span class="hint">(数据源:选中电机的状态轮询)</span></div>
+        <div class="chart-wrap">
+          <canvas class="chart" id="chart" width="860" height="200"></canvas>
+          <div class="chart-ctl">
+            <button class="small" id="btnPause" onclick="chartTogglePause()">⏸ 暂停</button>
+            <button class="small" onclick="chartClear()">🧹 清空</button>
+            <label style="min-width:0"><input type="checkbox" id="chkPos" checked onchange="chartDraw()"> <span style="color:#00d4ff">位置</span></label>
+            <label style="min-width:0"><input type="checkbox" id="chkSpd" checked onchange="chartDraw()"> <span style="color:#4ade80">速度</span></label>
+            <label style="min-width:0"><input type="checkbox" id="chkIq" checked onchange="chartDraw()"> <span style="color:#f59e0b">力矩电流</span></label>
+          </div>
         </div>
+        <div class="legend">
+          <span><i style="background:#00d4ff"></i>位置 °</span>
+          <span><i style="background:#4ade80"></i>速度 dps</span>
+          <span><i style="background:#f59e0b"></i>力矩电流 A</span>
+          <span style="color:#8aa0c0">(Y 轴量程随数据自动调整,刻度标注主轴;无数据时曲线停留不归零;鼠标悬停可读数)</span>
+        </div>
+        <div class="panel-title" style="margin-top:12px">📊 状态监控(0x9A + 0x9C 轮询,间隔可调)</div>
+        <div id="monitorPanel"></div>
+        <div class="panel-title" style="margin-top:12px">📥 收发日志
+          <button class="small" onclick="uiClearLog()">清空</button>
+          <label style="min-width:0; margin-left:8px"><input type="checkbox" id="chkScroll" checked> 自动滚动</label>
+        </div>
+        <div class="logbox" id="logbox"></div>
       </div>
-      <div class="legend">
-        <span><i style="background:#00d4ff"></i>位置 °</span>
-        <span><i style="background:#4ade80"></i>速度 dps</span>
-        <span><i style="background:#f59e0b"></i>力矩电流 A</span>
-        <span style="color:#8aa0c0">(Y 轴量程随数据自动调整,刻度标注主轴;无数据时曲线停留不归零;鼠标悬停可读数)</span>
-      </div>
-    </section>
-
-    <!-- 日志 -->
-    <section class="card">
-      <h2>📥 收发日志
-        <button class="small" onclick="uiClearLog()">清空</button>
-        <label style="min-width:0; margin-left:8px"><input type="checkbox" id="chkScroll" checked> 自动滚动</label>
-      </h2>
-      <div class="logbox" id="logbox"></div>
     </section>
   </section>
 </main>
@@ -320,9 +341,9 @@ function createMockBridge() {
         this.rx++;
       };
       if (!extd && id === 0x300 && data[0] === 0x79) {
-        // 0x79 读/写 ID:回复从 0x300 回(V3.8 协议第 4 章)
-        if (data[2] === 1) pushRx(0x300, [0x79, 0, 1, 0, 0, 0, 4, 0]);          // 读:回复 D6~7=uint16 当前 ID
-        else pushRx(0x300, [0x79, 0, 0, 0, 0, 0, 0, data[7]]);                // 写:回显
+        // 0x79 读 ID 回复 D6-D7 是系统回复 CAN 地址 0x240+编号,不是编号本身。
+        if (data[2] === 1) pushRx(0x300, [0x79, 0, 1, 0, 0, 0, 2, 0x24]);
+        else pushRx(0x300, [0x79, 0, 0, 0, 0, 0, 0, data[7]]);
       } else if (!extd && n >= 1 && n <= 32 && n <= 4) {
         const cmd = data[0];
         let rep = null;
@@ -382,9 +403,10 @@ function bridgeReady() {
 }
 
 /* =====================================================================
- * 二、协议知识库(V2.4 / V4.4 双协议)
+ * 二、协议知识库(V3.9 / V4.3 / V4.4 三协议)
  * ===================================================================== */
-const P = { V3: "V3(旧型号)", V44: "V4(新型号)" };
+const P = { V3: "V3(旧型号)", V43: "V4.3(新款V2系)", V44: "V4.4(最新款)" };
+const P_SHORT = { V3: "V3", V43: "V4.3", V44: "V4.4" };
 
 const ERR_V44 = [
   [0x0002, "电机堵转"], [0x0004, "低压保护"], [0x0008, "过压保护"], [0x0010, "相电流过流"],
@@ -412,13 +434,13 @@ function pad8(arr) { while (arr.length < 8) arr.push(0); return arr.slice(0, 8);
 
 /* ---------- V3.x(RMD-X 系列)组帧 ---------- */
 /* 与 V4.4 的差异:无 0x88 使能;PID 为六参数 uint8(0x30 读/0x31 写RAM/0x32 写ROM,一次读写全六参数);
-   加速度 0x42/0x43 索引式(uint32,1dps/s);0x79 编号在 D7(uint8);0x9C 回复 D6~7 为角度;
-   0x71 功率在 D6~7;0xA6 单圈位置(D1 方向 + D2~3 速度 uint16 + D4~5 角度 uint16)。 */
+   加速度 0x42/0x43 索引式(uint32,1dps/s);0x79 编号在 D7(uint8);0x9C 回复 D6-D7 为角度;
+   0x71 功率在 D6-D7;0xA6 单圈位置(D1 方向 + D2-D3 速度 uint16 + D4-D5 角度 uint16)。 */
 const BUILD_V3 = {
   Q(cmd) { return pad8([cmd]); },
   // 0xA4 绝对位置 / 0xA8 增量位置:最大速度 dps,角度 0.01°(转子侧)
   POS(cmd, spdDps, deg) { return pad8([cmd, 0, ...pU16(Math.round(spdDps)), ...pI32(Math.round(deg * 100))]); },
-  // 0xA6 单圈位置:D1 方向(0 顺/1 逆),D2~3 最大速度,D4~5 角度 0.01°(协议上限 0~35999,转子侧;超出固件行为异常,组帧前 clamp 到 35999)
+  // 0xA6 单圈位置:D1 方向(0 顺/1 逆),D2-D3 最大速度,D4-D5 角度 0.01°(协议上限 0~35999,转子侧;超出固件行为异常,组帧前 clamp 到 35999)
   POS1(dir, spdDps, deg) { return pad8([0xA6, dir & 255, ...pU16(Math.round(spdDps)), ...pU16(Math.max(0, Math.min(35999, Math.round(deg * 100)))), 0, 0]); },
   SPEED(velDps) { return pad8([0xA2, 0, 0, 0, ...pI32(Math.round(velDps * 100))]); },   // 无最大力矩字段
   TORQUE(amp) { return pad8([0xA1, 0, 0, 0, ...pI16(Math.round(amp * 100)), 0, 0]); },  // 0.01A/LSB
@@ -431,6 +453,7 @@ const BUILD_V3 = {
   READID() { return pad8([0x79, 0, 1, 0, 0, 0, 0, 0]); },                             // D2=1 读
   B3(ms) { return pad8([0xB3, 0, 0, 0, ...pU32(ms)]); },
   B4(idx) { return pad8([0xB4, 0, 0, 0, 0, 0, 0, idx]); },                            // 0=CAN 500K,1=CAN 1M
+  B6(on) { return pad8([0xB6, 0, 0, 0, 0, 0, 0, on ? 1 : 0]); },                     // 主动回复 0xB6(V3.9 文档亦有)
   FUNC(idx, val) { return pad8([0x20, idx & 255, 0, 0, ...pI32(val)]); },
 };
 
@@ -464,8 +487,33 @@ function errText(code, proto) {
   return hits.length ? hits.join(" + ") : "未知错误位 " + code.toString(16).toUpperCase();
 }
 
+/* 0x79 读 ID 的 D6-D7 是回复 CAN 地址(例如 0x0242),不是电机编号本身。
+   该特征在 V3.9/V3.91/V4.3 资料中共用,只能记录为只读证据,不能单独确认子版本。 */
+function decode79Reply(bytes) {
+  const b = Array.isArray(bytes) ? bytes : [];
+  const op = b[2];
+  if (b.length < 8 || op === undefined) {
+    return { mode: "invalid", id: null, replyCanId: null, summary: "0x79 回复长度不足,未确认编号" };
+  }
+  if (op === 1) {
+    const replyCanId = u16(b, 6);
+    const id = replyCanId >= 0x241 && replyCanId <= 0x260 ? replyCanId - 0x240 : null;
+    return id === null
+      ? { mode: "read", id: null, replyCanId, summary: "已收到 0x79 只读回复,回复地址无法换算为合法编号" }
+      : { mode: "read", id, replyCanId, summary: `已收到 0x79 只读回复,编号 ${id}` };
+  }
+  if (op === 0) {
+    const id = b[7];
+    return id >= 1 && id <= 32
+      ? { mode: "writeEcho", id, replyCanId: null, summary: `收到 0x79 回显,编号 ${id}` }
+      : { mode: "writeEcho", id: null, replyCanId: null, summary: "收到 0x79 回显,编号不在 1~32" };
+  }
+  return { mode: "unknown", id: null, replyCanId: null, summary: "收到 0x79 回复,操作类型无法确认" };
+}
+
 function parseReply(proto, cid, bytes) {
   /* 返回 { motorId, cmd, summary, values } */
+  if (!Array.isArray(bytes) || bytes.length === 0) return null;
   let n = 0, broadcast = false, sys300 = false;
   if (cid === 0x280) broadcast = true;
   else if (cid === 0x300) sys300 = true;        // 0x79 读/写 ID 的系统地址,回复也从 0x300 回
@@ -488,9 +536,19 @@ function parseReply(proto, cid, bytes) {
         break;
       }
       case 0x9C: {
-        // V3.x 的 D6~7 是 16 位编码器脉冲(uint16,转子侧单圈 0~65535),不是角度!
-        // 曾误当 int16 角度 → 曲线在 ±32767 之间锯齿跳变(「溢出」)。角度请用 0x92 多圈角度。
+        // ⚠️ V3 系 0x9C 语义按固件实测区分(2026-08-22):
+        //   手册(V3.9/V3.91)写 D6-D7=输出轴角度 1°/LSB,但 X8 固件实测为编码器脉冲
+        //   (0~65535 转子单圈)。m.v9cSemantics("angle"|"pulse") 当前由人工按
+        //   「协议版本自测」观测现象确认后写入注册表(自测页只展示现象,不自动落盘);
+        //   null=未检测,默认按 X8 实测(pulse)。
+        const sem = rm && rm.v9cSemantics;
         out.values = { temp: bytes[1], iq: i16(bytes, 2) / 100, spd: i16(bytes, 4), enc: u16(bytes, 6) };
+        if (sem === "angle") {
+          out.values.ang = i16(bytes, 6);          // 输出轴角度 1°/LSB
+          out.values.enc = null;
+          out.summary = `温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A · 速度 ${rot2out(out.values.spd, rm)}dps · 角度 ${rot2out(out.values.ang, rm)}°(0x9C)`;
+          break;
+        }
         const q = dirOf(rm);
         out.summary = `温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * q).toFixed(2)}A(输出轴) · 速度 ${rot2out(out.values.spd, rm).toFixed(2)}dps(输出轴) · 编码器 ${out.values.enc} 脉冲(转子侧原始)`;
         break;
@@ -515,9 +573,9 @@ function parseReply(proto, cid, bytes) {
         out.summary = `单圈编码器 ${out.values.enc}(原始 ${out.values.raw},零偏 ${out.values.off})脉冲`;
         break;
       case 0x92:
-        // ⚠️ 0x92 回复的 int32 角度在 D1~4 小端(2026-08-20 日志实证:
-        // 92 21 67 00 00 00 00 00 → i32(D1~4)=0x6721=264.01°,与 0x9C 相位 264.0 一致;
-        // 92 82 DA FF FF FF FF FF → i32(D1~4)=0xFFFFDA82=−95.98°)。此前读 D4~7 导致
+        // ⚠️ 0x92 回复的 int32 角度在 D1-D4 小端(2026-08-20 日志实证:
+        // 92 21 67 00 00 00 00 00 → i32(D1-D4)=0x6721=264.01°,与 0x9C 相位 264.0 一致;
+        // 92 82 DA FF FF FF FF FF → i32(D1-D4)=0xFFFFDA82=−95.98°)。此前读 D4~7 导致
         // 264.01° 被当 0 忽略(「恒 0」误判)、负值错位——0x92 校准从未真正生效。
         out.values = { pos: i32(bytes, 1) / 100 / gearOf(rm) * dirOf(rm) };
         out.summary = `多圈角度 ${out.values.pos.toFixed(2)}°(输出轴${dirOf(rm) === -1 ? ",方向已映射" : ""})`;
@@ -535,13 +593,12 @@ function parseReply(proto, cid, bytes) {
         out.summary = `运行模式 ${V3_MODE[out.values.mode] || out.values.mode.toString(16)}`;
         break;
       case 0x71:
-        out.values = { power: u16(bytes, 6) / 10 };   // V3.x 功率在 D6~7
+        out.values = { power: u16(bytes, 6) / 10 };   // V3.x 功率在 D6-D7
         out.summary = `功率 ${out.values.power.toFixed(1)}W`;
         break;
       case 0x79:
-        // D2=0 写:回复回显原命令,D7=新 ID;D2=1 读:回复 D6~7=uint16 当前 ID
-        out.values = { id: bytes[2] === 1 ? u16(bytes, 6) : bytes[7] };
-        out.summary = `电机 ID ${out.values.id}${bytes[2] === 1 ? "(当前值)" : "(写入回显,重启生效)"}`;
+        out.values = decode79Reply(bytes);
+        out.summary = out.values.summary;
         break;
       case 0xB1:
         out.values = { ms: u32(bytes, 4) };
@@ -592,14 +649,32 @@ function parseReply(proto, cid, bytes) {
         out.values = { ia: i16(bytes, 1) / 100, ib: i16(bytes, 3) / 100, ic: i16(bytes, 5) / 100 };
         out.summary = `相电流 A ${out.values.ia.toFixed(2)}A · B ${out.values.ib.toFixed(2)}A · C ${out.values.ic.toFixed(2)}A`;
         break;
-      case 0x92: case 0x94:
+      case 0x92:
         out.values = { pos: i32(bytes, 4) / 100 * dirOf(rm) };
         out.summary = `多圈角度 ${out.values.pos.toFixed(2)}°(输出轴${dirOf(rm) === -1 ? ",方向已映射" : ""})`;
         break;
-      case 0x60: case 0x61: case 0x62:
-        out.values = { enc: i32(bytes, 4) };
-        out.summary = `编码器 ${out.values.enc * dirOf(rm)} 脉冲(方向已映射;原始 ${out.values.enc})`;
+      case 0x94:
+        // ⚠️ 0x94 按协议分叉:V4.3 两字节单圈(0~35999,D6~D7,协议自测确认「两字节格式」);
+        //    V4.4 改 int32 ±180°(D4~D7,修订 e)。V3 分支另读 u16(bytes,6)。
+        out.values = { pos: (proto === "V44" ? i32(bytes, 4) : u16(bytes, 6)) / 100 * dirOf(rm) };
+        out.summary = `单圈角度 ${out.values.pos.toFixed(2)}°(输出轴${dirOf(rm) === -1 ? ",方向已映射" : ""},${proto === "V44" ? "±180°" : "0~359.99"})`;
         break;
+      case 0x63: case 0x64: {
+        // V4.3: D4~D7 为 encoderOffset(int32, little-endian, encoder pulses).
+        const encoderOffset = i32(bytes, 4);
+        out.values = { encoderOffset };
+        const label = cmd === 0x63 ? "零偏写入回显" : "当前位置设零回读";
+        out.summary = `${label}: ${encoderOffset} 脉冲`;
+        break;
+      }
+      case 0x60: case 0x61: case 0x62: {
+        const encoderValue = i32(bytes, 4);
+        out.values = { enc: encoderValue };
+        if (cmd === 0x62) out.values.encoderOffset = encoderValue;
+        const label = { 0x60: "多圈位置", 0x61: "多圈原始位置", 0x62: "多圈零偏" }[cmd];
+        out.summary = `${label}: ${encoderValue * dirOf(rm)} 脉冲(原始 ${encoderValue})`;
+        break;
+      }
       case 0x30: case 0x31: case 0x32:
         out.values = { idx: bytes[1], val: f32(bytes, 4) };
         out.summary = `PID 索引 ${V44_PID_NAME[out.values.idx] || out.values.idx} = ${out.values.val.toFixed(5)}`;
@@ -635,6 +710,10 @@ function parseReply(proto, cid, bytes) {
       case 0xB6:
         out.values = { on: bytes[7] };
         out.summary = `主动回复:${out.values.on ? "已开启" : "已关闭"}`;
+        break;
+      case 0x79:
+        out.values = decode79Reply(bytes);
+        out.summary = out.values.summary;
         break;
       case 0x20: {
         const fidx = bytes[1];
@@ -716,7 +795,7 @@ function dirOf(m) { return m && m.dir === -1 ? -1 : 1; }        // 1=正向(协�
 function out2rot(v, m) { return v * gearOf(m) * dirOf(m); }     // 输出轴角度/速度 → 协议侧(发帧用)
 function rot2out(v, m) { return v / gearOf(m) * dirOf(m); }     // 协议侧角度/速度 → 输出轴(显示用)
 function amp2rot(v, m) { return v * dirOf(m); }                 // 力矩电流(A):只映射方向,不乘减速比
-function spd2rot(v, m) { return Math.abs(out2rot(v, m)); }      // 无符号「上限速度」字段(0xA4/0xA6/0xA9 D2~3):只取幅度
+function spd2rot(v, m) { return Math.abs(out2rot(v, m)); }      // 无符号「上限速度」字段(0xA4/0xA6/0xA9 D2-D3):只取幅度
 
 /* =====================================================================
  * 四、日志
@@ -746,11 +825,40 @@ function hexToBytes(s) {
   return pad8(b);
 }
 
+function protocolPending(m) {
+  return !!m && /未确认|待确认|未知/.test(String(m.note || ""));
+}
+function frameReadOnly(canId, bytes) {
+  const b = Array.isArray(bytes) ? bytes : [];
+  const cmd = b[0];
+  const tailZero = b.slice(1).every(v => !v);
+  if (canId === 0x300) return cmd === 0x79 && b[2] === 1;
+  if ([0x30, 0x42, 0x60, 0x61, 0x62, 0x71, 0x90, 0x92, 0x94, 0x9A, 0x9C, 0x9D, 0xB1, 0xB2, 0xB5].includes(cmd)) return true;
+  if ([0x70, 0xB3, 0xB4, 0xB6].includes(cmd)) return tailZero;
+  return false;
+}
+function pendingTarget(canId) {
+  const id = canId >= 0x140 && canId <= 0x15F ? canId - 0x140 : 0;
+  return selMotor() || (id ? motorById(id) : null);
+}
+
 async function rawSend(canId, extd, hexStr, note, silent) {
   if (!bridgeReady()) return false;
   if (!dev.opened) { addLog("err", "设备未打开,请先打开设备"); return false; }
+  const frame = hexToBytes(hexStr);
+  const target = pendingTarget(canId);
+  if (!frameReadOnly(canId, frame) && (!target || protocolPending(target))) {
+    const msg = target ? `${target.name} 的协议尚未确认,已拦截写入/运动指令` : "未选定已确认协议的电机,已拦截写入/运动指令";
+    if (typeof protoState !== "undefined" && protoState.active) protoSetText("protoHint", msg);
+    else addLog("warn", msg);
+    return false;
+  }
   const r = await bridge.send_frame(canId, extd ? 1 : 0, hexStr);
-  if (!r.ok) { addLog("err", `发送失败:${r.msg}`); return false; }
+  if (!r.ok) {
+    if (typeof protoState !== "undefined" && protoState.active) protoSetText("protoHint", `通信发送失败，已停止确认:${r.msg}`);
+    else addLog("err", `发送失败:${r.msg}`);
+    return false;
+  }
   if (!silent) addLog("tx", `→ 0x${canId.toString(16).toUpperCase().padStart(3, "0")}  ${hexStr}  ${note || ""}`);
   return true;
 }
@@ -835,7 +943,7 @@ async function uiOpenDevice() {
     document.getElementById("btnOpen").disabled = true;
     document.getElementById("btnClose").disabled = false;
     document.getElementById("btnScan").disabled = false;
-    document.getElementById("connHint").textContent = "✅ 设备已打开,可开始调试(V3.x/V4.4 电机直接发闭环指令,无需使能)。";
+    document.getElementById("connHint").textContent = "✅ 设备已打开,可开始调试(V3.9/V4.3/V4.4 电机直接发闭环指令,无需使能)。";
     // 2026-08-20:轮询默认自动开启(状态监控/曲线/收发显示应常驻,无需手动触发)
     if (!pollOn) pollToggle(1);
   }
@@ -873,7 +981,7 @@ function uiAddMotor() {
     if (m) Object.assign(m, { id, name, proto, note: note || "", gear: gear > 0 ? gear : 1, dir });
     if (selectedId === editingId && id !== editingId) selectedId = id;
     motors.sort((a, b) => a.id - b.id);
-    saveMotors(); renderMotors(); renderTabs(); uiCancelEdit(true);
+    saveMotors(); renderMotors(); renderBlocks(); uiCancelEdit(true);
     addLog("sys", `已更新电机:${name}(ID ${id},${P[proto]},减速比 1:${m ? m.gear : gear},${dirTxt})`);
     return;
   }
@@ -884,7 +992,7 @@ function uiAddMotor() {
   saveMotors(); renderMotors();
   addLog("sys", `已添加电机:${name}(ID ${id},${P[proto]},减速比 1:${g},${dirTxt})`);
   if (proto === "V3" && g === 1) addLog("warn", `提示:${name} 为 V3(旧型号,如 X8-PRO/X6-S2),减速比填 1:1。若该电机带减速器(如 X8-PRO 1:6 填 6、X6-S2 填 36),请点该行「编辑」填实际值,否则角度/速度会差一个减速比。`);
-  if (proto === "V44" && g !== 1) addLog("sys", `提示:${name} 为 V4(新型号),固件通常已内置减速比(角度/速度均为输出轴单位),一般填 1:1;若实测角度偏小再填实际减速比。`);
+  if ((proto === "V43" || proto === "V44") && g !== 1) addLog("sys", `提示:${name} 为 V4(新型号),固件通常已内置减速比(角度/速度均为输出轴单位),一般填 1:1;若实测角度偏小再填实际减速比。`);
 }
 function uiEditMotor(id) {
   const m = motorById(id);
@@ -919,12 +1027,12 @@ function uiDelMotor(id) {
   if (!m) return;
   motors = motors.filter(x => x.id !== id);
   if (selectedId === id) selectedId = null;
-  saveMotors(); renderMotors(); renderTabs();
+  saveMotors(); renderMotors(); renderBlocks();
   addLog("sys", `已删除电机:${m.name}(ID ${id})`);
 }
 function uiSelMotor(id) {
   selectedId = id;
-  renderMotors(); renderTabs();
+  renderMotors(); renderBlocks();
   addLog("sys", `已选中电机:${motorById(id).name}(ID ${id},${P[motorById(id).proto]})`);
   // 2026-08-20:设备已打开且选中电机时,轮询自动保持开启(常驻,无需手动触发)
   if (dev.opened && !pollOn) pollToggle(1);
@@ -942,7 +1050,7 @@ async function uiScanMotors() {
   for (const id of target) {
     const m = motorById(id);
     const before = lastRecv[id] || 0;
-    // silent:扫描探测帧与轮询帧同机制静默,日志栏只留结果(日志\ 子文件夹仍完整记录)
+    // silent:扫描探测帧与轮询帧同机制静默,日志栏只留结果(日志\子文件夹仍完整记录)
     const ok = await rawSend(0x140 + id, 0, hx(pad8([0x9A])), `扫描 ID ${id}`, true);
     if (!ok) {
       // 发送失败 = 总线上无设备应答(电机未上电/CAN 线断开/波特率不符),继续扫下去也没有意义
@@ -987,7 +1095,7 @@ function renderMotors() {
       <span class="dot ${online ? "on" : ""}"></span>
       <span class="name" title="${esc(m.note ? m.name + "(" + m.note + ")" : m.name)}">${esc(m.name)}</span>
       <span class="motor-c">${m.id}</span>
-      <span><span class="proto-badge proto-${m.proto === "V3" ? "v3" : "v44"}">${P[m.proto]}</span></span>
+      <span><span class="proto-badge proto-v${m.proto === "V43" ? "43" : (m.proto === "V44" ? "44" : "3")}" title="${P[m.proto]}">${P_SHORT[m.proto] || m.proto}</span></span>
       <span class="motor-c" title="${dirOf(m) === -1 ? "反转:正角度与协议方向相反,指令/读数已自动反向映射" : "正转(协议方向)"}">${gearOf(m) !== 1 ? "1:" + gearOf(m) : "1"}${dirOf(m) === -1 ? " ↺" : ""}</span>
       <span class="motor-ops"><button class="small" onclick="event.stopPropagation();uiEditMotor(${m.id})">编辑</button><button class="small danger" onclick="event.stopPropagation();uiDelMotor(${m.id})">删除</button></span>`;
     box.appendChild(div);
@@ -996,26 +1104,53 @@ function renderMotors() {
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
 /* =====================================================================
- * 八、调试区页签(按电机协议动态渲染)
+ * 八、调试区(三大块:控制参数 / 基础参数 / 协议自测独立,按电机协议渲染)
  * ===================================================================== */
-const TABS = ["状态监控", "启停与抱闸", "位置控制", "速度/力矩", "PID 参数", "编码器与零点", "系统"];
-let curTab = 0;
-
-function renderTabs() {
-  const m = selMotor();
-  const bar = document.getElementById("tabBar");
-  bar.innerHTML = "";
-  TABS.forEach((t, i) => {
-    const b = document.createElement("button");
-    b.className = "tab" + (i === curTab ? " act" : "");
-    b.textContent = t;
-    b.onclick = () => { curTab = i; renderTabs(); };
-    bar.appendChild(b);
+function guardPendingPanel(m, panel) {
+  if (!m || !protocolPending(m) || !panel) return;
+  panel.insertAdjacentHTML("afterbegin", '<div class="hint warn">协议尚未确认：当前仅开放只读确认；写入、复位和运动操作已隐藏。</div>');
+  const blocked = /(sysCmd|sysSend|sysReset|v3SetId|v44SetId79|v3Func|v44Func|v44FuncQuick|v3PidWrite|v44LimitWrite|v44SetZero|v3Home|v3Pos1|v3Pos\(|v3Speed|v3Torque|v44Pos|v44Speed|v44Torque|v44FF|v44ForcePos|v3Acc\(0x43|v44Acc\(0x43|v44Pid\(0x3[12]|sendMotor\(BUILD_)/;
+  panel.querySelectorAll("button[onclick]").forEach(button => {
+    if (blocked.test(button.getAttribute("onclick") || "")) {
+      button.hidden = true;
+      button.title = "协议未确认,该操作已隐藏";
+    }
   });
+}
+
+/* 三大块渲染:块1 控制参数(限幅与零点置顶) / 块3 基础参数 / 协议自测独立;块2 实时显示常驻 */
+function renderBlocks() {
+  const m = selMotor();
   document.getElementById("dbgTitle").textContent = m
     ? `—— ${m.name}(编号 ${m.id},${P[m.proto]}${m.note ? "," + m.note : ""})`
     : "——请先在左侧注册表选择一台电机";
-  document.getElementById("tabPanel").innerHTML = m ? TAB_RENDER[m.proto][curTab](m) : '<div class="hint">选择电机后显示调试面板。</div>';
+  const ctrl = document.getElementById("blockCtrl");
+  const base = document.getElementById("blockBase");
+  const proto = document.getElementById("blockProto");
+  const monitor = document.getElementById("monitorPanel");
+  if (!m) {
+    ctrl.innerHTML = '<div class="hint">选择电机后显示控制参数面板。</div>';
+    base.innerHTML = '<div class="hint">选择电机后显示基础参数面板。</div>';
+    proto.innerHTML = '<div class="hint">选择电机后可进行协议版本自测。</div>';
+    monitor.innerHTML = '<div class="hint">选择电机后开始状态监控。</div>';
+    return;
+  }
+  const R = BLOCK_RENDER[m.proto];
+  ctrl.innerHTML = limitZeroPanel(m) + R.ctrl(m);
+  base.innerHTML = R.base(m);
+  proto.innerHTML = TAB_RENDER_PROTO(m);
+  monitor.innerHTML = R.monitor(m);
+  guardPendingPanel(m, ctrl);
+  guardPendingPanel(m, base);
+}
+/* 块2「实时显示」整块收起/展开(可开关的图像与日志窗口) */
+let monitorCollapsed = false;
+function monitorToggle() {
+  monitorCollapsed = !monitorCollapsed;
+  const box = document.getElementById("blockMonitor");
+  const btn = document.getElementById("btnMonitorToggle");
+  if (box) box.style.display = monitorCollapsed ? "none" : "";
+  if (btn) btn.textContent = monitorCollapsed ? "🔽 展开" : "🔼 收起";
 }
 
 /* ---------- 通用组件 ---------- */
@@ -1057,7 +1192,7 @@ const TAB_RENDER_V3 = [
   // 2 位置控制
   () => `
     <div class="panel-title">🎯 位置闭环控制</div>
-    <div class="hint">角度/速度均为<b>输出轴</b>单位(°、dps),发送时自动 ×减速比换算到转子侧(0.01°/LSB、1dps/LSB);力矩电流不换算。<b>旧款 X8/X6 的 0xA4 实为「单圈相位」固件闭环</b>(重复点击收敛同一位置):上位机发目标相位,固件内部闭环;唯一缺陷是「当前相位在跳变区」(输出轴 0°/60° 倍数附近)时方向判定不稳——上位机检测到跳变区会自动改用 <b>0xA8 增量离开</b>(方向定死,0xA8 实测稳定)。</div>
+    <div class="hint">角度/速度均为<b>输出轴</b>单位(°、dps),发送时自动 ×减速比换算到转子侧(0.01°/LSB、1dps/LSB);力矩电流不换算。<b>0xA4 为多圈绝对角目标</b>(固件按「目标−当前」差值直接执行,非单圈相位):上位机以 0x92 轮询把内部角校准到固件多圈角,发目标 = 机械零点 E0 + 目标角度(输出轴×减速比);0xA8 为增量位置(相对当前)。</div>
     <div class="row">
       <label>目标角度</label> ${numInp("pDeg", 0, 120)} <span class="hint">°(输出轴)</span>
       <label>最大速度</label> ${numInp("pSpd", 60, 90)} <span class="hint">dps</span>
@@ -1111,12 +1246,7 @@ const TAB_RENDER_V3 = [
       <button class="primary" onclick="v3PidWrite(0)">0x31 写 RAM</button>
       <button class="danger" onclick="v3PidWrite(1)">0x32 写 ROM</button>
       <span class="hint">恢复参考:X8-PRO 出厂值 电流KP 100 / KI 100 · 速度KP 50 / KI 40 · 位置KP 50 / KI 50</span>
-    </div>
-    <div class="panel-title" style="margin-top:12px">⛔ 限幅说明</div>
-    <div class="hint">V3.x 协议<b>无角度限幅指令</b>。各限幅由闭环指令自带参数承担:<br>
-    ・角度限幅:无(位置运行无角度上下限,请谨慎设置目标值);<br>
-    ・速度限幅:位置/增量指令的「最大速度」参数(0xA4/0xA8/0xA6);<br>
-    ・电流限幅:力矩闭环「力矩电流」(0xA1,0.01A/LSB)。</div>`,
+    </div>`,
   // 5 编码器与零点
   () => `
     <div class="panel-title">🔢 编码器与零点</div>
@@ -1133,7 +1263,9 @@ const TAB_RENDER_V3 = [
       <button class="primary" onclick="v3Home()">🏠 自动回机械零点</button>
       ${numInp("homeSpd", 15, 90, 2)} <span class="hint">归位速度°/s(输出轴)</span>
     </div>
-    <div class="hint">E0 标定步骤:① 电机失能/断电 → ② 人工把关节转到「凸点对齐」的机械零点 → ③ 点「记录机械零点」→ ④ 之后随时点「自动回机械零点」即回到该位置。E0 只存上位机注册表档案(0x63/0x64 对旧款无效,无法写入固件)。</div>
+    <div class="hint">E0 标定步骤:① 电机失能/断电 → ② 人工把关节转到「凸点对齐」的机械零点 → ③ 点「记录机械零点」→ ④ 之后随时点「自动回机械零点」即回到该位置。E0 只存上位机注册表档案(0x63/0x64 对旧款无效,无法写入固件)。</div>`,
+  // 加速度(独立,归块1 控制参数)
+  () => `
     <div class="panel-title">🏃 加速度(0x42 读 / 0x43 写,索引 0~3)</div>
     <div class="row">
       <select id="accIdx">
@@ -1168,9 +1300,16 @@ const TAB_RENDER_V3 = [
     <div class="panel-title">📊 状态读取</div>
     <div class="row">
       <button onclick="readCmd(0x71,'0x71 读功率')">0x71 功率</button>
+      <button onclick="readCmd(0x9D,'0x9D 三相电流')">0x9D 三相电流</button>
       <button onclick="readCmd(0xB1,'0xB1 运行时间')">0xB1 运行时间</button>
       <button onclick="readCmd(0xB2,'0xB2 固件日期')">0xB2 固件日期</button>
       <button onclick="readCmd(0xB5,'0xB5 型号')">0xB5 型号</button>
+    </div>
+    <div class="panel-title">📡 主动回复(0xB6)</div>
+    <div class="row">
+      <button onclick="readCmd(0xB6,'0xB6 读主动回复')">0xB6 读</button>
+      <button onclick="sysSend(BUILD_V3.B6(true),'0xB6 开启主动回复')">开启</button>
+      <button onclick="sysSend(BUILD_V3.B6(false),'0xB6 关闭主动回复')">关闭</button>
     </div>
     <div class="panel-title">🛡️ 保护与复位</div>
     <div class="row">
@@ -1198,14 +1337,7 @@ const TAB_RENDER_V3 = [
       <button class="danger" onclick="v3Func()">0x20 执行</button>
     </div>
     <div class="hint warn">⚠️ 索引 1 清除多圈值并保存,重启生效;索引 2 失能编号滤波器是多电机 0x280 广播的前提。</div>
-    <div class="panel-title">🔧 掉电位置恢复(旧款 X8/X6,单圈绝对值模型)</div>
-    <div class="hint warn">⚠️ <b>旧款 X8/X6(V3 固件)为转子侧单圈绝对值编码器</b>:断电后转子相位(单圈 0~360°)保持精确,多圈圈号丢失;0x20 索引 4「多圈掉电保存」在旧固件不存在,0x63/0x64 写 ROM 实测无效。恢复方案(推荐):先标定机械零点 E0(编码器与零点页),上电后点「🏠 自动回机械零点」——0xA4 发相位 E0,沿最短路径自动回位,圈号清零,之后位置完全绝对化。</div>
-    <div class="row">
-      <button class="warn" onclick="v3RecordZero()">📌 记录机械零点(E0)</button>
-      <button class="primary" onclick="v3Home()">🏠 自动回机械零点</button>
-      <button onclick="readCmd(0x92,'0x92 多圈角度')">0x92 读多圈角度</button>
-    </div>
-    <div class="hint">标准做法(每次上电):① 上电 → ② 确认机械零点已标定(未标定先转至凸点后点「记录机械零点」)→ ③ 点「🏠 自动回机械零点」(低速,回位后圈号清零)→ ④ 开始绝对位置控制(0xA4 相位 + 0xA8 补圈自动完成)。若不想自动回位,也可在已知圈数时直接发 0xA4/0xA8 指令,上位机会按当前相位自动拆分圈号。</div>`,
+    <div class="hint">🔧 旧款 X8/X6 为<b>转子侧单圈绝对值编码器</b>(断电后相位保持、圈号丢失,0x20 索引 4 掉电保存不存在):掉电恢复请用「控制参数 → 📍 设置当前位置为零点 / 编码器页的 E0 标定 + 🏠 自动回机械零点」方案。</div>`,
 ];
 
 /* ---------- V4.4 页签 ---------- */
@@ -1229,7 +1361,7 @@ const TAB_RENDER_V44 = [
     <div class="hint ok">✅ 新型号电机<b>没有使能环节</b>:上电后直接发闭环指令(0xA1/A2/A4/A8 等)即运行。</div>
     <div class="row">
       <button class="danger" onclick="sysCmd(0x80,'0x80 失能')">0x80 失能</button>
-      <button class="warn" onclick="sysCmd(0x81,'0x81 停止保持')">0x81 停止</button>
+      <button class="warn" onclick="sysCmd(0x81,'0x81 停止保持')">0x81 停止保持</button>
     </div>
     <div class="row">
       <button onclick="sysCmd(0x77,'0x77 松抱闸')">0x77 松抱闸</button>
@@ -1302,18 +1434,7 @@ const TAB_RENDER_V44 = [
     <div class="row">
       <button class="small primary" onclick="v44PidReadAll()">📖 读取全部七参数</button>
     </div>
-    <div class="kv" id="pidKv"><div class="k">尚未读取。</div></div>
-    <div class="panel-title" style="margin-top:12px">⛔ 限幅设置(0x20)</div>
-    <div class="hint">角度限幅:0x20 索引 6(正向)/7(反向)位置运行最大角度,0.01°/LSB,保存 ROM <b>立即生效</b>;输入按<b>输出轴</b>,发送时自动 ×减速比。0x20 无读回指令(回复=回显)。<br>
-    速度限幅 = 闭环指令「最大速度」参数(位置页 0xA4 D2~3、速度页 0xA2);电流限幅 = 速度页 0xA2「最大力矩%」与 0xA1「力矩电流」。</div>
-    <div class="row">
-      <label>正向最大角</label> ${numInp("limPos", 360, 100)} <span class="hint">°(输出轴)</span>
-      <button class="danger" onclick="v44LimitWrite(6)">0x20 索引6 写</button>
-    </div>
-    <div class="row">
-      <label>反向最大角</label> ${numInp("limNeg", -360, 100)} <span class="hint">°(输出轴)</span>
-      <button class="danger" onclick="v44LimitWrite(7)">0x20 索引7 写</button>
-    </div>`,
+    <div class="kv" id="pidKv"><div class="k">尚未读取。</div></div>`,
   // 5 编码器与零点
   () => `
     <div class="panel-title">🔢 编码器与零点</div>
@@ -1329,7 +1450,9 @@ const TAB_RENDER_V44 = [
       <button onclick="sendMotor(BUILD_V44.ZERO_OFF(v('zoVal',0)),'0x63 写零偏')">0x63 写零偏</button>
       <button class="danger" onclick="v44SetZero()">0x64 当前位置设零</button>
     </div>
-    <div class="hint warn">⚠️ 0x63 重启生效;0x64 按钮已自动完成「0x80 失能 → 0x64 写 ROM → 0x76 复位」三步(协议要求:失能时才能写 ROM,写后需复位才生效);勿高频写 ROM。</div>
+    <div class="hint warn">⚠️ 0x63 重启生效;0x64 按钮已自动完成「0x80 失能 → 0x64 写 ROM → 0x76 复位」三步(协议要求:失能时才能写 ROM,写后需复位才生效);勿高频写 ROM。</div>`,
+  // 加速度(独立,归块1 控制参数)
+  () => `
     <div class="panel-title">🏃 加速度(0x42 读 / 0x43 写,索引 0~3)</div>
     <div class="row">
       <select id="accIdx">
@@ -1374,6 +1497,12 @@ const TAB_RENDER_V44 = [
       <button class="danger" onclick="sysSend(BUILD_V44.B4(parseInt(v('b4sel',0))),'0xB4 写波特率')">0xB4 写</button>
     </div>
     <div class="hint warn">⚠️ 波特率修改后立即生效,总线所有设备与上位机必须同步调整,否则失联。</div>
+    <div class="panel-title">🆔 电机编号(0x20 索引 5)</div>
+    <div class="row">
+      ${numInp("newId", 1, 80, 1)} <span class="hint">新编号(1~32)</span>
+      <button class="danger" onclick="v44SetId()">修改编号(保存 ROM)</button>
+    </div>
+    <div class="hint warn">⚠️ V4.4 协议<b>已删除 0x79</b>,改编号用 0x20 索引 5;修改保存 ROM 重启生效,修改前确保总线上只有这一台电机通电(多台会一起被改)。</div>
     <div class="panel-title">🧰 功能控制(0x20)</div>
     <div class="row">
       <select id="f20sel">
@@ -1382,7 +1511,7 @@ const TAB_RENDER_V44 = [
         <option value="5">05 设置电机编号</option><option value="6">06 正向最大角度</option>
         <option value="7">07 反向最大角度</option><option value="8">08 错误自动恢复</option>
       </select>
-      ${numInp("f20val", 0, 120)} <span class="hint">数值(0 或 1;索引 5 填新编号)</span>
+      ${numInp("f20val", 0, 120)} <span class="hint">数值(0 或 1;索引 5 填新编号;索引 6/7 填角度°,按输出轴换算)</span>
       <button class="danger" onclick="v44Func()">0x20 执行</button>
     </div>
     <div class="panel-title">🔋 掉电记忆(多圈掉电保存,0x20 索引 4)</div>
@@ -1399,7 +1528,456 @@ const TAB_RENDER_V44 = [
       <button onclick="sysSend(BUILD_V44.B6(false),'0xB6 关闭主动回复')">关闭</button>
     </div>`,
 ];
-const TAB_RENDER = { V3: TAB_RENDER_V3, V44: TAB_RENDER_V44 };
+/* 协议确认页只呈现结论与用户要观察的现象,技术细节留在帮助和内部记录。 */
+const TAB_RENDER_PROTO = () => `
+    <div class="panel-title">协议版本确认</div>
+    <div class="hint">只读取当前选中电机的身份、状态、位置和参数格式，不改变电机设置，也不让电机运动。</div>
+    <div class="row">
+      <button id="protoStartBtn" class="primary" onclick="protoSelfTest()">开始安全确认</button>
+      <button id="protoFeatureBtn" class="primary" onclick="protoFeatureTest()">补充协议特征</button>
+      <button id="protoObserveStartBtn" class="warn" onclick="protoObserveStart()">记录静止读数</button>
+      <button id="protoObserveEndBtn" class="warn" onclick="protoObserveEnd()" disabled>完成人工观察</button>
+      <button onclick="protoReset()">清空结果</button>
+    </div>
+    <div id="protoHint" class="hint">先点击“开始安全确认”。如需核对位置读数，再按提示做人工轻微转动。</div>
+    <div id="protoResult" class="proto-result">
+      <div class="proto-line"><span class="proto-label">确认状态</span><span class="proto-value">尚未开始</span></div>
+    </div>
+    <details class="proto-help">
+      <summary>帮助：确认内容与安全边界</summary>
+      <ul>
+        <li>软件只发读取类请求，逐条等待当前电机的回复；不发送位置、速度、电流、模式、编号、波特率、复位或任何 ROM 写入。</li>
+        <li>参数结构只作为内部证据标签，不直接推出协议版本；V3.9、V4.3、V4.4 的共用特征不能单独定版。</li>
+        <li>“补充协议特征”只读取兼容性特征和单圈数据格式；页面不显示指令号。V4.3 的旧式特征与 V4.4 的新式单圈格式均须收到正向证据才能给出“更支持”结论。</li>
+        <li>“人工观察”不调用位置控制页。请在机械安全、不会突然受力的条件下轻微转动外部转子，随后点击完成；软件只比较两次读数，不驱动电机。</li>
+        <li>原始帧只保留在本次确认的内部诊断记录中，不显示在收发日志，也不自动写入电机注册表。</li>
+      </ul>
+    </details>`;
+/* ---------- V4.3 页签(V4.4 变体:无 0x72/0x73 前馈,有 0x79/0x90,0x20 索引 1~7) ---------- */
+const TAB_RENDER_V43 = [
+  TAB_RENDER_V44[0],                                   // 状态监控(结构同 V4.4)
+  () => `
+    <div class="panel-title">⚡ 启停与抱闸(V4.3 新型号)</div>
+    <div class="hint ok">✅ 新型号电机<b>没有使能环节</b>:上电后直接发闭环指令(0xA1/A2/A4/A8 等)即运行。</div>
+    <div class="row">
+      <button class="danger" onclick="sysCmd(0x80,'0x80 失能')">0x80 失能</button>
+      <button class="warn" onclick="sysCmd(0x81,'0x81 停止保持')">0x81 停止保持</button>
+    </div>
+    <div class="row">
+      <button onclick="sysCmd(0x77,'0x77 松抱闸')">0x77 松抱闸</button>
+      <button onclick="sysCmd(0x78,'0x78 锁抱闸')">0x78 锁抱闸</button>
+    </div>
+    <div class="hint">抱闸款电机在闭环运动前请先 0x77 释放抱闸。</div>`,
+  TAB_RENDER_V44[2],                                   // 位置控制(结构同 V4.4)
+  () => `
+    <div class="panel-title">🚀 速度 / 力矩闭环</div>
+    <div class="row">
+      <label>目标速度</label> ${numInp("vSpd", 0, 120)} <span class="hint">dps(输出轴)</span>
+      <label>最大力矩</label> ${numInp("vTqPct", 100, 80)} <span class="hint">%额定(电流限幅)</span>
+      <button class="primary" onclick="v44Speed()">0xA2 速度闭环</button>
+    </div>
+    <div class="row">
+      <label>力矩电流</label> ${numInp("vIq", 0, 120)} <span class="hint">A(0.01A/LSB)</span>
+      <button class="primary" onclick="v44Torque()">0xA1 力矩闭环</button>
+    </div>
+    <div class="panel-title" style="margin-top:12px">🎯 力控位置(0xA9)</div>
+    <div class="row">
+      <label>位置</label> ${numInp("fpPos", 0, 110)} <span class="hint">°(输出轴)</span>
+      <label>速度</label> ${numInp("fpSpd", 60, 90)} <span class="hint">dps(输出轴)</span>
+      <label>力矩</label> ${numInp("fpTq", 50, 80)} <span class="hint">%额定</span>
+      <button class="primary" onclick="v44ForcePos()">0xA9 力控位置</button>
+    </div>
+    <div class="hint">注:0x72/0x73 前馈位置控制为 V4.4 专属指令,本 V4.3 面板不含。</div>`,
+  TAB_RENDER_V44[4],                                   // PID(索引式,同 V4.4)
+  () => `
+    <div class="panel-title">🔢 编码器与零点</div>
+    <div class="row">
+      <button onclick="readCmd(0x60,'0x60 多圈位置')">0x60 多圈位置</button>
+      <button onclick="readCmd(0x61,'0x61 原始位置')">0x61 原始位置</button>
+      <button onclick="readCmd(0x62,'0x62 零偏')">0x62 零偏</button>
+      <button class="small primary" onclick="readCmd(0x90,'0x90 单圈编码器')">0x90 单圈编码器</button>
+      <button class="small primary" onclick="readCmd(0x92,'0x92 多圈角度')">0x92 多圈角度</button>
+      <button class="small" onclick="readCmd(0x94,'0x94 单圈角度')">0x94 单圈角度</button>
+    </div>
+    <div class="row">
+      <label>零偏值</label> ${numInp("zoVal", 0, 140)} <span class="hint">脉冲</span>
+      <button onclick="sendMotor(BUILD_V44.ZERO_OFF(v('zoVal',0)),'0x63 写零偏')">0x63 写零偏</button>
+      <button class="danger" onclick="v44SetZero()">0x64 当前位置设零</button>
+    </div>
+    <div class="hint warn">⚠️ 0x63 重启生效;0x64 按钮已自动完成「0x80 失能 → 0x64 写 ROM → 0x76 复位」三步(协议要求:失能时才能写 ROM,写后需复位才生效);勿高频写 ROM。</div>`,
+  TAB_RENDER_V44[6],                                   // 加速度(同 V4.4)
+  () => `
+    <div class="panel-title">⚙️ 系统功能</div>
+    <div class="row">
+      <button onclick="readCmd(0x70,'0x70 读模式')">0x70 读模式</button>
+      <select id="modeSel">
+        <option value="1">电流环模式</option>
+        <option value="2" selected>位置环模式</option>
+        <option value="3">速度环模式</option>
+      </select>
+      <button class="warn" onclick="sysSend(BUILD_V44.MODE(parseInt(v('modeSel',2))),'0x70 写模式')">0x70 写模式</button>
+    </div>
+    <div class="row">
+      <button onclick="readCmd(0xB1,'0xB1 运行时间')">0xB1 运行时间</button>
+      <button onclick="readCmd(0xB2,'0xB2 固件日期')">0xB2 固件日期</button>
+      <button onclick="readCmd(0xB5,'0xB5 型号')">0xB5 型号</button>
+      <button onclick="readCmd(0x9D,'0x9D 三相电流')">0x9D 三相电流</button>
+    </div>
+    <div class="row">
+      <label>保护时长</label> ${numInp("b3ms", 5000, 110)} <span class="hint">ms</span>
+      <button onclick="readCmd(0xB3,'0xB3 读保护')">0xB3 读</button>
+      <button onclick="sysSend(BUILD_V44.B3(v('b3ms',5000)),'0xB3 写保护')">0xB3 写</button>
+      <button class="danger" onclick="sysReset()">0x76 复位</button>
+    </div>
+    <div class="panel-title">📡 波特率(0xB4)</div>
+    <div class="row">
+      <button onclick="readCmd(0xB4,'0xB4 读波特率')">0xB4 读</button>
+      <select id="b4sel">
+        <option value="0">索引 0:1M</option>
+        <option value="1">索引 1:500K</option>
+        <option value="2">索引 2:250K</option>
+      </select>
+      <button class="danger" onclick="sysSend(BUILD_V44.B4(parseInt(v('b4sel',0))),'0xB4 写波特率')">0xB4 写</button>
+    </div>
+    <div class="hint warn">⚠️ 波特率修改后立即生效,总线所有设备与上位机必须同步调整,否则失联。</div>
+    <div class="panel-title">🆔 电机 ID(0x79,V4.3 保留)</div>
+    <div class="row">
+      <button onclick="v44ReadId79()">0x79 读当前 ID</button>
+      ${numInp("newId", 1, 80, 1)} <span class="hint">新 ID(1~32)</span>
+      <button class="danger" onclick="v44SetId79()">0x79 修改 ID</button>
+    </div>
+    <div class="hint warn">⚠️ 0x79 发往固定地址 <b>0x300</b>,修改前确保总线上只有这一台电机通电(多台会一起被改),保存 ROM 重启生效。<b>V4.3 协议支持 0x79(实测 X6-40 有回复);V4.4 已删除 0x79</b>。</div>
+    <div class="panel-title">🧰 功能控制(0x20)</div>
+    <div class="row">
+      <select id="f20sel">
+        <option value="1">01 清除多圈值</option><option value="2">02 编号滤波器</option>
+        <option value="3">03 错误主动上报</option><option value="4">04 多圈掉电保存</option>
+        <option value="5">05 设置电机编号</option><option value="6">06 正向最大角度</option>
+        <option value="7">07 反向最大角度</option>
+      </select>
+      ${numInp("f20val", 0, 120)} <span class="hint">数值(0 或 1;索引 5 填新编号;索引 6/7 填角度°,按输出轴换算)</span>
+      <button class="danger" onclick="v44Func()">0x20 执行</button>
+    </div>
+    <div class="hint warn">⚠️ 索引 4/5 为 V4.3 文档功能,<b>X6-40 真机待验证</b>(掉电记忆、改编号写入 ROM 前请先确认);索引 6/7 角度限幅已在 X6-40 实测(限位语义待确认,见限幅与零点模块);索引 8 错误自动恢复为 V4.4 专属,本面板不含。</div>
+    <div class="panel-title">🔋 掉电记忆(0x20 索引 4,X6-40 待验证)</div>
+    <div class="row">
+      <button class="primary" onclick="v44FuncQuick(4, 1)">🔋 开启掉电记忆</button>
+      <button onclick="v44FuncQuick(4, 0)">关闭(单圈模式)</button>
+    </div>
+    <div class="hint">开启后<b>掉电前固件自动把当前多圈值保存到 FLASH,重新上电恢复断电前的位置</b>;写入需在电机失能时进行,<b>重启生效</b>。⚠️ V4.3 文档列出该功能,但 X6-40 真机尚未独立验证。</div>
+    <div class="panel-title">📡 主动回复(0xB6)</div>
+    <div class="row">
+      <button onclick="readCmd(0xB6,'0xB6 读主动回复')">0xB6 读</button>
+      <button onclick="sysSend(BUILD_V44.B6(true),'0xB6 开启主动回复')">开启</button>
+      <button onclick="sysSend(BUILD_V44.B6(false),'0xB6 关闭主动回复')">关闭</button>
+    </div>`,
+];
+
+/* ---------- 三大块组装(按协议独立渲染,新协议只加一套) ---------- */
+function blk(...fns) { return fns.map(f => f()).join(""); }
+const BLOCK_RENDER = {
+  // monitor=状态监控(块2);ctrl=块1 控制参数;base=块3 基础参数
+  V3: {
+    monitor: TAB_RENDER_V3[0],
+    ctrl: () => blk(TAB_RENDER_V3[1], TAB_RENDER_V3[2], TAB_RENDER_V3[3], TAB_RENDER_V3[4], TAB_RENDER_V3[6]),
+    base: () => blk(TAB_RENDER_V3[5], TAB_RENDER_V3[7]),
+  },
+  V43: {
+    monitor: TAB_RENDER_V43[0],
+    ctrl: () => blk(TAB_RENDER_V43[1], TAB_RENDER_V43[2], TAB_RENDER_V43[3], TAB_RENDER_V43[4], TAB_RENDER_V43[6]),
+    base: () => blk(TAB_RENDER_V43[5], TAB_RENDER_V43[7]),
+  },
+  V44: {
+    monitor: TAB_RENDER_V44[0],
+    ctrl: () => blk(TAB_RENDER_V44[1], TAB_RENDER_V44[2], TAB_RENDER_V44[3], TAB_RENDER_V44[4], TAB_RENDER_V44[6]),
+    base: () => blk(TAB_RENDER_V44[5], TAB_RENDER_V44[7]),
+  },
+};
+
+/* ---------- ⛔ 限幅与零点模块(块1 置顶;所有指令共用一个限幅,注册表持久化) ---------- */
+/* 设零按钮不露指令名:V3 走 E0 机械零点记录(0x63/0x64 对旧款无效),V4 走 0x80→0x64→0x76 三步 */
+function limitZeroPanel(m) {
+  const v4 = m.proto !== "V3";
+  const lim = k => { const x = m[k]; return (typeof x === "number" && isFinite(x)) ? x : ""; };
+  const fw = v4 ? `
+    <div class="row">
+      <span class="hint">固件角度限幅(V4,0x20 索引 6/7,保存 ROM 立即生效):</span>
+      <label>正向最大角</label> ${numInp("limPos", 360, 90)} <span class="hint">°(输出轴)</span>
+      <button class="danger" onclick="v44LimitWrite(6)">写入固件</button>
+      <label>反向最大角</label> ${numInp("limNeg", -360, 90)} <span class="hint">°(输出轴)</span>
+      <button class="danger" onclick="v44LimitWrite(7)">写入固件</button>
+    </div>
+    <div class="hint warn">⚠️ X6-40(V4.3)固件限位语义待确认(限位 ±180° 时发 0° 停在 +180°):写入前请先核实;下方<b>软件限幅</b>为独立安全层,不受固件限位影响。</div>` : "";
+  return `
+    <div class="panel-title">📍 设置当前位置为零点</div>
+    <div class="row">
+      <button class="warn" onclick="${v4 ? "v44SetZero()" : "v3RecordZero()"}">📍 设置当前位置为零点</button>
+      <span class="hint">${v4 ? "自动执行 失能→写零点→复位 三步(失能瞬间掉力,请先做好机械防护)" : "记录当前固件角为机械零点 E0,之后位置显示以零点为 0°(旧款无法写固件零点,用 E0 档案方案)"}</span>
+    </div>
+    <div class="panel-title">⛔ 软件限幅(所有指令共用)</div>
+    <div class="row">
+      <label>角度下限</label> ${numInp("limMinDeg", lim("limMinDeg"), 85)} <span class="hint">°</span>
+      <label>角度上限</label> ${numInp("limMaxDeg", lim("limMaxDeg"), 85)} <span class="hint">°</span>
+      <label>最大速度</label> ${numInp("limMaxSpd", lim("limMaxSpd"), 85)} <span class="hint">dps</span>
+      <label>最大电流</label> ${numInp("limMaxIq", lim("limMaxIq"), 85)} <span class="hint">A</span>
+      <button class="primary" onclick="saveLimits()">💾 保存限幅</button>
+    </div>
+    <div class="hint">软件限幅为<b>上位机安全层</b>:所有位置/速度/力矩指令发送前自动校验,超限拦截并提示;保存到电机注册表(重启不丢),显示值 = 注册表当前值,未设置则留空放行。</div>
+    ${fw}`;
+}
+function saveLimits() {
+  const m = selMotor();
+  if (!m) return;
+  const fields = ["limMinDeg", "limMaxDeg", "limMaxSpd", "limMaxIq"];
+  fields.forEach(k => {
+    const el = document.getElementById(k);
+    if (el && el.value !== "") m[k] = parseFloat(el.value);
+    else delete m[k];
+  });
+  const warns = [];
+  if (typeof m.limMinDeg === "number" && typeof m.limMaxDeg === "number" && m.limMinDeg >= m.limMaxDeg) warns.push("角度下限必须小于上限");
+  if (typeof m.limMaxSpd === "number" && m.limMaxSpd <= 0) warns.push("最大速度需 > 0");
+  if (typeof m.limMaxIq === "number" && m.limMaxIq <= 0) warns.push("最大电流需 > 0");
+  if (warns.length) addLog("warn", "⛔ 限幅保存提醒:" + warns.join(";"));
+  saveMotors();
+  addLog("sys", `⛔ 限幅已保存(${m.name}):下限 ${m.limMinDeg ?? "—"}° 上限 ${m.limMaxDeg ?? "—"}° 最大速度 ${m.limMaxSpd ?? "—"} dps 最大电流 ${m.limMaxIq ?? "—"} A`);
+  renderMotors();
+}
+/* 发送前限幅校验:vals = {deg, spd, iq}(输出轴单位);返回 true=放行,false=拦截 */
+function limitBlock(m, vals) {
+  if (!m) return true;
+  const d = k => (typeof m[k] === "number" && isFinite(m[k])) ? m[k] : null;
+  const msgs = [];
+  if (vals.deg !== undefined) {
+    if (d("limMinDeg") !== null && vals.deg < d("limMinDeg")) msgs.push(`目标角度 ${vals.deg}° 低于下限 ${d("limMinDeg")}°`);
+    if (d("limMaxDeg") !== null && vals.deg > d("limMaxDeg")) msgs.push(`目标角度 ${vals.deg}° 超过上限 ${d("limMaxDeg")}°`);
+  }
+  if (vals.spd !== undefined && d("limMaxSpd") !== null && Math.abs(vals.spd) > d("limMaxSpd")) msgs.push(`速度 ${Math.abs(vals.spd)} dps 超过最大速度 ${d("limMaxSpd")} dps`);
+  if (vals.iq !== undefined && d("limMaxIq") !== null && Math.abs(vals.iq) > d("limMaxIq")) msgs.push(`电流 ${Math.abs(vals.iq)} A 超过最大电流 ${d("limMaxIq")} A`);
+  if (msgs.length) {
+    addLog("err", "⛔ 限幅拦截(未发送):" + msgs.join(";"));
+    alert("⛔ 限幅拦截(未发送):\n" + msgs.join("\n") + "\n\n如需执行,请先在「控制参数设置 → ⛔ 软件限幅」中调整限幅。");
+    return false;
+  }
+  return true;
+}
+
+/* =====================================================================
+ * 只读协议确认:会话帧与普通日志、状态轮询完全分离。
+ * ===================================================================== */
+const protoState = {
+  active: false, busy: false, frames: [], seq: 0, session: null,
+  pollWasOn: false, baseline: null, suppressUntil: 0, lastResult: null
+};
+function protoSetText(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
+function protoSetBusy(busy) {
+  protoState.busy = busy;
+  ["protoStartBtn", "protoFeatureBtn", "protoObserveStartBtn", "protoObserveEndBtn"].forEach(id => {
+    const el = document.getElementById(id); if (el) el.disabled = busy || (id === "protoObserveEndBtn" && !protoState.baseline);
+  });
+}
+function protoRender(rows, finalText) {
+  const box = document.getElementById("protoResult");
+  if (!box) return;
+  box.innerHTML = rows.map(row => `<div class="proto-line"><span class="proto-label">${row[0]}</span><span class="proto-value">${row[1]}</span></div>`).join("");
+  if (finalText) box.innerHTML += `<div class="proto-line proto-final"><span class="proto-label">确认结果</span><span class="proto-value">${finalText}</span></div>`;
+}
+function protoReset() {
+  if (protoState.busy) return;
+  protoState.frames = []; protoState.seq = 0; protoState.session = null; protoState.baseline = null; protoState.lastResult = null;
+  protoSetText("protoHint", "先点击“开始安全确认”。如需核对位置读数，再按提示做人工轻微转动。");
+  protoRender([["确认状态", "尚未开始"]]);
+  protoSetBusy(false);
+}
+function protoBegin() {
+  if (!bridgeReady() || !dev.opened) { protoSetText("protoHint", "请先打开 CAN 设备。"); return false; }
+  if (!selMotor()) { protoSetText("protoHint", "请先在左侧选择一台电机。"); return false; }
+  if (protoState.active || protoState.busy) return false;
+  protoState.active = true; protoState.frames = []; protoState.seq = 0;
+  protoState.session = { motorId: selMotor().id, canId: 0x140 + selMotor().id };
+  protoState.pollWasOn = pollOn;
+  if (pollOn) pollToggle(0);
+  return true;
+}
+function protoEnd() {
+  protoState.active = false; protoState.session = null; protoState.suppressUntil = Date.now() + 600;
+  if (protoState.pollWasOn && dev.opened) pollToggle(1);
+}
+function protoCapture(ev, bytes) {
+  if (!protoState.active || !protoState.session) return;
+  protoState.frames.push({ seq: ++protoState.seq, id: ev.id, data: bytes.slice(), ts: Date.now() });
+}
+async function protoRead(canId, bytes, cmd, waitMs = 450) {
+  const mark = protoState.seq;
+  if (!await rawSend(canId, 0, hx(pad8(bytes)), "", true)) return null;
+  const responseId = canId + 0x100;
+  const deadline = Date.now() + waitMs;
+  while (Date.now() < deadline) {
+    const hit = protoState.frames.slice().find(f => f.seq > mark && (f.id === canId || f.id === responseId) && f.data[0] === cmd);
+    if (hit) return hit;
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+  return null;
+}
+function protoDecodePid(frames) {
+  const indexed = frames.filter(f => f && f.data[0] === 0x30);
+  const v3 = indexed.filter(f => f.data[1] === 0 && (f.data[2] !== 0 || f.data[3] !== 0)).length;
+  const v4 = indexed.filter(f => f.data[1] === 1).length;
+  if (v3 && !v4) return "六参数结构";
+  if (v4 && !v3) return "索引参数结构";
+  return "未确认";
+}
+function protoU16(lo, hi) { return ((lo || 0) | ((hi || 0) << 8)) >>> 0; }
+function protoI32(b) {
+  const u = ((b[0] || 0) | ((b[1] || 0) << 8) | ((b[2] || 0) << 16) | ((b[3] || 0) << 24)) >>> 0;
+  return u & 0x80000000 ? u - 0x100000000 : u;
+}
+function protoDecodeFeatures(frames) {
+  const f79 = frames.find(f => f && f.data[0] === 0x79 && f.data.length >= 8 && f.data[2] === 1) || null;
+  const f90 = frames.find(f => f && f.data[0] === 0x90 && f.data.length >= 8) || null;
+  const f94 = frames.find(f => f && f.data[0] === 0x94 && f.data.length >= 8) || null;
+  let angleFormat = "未读到";
+  if (f94) {
+    const d = f94.data;
+    const oldValue = protoU16(d[6], d[7]);
+    const newValue = protoI32(d.slice(4, 8));
+    const oldLayout = d[1] === 0 && d[2] === 0 && d[3] === 0 && d[4] === 0 && d[5] === 0 && oldValue <= 35999;
+    const newLayout = d[1] === 0 && d[2] === 0 && d[3] === 0 && newValue >= -18000 && newValue <= 18000;
+    if (oldLayout && !newLayout) angleFormat = "两字节格式";
+    else if (newLayout && !oldLayout) angleFormat = "四字节格式";
+    else angleFormat = "暂无法判定";
+  }
+  return {
+    legacyFeature: !!(f79 || f90),
+    legacyFeatureKnown: !!(f79 || f90 || f94),
+    angleFormat,
+    f79: !!f79,
+    f90: !!f90,
+    f94: !!f94
+  };
+}
+function protoFeatureConclusion(base, features) {
+  const indexed = base && base.pidType === "索引参数结构";
+  const v43 = indexed && (features.f79 || features.f90 || features.angleFormat === "两字节格式");
+  const v44 = indexed && !features.f79 && !features.f90 && features.angleFormat === "四字节格式";
+  if (v43 && !v44) return "更支持 V4.3";
+  if (v44 && !v43) return "更支持 V4.4";
+  return "仍无法区分";
+}
+function protoRows(result) {
+  return [
+    ["连接响应", result.online ? "已收到" : "未收到"],
+    ["型号信息", result.model ? "已读取" : "未读取"],
+    ["位置读数", result.position ? "已读取" : "未读取"],
+    ["参数读法", result.pidType],
+    ["兼容特征", result.features ? (result.features.legacyFeature ? "发现" : "未发现") : "未检查"],
+    ["单圈读数格式", result.features ? result.features.angleFormat : "未检查"],
+  ];
+}
+function protoFeatureRows(result) {
+  return [
+    ["参数读法", result.pidType || "未确认"],
+    ["兼容特征", result.features.legacyFeature ? "发现" : "未发现"],
+    ["单圈读数格式", result.features.angleFormat],
+  ];
+}
+async function protoProbeFeatures(canId) {
+  const f79 = await protoRead(0x300, [0x79, 0, 1], 0x79, 450);
+  const f90 = await protoRead(canId, [0x90], 0x90, 450);
+  const f94 = await protoRead(canId, [0x94], 0x94, 450);
+  return protoDecodeFeatures([f79, f90, f94].filter(Boolean));
+}
+async function protoSelfTest() {
+  if (!protoBegin()) return;
+  protoSetBusy(true); protoSetText("protoHint", "正在执行只读确认，请保持总线和电机不变…");
+  const m = selMotor();
+  const canId = 0x140 + m.id;
+  const result = { online: false, model: false, position: false, pidType: "未确认", features: null };
+  try {
+    const status = await protoRead(canId, [0x9A], 0x9A);
+    const feedback = await protoRead(canId, [0x9C], 0x9C);
+    if (!status && !feedback) {
+      protoRender([["连接响应", "未收到"], ["安全状态", "已停止后续读取"]], "信息不足");
+      protoSetText("protoHint", "没有收到稳定回复，已停止后续读取；软件未修改电机设置。");
+      return;
+    }
+    const position = await protoRead(canId, [0x92], 0x92);
+    const modelFrames = [await protoRead(canId, [0xB5], 0xB5, 350)];
+    const pidFrames = [await protoRead(canId, [0x30, 0], 0x30), await protoRead(canId, [0x30, 1], 0x30)];
+    result.online = !!(status || feedback || position);
+    result.model = modelFrames.some(Boolean);
+    result.position = !!position;
+    result.pidType = protoDecodePid(pidFrames);
+    result.features = await protoProbeFeatures(canId);
+    result.featureConclusion = protoFeatureConclusion(result, result.features);
+    protoState.lastResult = result;
+    protoRender(protoRows(result), result.featureConclusion);
+    protoSetText("protoHint", result.featureConclusion === "仍无法区分" ? "只读检查完成。若单圈格式显示“暂无法判定”，请人工轻微转动外部转子后点击“补充协议特征”；否则把当前三项现象告诉开发者。" : "只读检查完成。请把当前三项现象告诉开发者，不要据此执行写入或运动操作。");
+  } catch (e) {
+    protoRender([["确认状态", "已停止"], ["原因", "通信异常，未继续发送"]], "信息不足");
+    protoSetText("protoHint", "确认因通信异常停止，未执行任何写入或运动指令。");
+  } finally {
+    protoEnd(); protoSetBusy(false);
+  }
+}
+async function protoFeatureTest() {
+  if (!protoBegin()) return;
+  protoSetBusy(true); protoSetText("protoHint", "正在补充只读协议特征，请保持总线和电机不变…");
+  try {
+    const m = selMotor();
+    const base = protoState.lastResult || { pidType: "未确认" };
+    const features = await protoProbeFeatures(0x140 + m.id);
+    const result = { ...base, features, featureConclusion: protoFeatureConclusion(base, features) };
+    protoState.lastResult = result;
+    protoRender(protoFeatureRows(result), result.featureConclusion);
+    protoSetText("protoHint", result.featureConclusion === "仍无法区分" ? "仍没有足够的正向差异证据；请把三项现象告诉开发者，不要执行写入或运动操作。" : "已得到只读特征结果；在开发者确认前仍不要执行写入或运动操作。");
+  } catch (e) {
+    protoSetText("protoHint", "补充特征读取失败，未修改电机配置。请把通信现象告诉开发者。");
+  } finally {
+    protoEnd(); protoSetBusy(false);
+  }
+}
+async function protoObserveStart() {
+  if (!protoBegin()) return;
+  protoSetBusy(true); protoSetText("protoHint", "正在记录静止读数…");
+  try {
+    const m = selMotor();
+    const f9c = await protoRead(0x140 + m.id, [0x9C], 0x9C);
+    const f92 = await protoRead(0x140 + m.id, [0x92], 0x92);
+    if (!f9c || !f92) {
+      protoState.baseline = null;
+      protoRender([["确认状态", "静止读数不完整"], ["安全状态", "未发送运动或写入指令"]], "信息不足");
+      protoSetText("protoHint", "没有同时读到位置反馈，未开始人工观察。");
+      return;
+    }
+    protoState.baseline = { f9c, f92 };
+    protoRender([["确认状态", "已记录静止读数"], ["下一步", "在机械安全条件下轻微转动外部转子"]]);
+    protoSetText("protoHint", "请仅人工轻微转动外部转子，不要点击其他控制页按钮；完成后点击“完成人工观察”。");
+  } catch (e) {
+    protoState.baseline = null;
+    protoSetText("protoHint", "静止读数失败，未开始人工观察。");
+  } finally {
+    protoEnd(); protoSetBusy(false);
+    const end = document.getElementById("protoObserveEndBtn"); if (end) end.disabled = !protoState.baseline;
+  }
+}
+async function protoObserveEnd() {
+  if (!protoState.baseline || !protoBegin()) return;
+  protoSetBusy(true); protoSetText("protoHint", "正在读取人工观察后的读数…");
+  try {
+    const m = selMotor();
+    const f9c = await protoRead(0x140 + m.id, [0x9C], 0x9C);
+    const f92 = await protoRead(0x140 + m.id, [0x92], 0x92);
+    const changed = !!(f9c && f92 && (f9c.data.join() !== protoState.baseline.f9c?.data.join() || f92.data.join() !== protoState.baseline.f92?.data.join()));
+    protoRender([["人工观察", changed ? "读数有变化" : "读数未明显变化"], ["安全状态", "未发送运动或写入指令"]], changed ? "读数与人工观察一致" : "信息不足");
+    protoSetText("protoHint", changed ? "请把“读数有变化”或曲线现象告诉开发者；软件没有自动修改协议解释。" : "读数未明显变化，可能是转动幅度不足或电机仍被机械保持，请把现场现象告诉开发者。");
+  } catch (e) {
+    protoRender([["人工观察", "读取失败"], ["安全状态", "未发送运动或写入指令"]], "信息不足");
+    protoSetText("protoHint", "人工观察读取失败，未修改电机配置。");
+  } finally {
+    protoState.baseline = null; protoEnd(); protoSetBusy(false);
+  }
+}
 
 /* =====================================================================
  * 九、调试动作函数
@@ -1426,6 +2004,10 @@ async function v3Pos(cmd) {
   if (cmd === 0xA8) {
     // 0xA8 增量位置:转子增量直发,指令积分推进 rotDeg(协议侧)
     const deg = v("pDelta", 0);
+    // 限幅按「当前角度 + 增量」的目标位置校验(增量本身不是目标)
+    const cur = lastAngle[m.id];
+    const target = (typeof cur === "number" && !isNaN(cur)) ? cur + deg : deg;
+    if (!limitBlock(m, { deg: target, spd: v("pSpd", 60) })) return;
     v3TrackOf(m).rotDeg += out2rot(deg, m);
     await sendMotor(BUILD_V3.POS(cmd, spd2rot(v("pSpd", 60), m), out2rot(deg, m)), "0xA8 增量位置闭环");
     return;
@@ -1439,6 +2021,7 @@ async function v3Pos(cmd) {
      注意:0xA8 整段方案曾全面试用,因运动期间 0x9C 回读滞后污染 rotDeg,
      快速连点时增量乱跳(效果更差),已废弃,仅保留跳变区场景。 */
   const deg = v("pDeg", 0);
+  if (!limitBlock(m, { deg, spd: v("pSpd", 60) })) return;
   const t = v3TrackOf(m);
   if (t.lastEnc === null) {
     addLog("err", "绝对位置需要当前相位回读(0x9C/0x90),请稍候轮询到数据后重试");
@@ -1468,6 +2051,7 @@ async function v3Pos1() {
   const m = selMotor();
   const g = gearOf(m);
   const degOut = v("a6Deg", 0);
+  if (!limitBlock(m, { deg: degOut, spd: v("a6Spd", 60) })) return;
   let rotDeg = out2rot(degOut, m);                // 转子侧角度(°,0.01°/LSB 上限 35999)
   let dirSel = parseInt(document.getElementById("a6dir").value);
   if (rotDeg < 0) { rotDeg = -rotDeg; dirSel = dirSel ? 0 : 1; }   // 反转电机:角度取正、运动方向翻转
@@ -1477,8 +2061,8 @@ async function v3Pos1() {
   }
   await sendMotor(BUILD_V3.POS1(dirSel, spd2rot(v("a6Spd", 60), m), rotDeg), "0xA6 单圈位置");
 }
-async function v3Speed() { const m = selMotor(); await sendMotor(BUILD_V3.SPEED(out2rot(v("vSpd", 0), m)), "0xA2 速度闭环"); }
-async function v3Torque() { const m = selMotor(); await sendMotor(BUILD_V3.TORQUE(amp2rot(v("vIq", 0), m)), "0xA1 力矩闭环"); }
+async function v3Speed() { const m = selMotor(); if (!limitBlock(m, { spd: v("vSpd", 0) })) return; await sendMotor(BUILD_V3.SPEED(out2rot(v("vSpd", 0), m)), "0xA2 速度闭环"); }
+async function v3Torque() { const m = selMotor(); if (!limitBlock(m, { iq: v("vIq", 0) })) return; await sendMotor(BUILD_V3.TORQUE(amp2rot(v("vIq", 0), m)), "0xA1 力矩闭环"); }
 function v3PidVals() {
   return [v("v3pid0", 0), v("v3pid1", 0), v("v3pid2", 0), v("v3pid3", 0), v("v3pid4", 0), v("v3pid5", 0)];
 }
@@ -1554,7 +2138,9 @@ async function v3Home() {
 async function v3Acc(cmd, rom) {
   const idx = parseInt(document.getElementById("accIdx").value);
   const m = selMotor();
-  await sendMotor(BUILD_V3.ACC(cmd, idx, out2rot(v("accVal", 500), m)), `0x${cmd.toString(16).toUpperCase()} 加速度${cmd === 0x43 ? " 写" : " 读"} 索引${idx}`);
+  const acc = out2rot(v("accVal", 500), m);
+  if (cmd === 0x43 && !(acc >= 100 && acc <= 60000)) { addLog("err", `加速度需在 100~60000 dps/s(当前 ${acc})`); return; }
+  await sendMotor(BUILD_V3.ACC(cmd, idx, acc), `0x${cmd.toString(16).toUpperCase()} 加速度${cmd === 0x43 ? " 写" : " 读"} 索引${idx}`);
 }
 /* 0x79 读/写 ID:命令必须发往固定地址 0x300(不是 0x140+ID),回复也从 0x300 回(V3.8 协议第 4 章) */
 async function v3ReadId() {
@@ -1567,6 +2153,34 @@ async function v3SetId() {
     `即将把本电机 ID 修改为 ${id}(0x79 写 ROM,发往 0x300),重启后生效。\n⚠️ 请确保总线上只有这一台电机通电,否则多台电机都会被修改!\n⚠️ 若电机为拨杆开关设置 ID 的旧款 X8/X6,0x79 无效,请直接用外壳拨杆设置。\n修改后注册表中该电机的 ID 也需同步更新。是否继续?`);
   if (!ok) return;
   await rawSend(0x300, 0, hx(BUILD_V3.SETID(id)), "0x79 修改 ID(发至 0x300)");
+}
+/* V4.3 兼容 0x79 读写 ID(发 0x300;V4.4 固件已删 0x79,无回复属正常) */
+async function v44ReadId79() {
+  await rawSend(0x300, 0, hx(pad8([0x79, 0, 1, 0, 0, 0, 0, 0])), "0x79 读当前 ID(发至 0x300,V4.3)");
+}
+async function v44SetId79() {
+  const m = selMotor();
+  if (!m) return;
+  const id = Math.round(v("newId", 1));
+  if (id < 1 || id > 32) { addLog("err", "新 ID 需在 1~32"); return; }
+  const ok = await showConfirm("⚠️ 修改电机 ID 确认(0x79,V4.3)",
+    `即将把本电机 ID 修改为 ${id}(0x79 写 ROM,发往 0x300),重启后生效。
+⚠️ 请确保总线上只有这一台电机通电(多台同时在线会一起被改)!
+⚠️ V4.4 固件已删除 0x79,若发后无回复请改用 0x20 索引 5 改编号。
+修改后注册表中该电机的 ID 也需同步更新。是否继续?`);
+  if (!ok) return;
+  await rawSend(0x300, 0, hx(pad8([0x79, 0, 0, 0, 0, 0, 0, id])), "0x79 修改 ID(发至 0x300)");
+}
+/* V4.4 改编号:0x20 索引 5(0x79 已删,保存 ROM 重启生效) */
+async function v44SetId() {
+  const m = selMotor();
+  if (!m) return;
+  const id = Math.round(v("newId", 1));
+  if (id < 1 || id > 32) { addLog("err", "新编号需在 1~32"); return; }
+  const ok = await showConfirm("⚠️ 修改电机编号确认",
+    `即将通过 0x20 索引 5 把本电机编号修改为 ${id}(保存 ROM,重启生效)。\n⚠️ 请确保总线上只有这一台电机通电(多台同时在线会一起被改)!⚠️ 修改后注册表中该电机的编号也需同步更新。是否继续?`);
+  if (!ok) return;
+  await sendMotor(BUILD_V44.FUNC(5, id), `0x20 索引5 设置电机编号 = ${id}`);
 }
 async function v3Func() {
   const idx = parseInt(document.getElementById("f20sel").value);
@@ -1584,13 +2198,43 @@ async function v3Func() {
 }
 
 /* V4.4 */
-async function v44Pos(cmd) { const m = selMotor(); await sendMotor(BUILD_V44.POS(cmd, spd2rot(v("pSpd", 60), m), out2rot(v("pDeg", 0), m)), `0x${cmd.toString(16).toUpperCase()} 位置闭环`); }
-async function v44PosInc() { const m = selMotor(); await sendMotor(BUILD_V44.POS(0xA8, spd2rot(v("pSpd", 60), m), out2rot(v("pDelta", 0), m)), "0xA8 增量位置"); }
-async function v44Speed() { const m = selMotor(); await sendMotor(BUILD_V44.SPEED(v("vTqPct", 100), out2rot(v("vSpd", 0), m)), "0xA2 速度闭环"); }
-async function v44Torque() { const m = selMotor(); await sendMotor(BUILD_V44.TORQUE(amp2rot(v("vIq", 0), m)), "0xA1 力矩闭环"); }
-async function v44FFSpd() { const m = selMotor(); await sendMotor(BUILD_V44.FF_SPD(out2rot(v("fSpd", 0), m), out2rot(v("fPos", 0), m)), "0x72 速度前馈位置"); }
-async function v44FFTq() { const m = selMotor(); await sendMotor(BUILD_V44.FF_TQ(amp2rot(v("fTqPct", 0), m), out2rot(v("fSpd2", 0), m), out2rot(v("fPos2", 0), m)), "0x73 力矩前馈位置"); }
-async function v44ForcePos() { const m = selMotor(); await sendMotor(BUILD_V44.FORCE_POS(amp2rot(v("fpTq", 50), m), spd2rot(v("fpSpd", 60), m), out2rot(v("fpPos", 0), m)), "0xA9 力控位置"); }
+async function v44Pos(cmd) {
+  const m = selMotor();
+  if (!limitBlock(m, { deg: v("pDeg", 0), spd: v("pSpd", 60) })) return;
+  await sendMotor(BUILD_V44.POS(cmd, spd2rot(v("pSpd", 60), m), out2rot(v("pDeg", 0), m)), `0x${cmd.toString(16).toUpperCase()} 位置闭环`);
+}
+async function v44PosInc() {
+  const m = selMotor();
+  const deg = v("pDelta", 0);
+  // 限幅按「当前角度 + 增量」的目标位置校验(增量本身不是目标)
+  const cur = lastAngle[m.id];
+  const target = (typeof cur === "number" && !isNaN(cur)) ? cur + deg : deg;
+  if (!limitBlock(m, { deg: target, spd: v("pSpd", 60) })) return;
+  await sendMotor(BUILD_V44.POS(0xA8, spd2rot(v("pSpd", 60), m), out2rot(deg, m)), "0xA8 增量位置");
+}
+async function v44Speed() {
+  const m = selMotor();
+  const tq = v("vTqPct", 100);
+  if (!(tq >= 0 && tq <= 255)) { addLog("err", `最大力矩需在 0~255 %额定(协议 uint8 字段,当前输入 ${tq} 会静默回绕)`); return; }
+  if (!limitBlock(m, { spd: v("vSpd", 0) })) return;
+  await sendMotor(BUILD_V44.SPEED(tq, out2rot(v("vSpd", 0), m)), "0xA2 速度闭环");
+}
+async function v44Torque() { const m = selMotor(); if (!limitBlock(m, { iq: v("vIq", 0) })) return; await sendMotor(BUILD_V44.TORQUE(amp2rot(v("vIq", 0), m)), "0xA1 力矩闭环"); }
+async function v44FFSpd() {
+  const m = selMotor();
+  if (!limitBlock(m, { deg: v("fPos", 0), spd: v("fSpd", 0) })) return;
+  await sendMotor(BUILD_V44.FF_SPD(out2rot(v("fSpd", 0), m), out2rot(v("fPos", 0), m)), "0x72 速度前馈位置");
+}
+async function v44FFTq() {
+  const m = selMotor();
+  if (!limitBlock(m, { deg: v("fPos2", 0), spd: v("fSpd2", 0) })) return;
+  await sendMotor(BUILD_V44.FF_TQ(amp2rot(v("fTqPct", 0), m), out2rot(v("fSpd2", 0), m), out2rot(v("fPos2", 0), m)), "0x73 力矩前馈位置");
+}
+async function v44ForcePos() {
+  const m = selMotor();
+  if (!limitBlock(m, { deg: v("fpPos", 0), spd: v("fpSpd", 60) })) return;
+  await sendMotor(BUILD_V44.FORCE_POS(amp2rot(v("fpTq", 50), m), spd2rot(v("fpSpd", 60), m), out2rot(v("fpPos", 0), m)), "0xA9 力控位置");
+}
 async function v44Pid(cmd, rom) {
   const idx = parseInt(document.getElementById("pidIdx").value);
   const val = v("pidVal", 0);
@@ -1623,7 +2267,9 @@ async function v44SetZero() {
 async function v44Acc(cmd, rom) {
   const idx = parseInt(document.getElementById("accIdx").value);
   const m = selMotor();
-  await sendMotor(BUILD_V44.ACC(cmd, idx, out2rot(v("accVal", 500), m)), `0x${cmd.toString(16).toUpperCase()} 加速度${cmd === 0x43 ? " 写" : " 读"} 索引${idx}`);
+  const acc = out2rot(v("accVal", 500), m);
+  if (cmd === 0x43 && !(acc >= 100 && acc <= 60000)) { addLog("err", `加速度需在 100~60000 dps/s(当前 ${acc})`); return; }
+  await sendMotor(BUILD_V44.ACC(cmd, idx, acc), `0x${cmd.toString(16).toUpperCase()} 加速度${cmd === 0x43 ? " 写" : " 读"} 索引${idx}`);
 }
 async function v44Func() {
   const idx = parseInt(document.getElementById("f20sel").value);
@@ -1753,8 +2399,15 @@ function updateStatusPanel(pr) {
   if (!m) return;
   /* —— 曲线喂数据:与当前页签无关,任何页签下都持续更新 —— */
   if (pr.cmd === 0x9C) {
-    if (m.proto === "V44") {
+    if (m.proto !== "V3") {
       chart.feed({ pos: rot2out(pr.values.ang, m), spd: rot2out(pr.values.spd, m), iq: pr.values.iq * dirOf(m) });
+      lastAngle[m.id] = rot2out(pr.values.ang, m);   // V4.3/V4.4:0x9C 自带角度,同步 lastAngle
+      lastAngleSrc[m.id] = "0x9C";
+    } else if (m.v9cSemantics === "angle") {
+      // 部分 V3.x 固件 0x9C 直接带输出轴角度 1°/LSB(由注册表 v9cSemantics="angle" 标记)
+      chart.feed({ pos: rot2out(pr.values.ang, m), spd: rot2out(pr.values.spd, m), iq: pr.values.iq * dirOf(m) });
+      lastAngle[m.id] = rot2out(pr.values.ang, m);
+      lastAngleSrc[m.id] = "0x9C";
     } else {
       // V3.x:单圈绝对值双来源模型——0x9C 编码器脉冲回读相位,最近邻校准 rotDeg
       const rot = v3OnPhase(m, pr.values.enc);
@@ -1768,10 +2421,11 @@ function updateStatusPanel(pr) {
     const a = v3PosDual(m);
     lastAngle[m.id] = a;
     lastAngleSrc[m.id] = "0x9C";
-  } else if (pr.cmd === 0x92 || pr.cmd === 0x94) {
+  } else if (pr.cmd === 0x92 && m.proto === "V3") {
     // 0x92 = 固件多圈绝对角(手册 2.12 int32 0.01°/LSB,与 rotDeg 同基准)。
     // rotDeg 直接校准到 0x92 值——0xA4 发送依赖「上位机角 ≈ 固件角」,
     // 否则固件差值 = ±360N 空转(2026-08-20 日志实证:发目标=当前相位仍转一圈)。
+    // ⚠️ 仅 V3 走多圈校准(V4 的 0x92 已含方向映射,不做 V3 模型校准)。
     const a = pr.values.pos;
     if (a !== 0) {
       v3TrackOf(m).rotDeg = a * gearOf(m) * dirOf(m);
@@ -1786,6 +2440,19 @@ function updateStatusPanel(pr) {
       v3_92info = { rel, raw: a, fw: a * gearOf(m) * dirOf(m), turn: Math.round(v3TrackOf(m).rotDeg / 360) };
     }
     // a===0:忽略(不覆盖 0x9C 的角度)
+  } else if (pr.cmd === 0x94) {
+    // 0x94 单圈角度(所有协议):仅更新显示角度,不做多圈校准(单圈无圈号)
+    lastAngle[m.id] = rot2out(pr.values.pos, m);
+    lastAngleSrc[m.id] = "0x94";
+  } else if (pr.cmd === 0x92) {
+    // V4 的 0x92 多圈角:仅同步 lastAngle(V4 面板角度以 0x9C 为准,此值供增量限幅换算)
+    lastAngle[m.id] = rot2out(pr.values.pos, m);
+    lastAngleSrc[m.id] = "0x92";
+  } else if ((pr.cmd >= 0x60 && pr.cmd <= 0x64) && m.proto !== "V3") {
+    const zeroInput = document.getElementById("zoVal");
+    if (zeroInput && Number.isFinite(pr.values.encoderOffset)) {
+      zeroInput.value = pr.values.encoderOffset;
+    }
   } else if (pr.cmd === 0x9A) {
     chart.feed({ iq: null, spd: null, pos: null });  // 状态帧只刷面板
   }
@@ -1802,7 +2469,7 @@ function updateStatusPanel(pr) {
       <div><div class="k">温度</div><div class="v">${pr.values.temp} ℃</div></div>
       <div><div class="k">电压</div><div class="v">${voltTxt}</div></div>
       <div><div class="k">抱闸</div><div class="v">${pr.values.brake}</div></div>
-      ${m.proto === "V44" ? `<div><div class="k">MOS 温度</div><div class="v">${pr.values.mosTemp} ℃</div></div>` : ""}
+      ${m.proto !== "V3" ? `<div><div class="k">MOS 温度</div><div class="v">${pr.values.mosTemp} ℃</div></div>` : ""}
       <div><div class="k">错误码</div><div class="v">0x${pr.values.err.toString(16).toUpperCase().padStart(4, "0")}</div></div>
       ${v3_92info.rel !== null ? v3_92row() : ""}`;
     const errs = (m.proto === "V3" ? ERR_V3 : ERR_V44).filter(e => (pr.values.err & e[0]) === e[0]);
@@ -1826,13 +2493,17 @@ function updateStatusPanel(pr) {
       <div><div class="k">角度${g !== 1 ? "(输出轴)" : ""}${angSrc}</div>
            <div class="v">${angCell}</div></div>
       ${v3_92info.rel !== null ? v3_92row() : ""}`;
+  } else if (pr.cmd >= 0x60 && pr.cmd <= 0x64 && m.proto !== "V3") {
+    const encoderValue = Number.isFinite(pr.values.encoderOffset) ? pr.values.encoderOffset : pr.values.enc;
+    const names = { 0x60: "多圈位置", 0x61: "多圈原始位置", 0x62: "多圈零偏", 0x63: "零偏写入回显", 0x64: "当前位置设零回读" };
+    kv.innerHTML = `<div><div class="k">${names[pr.cmd]}</div><div class="v">${encoderValue} 脉冲</div></div>`;
   } else if (pr.cmd === 0x70 && m.proto === "V3") {
     const el = document.getElementById("stMode");
     const modeTxt = V3_MODE[pr.values.mode];
     if (el) el.innerHTML = modeTxt
       ? `运行模式:${modeTxt}(0x${pr.values.mode.toString(16).toUpperCase()})`
       : `运行模式:未知(0x${pr.values.mode.toString(16).toUpperCase()})`;
-  } else if (pr.cmd === 0x30 && m.proto === "V44") {
+  } else if (pr.cmd === 0x30 && m.proto !== "V3") {
     const pk = document.getElementById("pidKv");
     if (pk) pk.innerHTML += `<div><div class="k">${V44_PID_NAME[pr.values.idx] || "索引" + pr.values.idx}</div><div class="v">${pr.values.val.toFixed(5)}</div></div>`;
   } else if ((pr.cmd === 0x30 || pr.cmd === 0x31 || pr.cmd === 0x32) && m.proto === "V3") {
@@ -1853,11 +2524,13 @@ function handleFrame(ev) {
   else if (cid >= 0x240 && cid <= 0x25F) n = cid - 0x240;
   else if (cid === 0x280) n = 0;
   const bytes = ev.data.split(/[\s,]+/).filter(Boolean).map(h => parseInt(h, 16));
+  protoCapture(ev, bytes);
+  const probeFrame = protoState.active || Date.now() < protoState.suppressUntil;
   if (cid === 0x300) {
     // 0x79 读/写 ID 的系统地址回复:归属当前选中电机(0x300 不带 ID 信息)
     const m = selMotor();
     const pr = m ? parseReply(m.proto, cid, bytes) : null;
-    addLog("rx", `← 0x300  ${ev.data}  ${m ? m.name + " " : ""}${pr ? pr.summary : "0x79 回复"}`);
+    if (!probeFrame) addLog("rx", `← 0x300  ${ev.data}  ${m ? m.name + " " : ""}${pr ? pr.summary : "0x79 回复"}`);
     return;
   }
   if (!n || bytes.length === 0) {
@@ -1865,7 +2538,7 @@ function handleFrame(ev) {
     const m = selMotor();
     if (m && cid === 0x280) {
       const pr = parseReply(m.proto, cid, bytes);
-      addLog("rx", `← 0x${cid.toString(16).toUpperCase()}  ${ev.data}  广播回复${pr ? ":" + pr.summary : ""}`);
+      if (!probeFrame) addLog("rx", `← 0x${cid.toString(16).toUpperCase()}  ${ev.data}  广播回复${pr ? ":" + pr.summary : ""}`);
     }
     return;
   }
@@ -1877,8 +2550,8 @@ function handleFrame(ev) {
   const cmd = bytes[0];
   // 状态轮询帧(0x9A/0x9C/0x92)不写收发日志,避免刷屏;面板与曲线照常更新
   const silent = pollOn && m && m.id === selectedId && (cmd === 0x9A || cmd === 0x9C || cmd === 0x92);
-  if (!silent) addLog("rx", `← 0x${cid.toString(16).toUpperCase()}  ${ev.data}  ${m ? "#" + n + " " + m.name : "未注册 #" + n}  ${note}`);
-  if (m && m.id === selectedId) {
+  if (!probeFrame && !silent) addLog("rx", `← 0x${cid.toString(16).toUpperCase()}  ${ev.data}  ${m ? "#" + n + " " + m.name : "未注册 #" + n}  ${note}`);
+  if (!probeFrame && m && m.id === selectedId) {
     updateStatusPanel(pr);
   }
 }
@@ -1890,15 +2563,16 @@ async function tick() {
   try {
     const pend = await bridge.get_pending();
     if (pend) {
-      (pend.logs || []).forEach(l => {
+      const probeSilent = protoState.active || Date.now() < protoState.suppressUntil;
+      if (!probeSilent) (pend.logs || []).forEach(l => {
         addLog(l.level === "err" ? "err" : (l.level === "warn" ? "warn" : "sys"), l.msg);
       });
       (pend.frames || []).forEach(ev => {
         if (ev.dir === "tx") {
           // 状态轮询帧(0x9A/0x9C/0x92)同样不写收发日志:Python 侧回显了发送帧,这里必须再静默一次,否则轮询仍刷屏
           const tcmd = parseInt((ev.data || "").split(/[\s,]+/)[0], 16);
-          const silentTx = pollOn && selectedId != null && ev.id === 0x140 + selectedId &&
-            (tcmd === 0x9A || tcmd === 0x9C || tcmd === 0x92);
+          const silentTx = probeSilent || (pollOn && selectedId != null && ev.id === 0x140 + selectedId &&
+            (tcmd === 0x9A || tcmd === 0x9C || tcmd === 0x92));
           if (!silentTx) {
             addLog("tx", `→ 0x${ev.id.toString(16).toUpperCase().padStart(3, "0")}  ${ev.data}`);
           }
@@ -2062,7 +2736,8 @@ function chartDraw() {
     let lastY = null, started = false;
     for (let i = 0; i < arr.length; i++) {
       const v = arr[i];
-      const x = cx + (i / Math.max(1, chart.max - 1)) * pw;
+      // x 按实际数据长度铺满全宽(与悬停换算、时间轴刻度一致;缓冲未满时不缩在左侧)
+      const x = cx + (i / Math.max(1, arr.length - 1)) * pw;
       let y;
       if (isNaN(v)) {
         if (lastY === null) continue;   // 尚无有效数据:跳过,不画零线
@@ -2200,9 +2875,9 @@ function uiClearLog() { logLines = []; document.getElementById("logbox").innerHT
 function init() {
   renderMotors();
   loadMotors();   // 桌面模式:从 exe 同目录 电机注册表.json 载入(异步,完成后重绘)
-  renderTabs();
+  renderBlocks();
   uiListDevices();
-  addLog("sys", `脉塔电机调试上位机已启动(${JS_MOCK ? "浏览器演示模式,JS 模拟设备" : "桌面程序模式"});双协议:V3(旧型号 X8-PRO/X6-S2 等)/V4(新型号 X6-40/X2-7 等),均无使能环节,上电后直接发闭环指令`);
+  addLog("sys", `脉塔电机调试上位机已启动(${JS_MOCK ? "浏览器演示模式,JS 模拟设备" : "桌面程序模式"});三协议:V3.9(旧型号 X8-PRO/X6-S2)/V4.3(X6-40)/V4.4(X2-7),均无使能环节,上电后直接发闭环指令`);
   setInterval(tick, 50);
   setInterval(renderMotors, 1000);  // 在线圆点刷新
   setInterval(chartDraw, 250);      // 曲线重绘

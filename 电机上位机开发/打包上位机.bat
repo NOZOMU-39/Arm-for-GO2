@@ -17,6 +17,7 @@ echo ================================================
 
 echo.
 echo [1/3] 备份调试日志(防止打包重建目录时丢失)...
+if exist "dist\上位机\日志" xcopy /e /i /y "dist\上位机\日志" "%TEMP%\shangweiji_logs_backup\" >nul 2>&1
 if exist "dist\上位机\调试日志.txt" copy /y "dist\上位机\调试日志.txt" "%TEMP%\shangweiji_log_backup.txt" >nul 2>&1
 if exist "dist\上位机\电机注册表.json" copy /y "dist\上位机\电机注册表.json" "%TEMP%\shangweiji_reg_backup.json" >nul 2>&1
 
@@ -53,6 +54,10 @@ if exist "%TEMP%\shangweiji_log_backup.txt" (
 if exist "%TEMP%\shangweiji_reg_backup.json" (
     copy /y "%TEMP%\shangweiji_reg_backup.json" "dist\上位机\电机注册表.json" >nul 2>&1
     del "%TEMP%\shangweiji_reg_backup.json" >nul 2>&1
+)
+if exist "%TEMP%\shangweiji_logs_backup" (
+    xcopy /e /i /y "%TEMP%\shangweiji_logs_backup" "dist\上位机\日志\" >nul 2>&1
+    rmdir /s /q "%TEMP%\shangweiji_logs_backup" >nul 2>&1
 )
 
 echo ================================================

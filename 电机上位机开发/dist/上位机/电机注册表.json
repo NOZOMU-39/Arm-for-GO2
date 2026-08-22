@@ -6,7 +6,26 @@
     "note": "",
     "gear": 6,
     "dir": -1,
-    "E0": -83.97,
-    "E0Date": "2026-08-19"
+    "E0": -92.97,
+    "E0Date": "2026-08-20"
+  },
+  {
+    "id": 2,
+    "name": "X6",
+    "proto": "V43",
+    "note": "协议自测支持 V4.3",
+    "gear": 1,
+    "dir": 1,
+    "E0": null,
+    "v9cSemantics": "pulse"
+  },
+  {
+    "id": 5,
+    "name": "X2",
+    "proto": "V44",
+    "note": "",
+    "gear": 1,
+    "dir": 1,
+    "E0": null
   }
 ]

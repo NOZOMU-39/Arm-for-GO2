@@ -412,6 +412,11 @@ class MockCan:
     def transmit(self, ch, can_id, extd, data8):
         self.tx_count += 1
         if not extd:
+            if can_id == 0x300 and data8 and data8[0] == 0x79:
+                if len(data8) > 2 and data8[2] == 1:
+                    # 0x79 读 ID 的 D6-D7 是回复 CAN 地址 0x240+编号。
+                    self._enqueue_reply(0x300, [0x79, 0, 1, 0, 0, 0, 2, 0x24])
+                return True
             n = can_id - 0x140
             if 1 <= n <= 32:
                 self._mock_respond(n, data8)
@@ -476,9 +481,9 @@ class MockCan:
             self._enqueue_reply(rid, [0x70, 0, 0, 0, 0, 0, 0, 0x02])
         elif cmd == 0x71:  # V2.4 功率
             self._enqueue_reply(rid, [0x71, 0, 0, 0, 500, 0, 0, 0])
-        elif cmd == 0x79:  # V2.4 读编号(D2=1 读)
+        elif cmd == 0x79:  # 旧协议 ID 查询固定走 0x300,此处保留兼容模拟
             if req[2] == 1:
-                self._enqueue_reply(rid, [0x79, 0, 0, 0] + list(struct.pack("<I", n)))
+                self._enqueue_reply(0x300, [0x79, 0, 1, 0, 0, 0, (0x240 + n) & 255, (0x240 + n) >> 8])
         elif cmd in (0x30, 0x31, 0x32):  # V4.4 PID 读(单索引,回 float32=1.0)
             self._enqueue_reply(rid, [cmd, req[1], 0, 0] + list(struct.pack("<f", 1.0)))
         elif cmd in (0x42, 0x43):  # 加速度读
