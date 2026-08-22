@@ -48,4 +48,4 @@ ESP32 for WiFi and BLE CAN\
 
 ## 5. 文档分工
 
-- 人类:工程内 README.md(三部分式);AI:本文件 + `AI间交流\情报.md` 第五节;交接协议见项目根 CLAUDE.md。
+- 人类:工程内 README.md(三部分式);AI:本文件 + `AI间交流\情报.md` 第五节;交接协议见项目根 AGENTS.md。
