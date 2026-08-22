@@ -82,6 +82,11 @@ aside { display: flex; flex-direction: column; gap: 12px; }
 .block-title.warn { color: var(--warn); border-left-color: var(--warn); }
 .block-title.ok { color: var(--ok); border-left-color: var(--ok); }
 .panel-title { font-size: 13px; color: var(--accent); margin-bottom: 8px; }
+/* 二级标题折叠(默认隐藏,点击展开/收起;状态随 DOM 常驻保持) */
+.panel-title[data-collapse] { cursor: pointer; user-select: none; }
+.panel-title[data-collapse]::before { content: "▶ "; color: var(--dim); font-size: 10px; }
+.panel-title[data-collapse].collapsed::before { content: "▼ "; }
+.panel-title[data-collapse]:hover { color: #fff; }
 .hint { color: var(--dim); font-size: 12px; margin: 4px 0 8px; }
 .hint.warn { color: var(--warn); }
 .hint.err { color: var(--err); }
@@ -248,16 +253,7 @@ canvas.chart { background: var(--log); border: 1px solid var(--border); border-r
 
   <!-- ============ 右栏 ============ -->
   <section class="right">
-    <!-- 调试区:三大块(横向页签切换,未选中隐藏) -->
-    <section class="card">
-      <h2>🛠️ 电机调试区 <span id="dbgTitle" class="hint">——请先在左侧注册表选择一台电机</span></h2>
-      <div class="tabs" id="tabBar"></div>
-      <div id="blockCtrl"><div class="hint">选择电机后显示控制参数面板。</div></div>
-      <div id="blockBase" style="display:none"><div class="hint">选择电机后显示基础参数面板。</div></div>
-      <div id="blockProto" style="display:none"><div class="hint">选择电机后可进行协议版本自测。</div></div>
-    </section>
-
-    <!-- 实时显示(块2,整块可开关) -->
+    <!-- 实时显示(置顶,整块可开关) -->
     <section class="card">
       <h2>📊 实时显示 <button class="small monitor-toggle" id="btnMonitorToggle" onclick="monitorToggle()">🔼 收起</button></h2>
       <div id="blockMonitor">
@@ -286,6 +282,15 @@ canvas.chart { background: var(--log); border: 1px solid var(--border); border-r
         </div>
         <div class="logbox" id="logbox"></div>
       </div>
+    </section>
+
+    <!-- 调试区:三大块(横向页签切换,未选中隐藏) -->
+    <section class="card">
+      <h2>🛠️ 电机调试区 <span id="dbgTitle" class="hint">——请先在左侧注册表选择一台电机</span></h2>
+      <div class="tabs" id="tabBar"></div>
+      <div id="blockCtrl"><div class="hint">选择电机后显示控制参数面板。</div></div>
+      <div id="blockBase" style="display:none"><div class="hint">选择电机后显示基础参数面板。</div></div>
+      <div id="blockProto" style="display:none"><div class="hint">选择电机后可进行协议版本自测。</div></div>
     </section>
   </section>
 </main>
@@ -1112,9 +1117,18 @@ function guardPendingPanel(m, panel) {
   });
 }
 
-/* 三大块横向页签:控制参数设置 / 电机基础参数设置 / 协议版本自测;未选中隐藏;块2 实时显示常驻 */
+/* 三大块横向页签:控制参数设置 / 电机基础参数设置 / 协议版本自测;未选中隐藏;块2 实时显示常驻。
+   切换保留输入与折叠状态:内容只在「选中电机变化」时重渲染(renderBlocks),tab 切换只改显隐(showTab)。 */
 const TABS = ["控制参数设置", "电机基础参数设置", "协议版本自测"];
 let curTab = 0;
+let renderedFor = null;   // 当前内容渲染所属电机 id(变化时才重渲染)
+function showTab(i) {
+  curTab = i;
+  const ids = ["blockCtrl", "blockBase", "blockProto"];
+  ids.forEach((id, k) => { const el = document.getElementById(id); if (el) el.style.display = k === i ? "" : "none"; });
+  const bar = document.getElementById("tabBar");
+  if (bar) Array.from(bar.children).forEach((b, k) => b.className = "tab" + (k === i ? " act" : ""));
+}
 function renderBlocks() {
   const m = selMotor();
   document.getElementById("dbgTitle").textContent = m
@@ -1126,30 +1140,32 @@ function renderBlocks() {
     const b = document.createElement("button");
     b.className = "tab" + (i === curTab ? " act" : "");
     b.textContent = t;
-    b.onclick = () => { curTab = i; renderBlocks(); };
+    b.onclick = () => showTab(i);
     bar.appendChild(b);
   });
   const ctrl = document.getElementById("blockCtrl");
   const base = document.getElementById("blockBase");
   const proto = document.getElementById("blockProto");
-  ctrl.style.display = curTab === 0 ? "" : "none";
-  base.style.display = curTab === 1 ? "" : "none";
-  proto.style.display = curTab === 2 ? "" : "none";
   const monitor = document.getElementById("monitorPanel");
   if (!m) {
-    ctrl.innerHTML = '<div class="hint">选择电机后显示控制参数面板。</div>';
-    base.innerHTML = '<div class="hint">选择电机后显示基础参数面板。</div>';
-    proto.innerHTML = '<div class="hint">选择电机后可进行协议版本自测。</div>';
+    renderedFor = null;
+    ctrl.innerHTML = base.innerHTML = proto.innerHTML = '<div class="hint">选择电机后显示调试面板。</div>';
     monitor.innerHTML = '<div class="hint">选择电机后开始状态监控。</div>';
+    showTab(curTab);
     return;
   }
+  if (renderedFor === m.id) { showTab(curTab); return; }   // 同一电机:只切显隐,保留输入/折叠
+  renderedFor = m.id;
   const R = BLOCK_RENDER[m.proto];
   ctrl.innerHTML = limitZeroPanel(m) + R.ctrl(m);
   base.innerHTML = R.base(m);
   proto.innerHTML = TAB_RENDER_PROTO(m);
   monitor.innerHTML = R.monitor(m);
-  if (curTab === 0) guardPendingPanel(m, ctrl);
-  else if (curTab === 1) guardPendingPanel(m, base);
+  guardPendingPanel(m, ctrl);
+  guardPendingPanel(m, base);
+  initCollapse(ctrl);
+  initCollapse(base);
+  showTab(curTab);
 }
 /* 块2「实时显示」整块收起/展开(可开关的图像与日志窗口) */
 let monitorCollapsed = false;
@@ -1159,6 +1175,30 @@ function monitorToggle() {
   const btn = document.getElementById("btnMonitorToggle");
   if (box) box.style.display = monitorCollapsed ? "none" : "";
   if (btn) btn.textContent = monitorCollapsed ? "🔽 展开" : "🔼 收起";
+}
+/* 二级标题折叠:panel-title 默认隐藏,点击展开/收起;折叠状态按标题记在 collState,
+   DOM 常驻(切换 tab 不重渲染)+ 状态字典 → 切换前后保持一致,不回到默认。 */
+const collState = {};
+function initCollapse(root) {
+  if (!root) return;
+  const titles = root.querySelectorAll(".panel-title");
+  titles.forEach(t => {
+    if (t.dataset.nocollapse || t.dataset.collapseDone) return;
+    t.dataset.collapseDone = "1";
+    const body = [];
+    let sib = t.nextElementSibling;
+    while (sib && !sib.classList.contains("panel-title")) { body.push(sib); sib = sib.nextElementSibling; }
+    if (!body.length) return;
+    const key = t.textContent.trim();
+    if (collState[key] === undefined) collState[key] = false;   // 默认折叠(隐藏)
+    const apply = () => {
+      t.dataset.collapse = "1";
+      t.classList.toggle("collapsed", !collState[key]);
+      body.forEach(el => { el.style.display = collState[key] ? "" : "none"; });
+    };
+    apply();
+    t.addEventListener("click", () => { collState[key] = !collState[key]; apply(); });
+  });
 }
 
 /* ---------- 通用组件 ---------- */
@@ -1717,12 +1757,12 @@ function limitZeroPanel(m) {
     </div>
     <div class="hint warn">⚠️ X6-40(V4.3)固件限位语义待确认(限位 ±180° 时发 0° 停在 +180°):写入前请先核实;下方<b>软件限幅</b>为独立安全层,不受固件限位影响。</div>` : "";
   return `
-    <div class="panel-title">📍 设置当前位置为零点</div>
+    <div class="panel-title" data-nocollapse="1">📍 设置当前位置为零点</div>
     <div class="row">
       <button class="warn" onclick="${v4 ? "v44SetZero()" : "v3RecordZero()"}">📍 设置当前位置为零点</button>
       <span class="hint">${v4 ? "自动执行 失能→写零点→复位 三步(失能瞬间掉力,请先做好机械防护)" : "记录当前固件角为机械零点 E0,之后位置显示以零点为 0°(旧款无法写固件零点,用 E0 档案方案)"}</span>
     </div>
-    <div class="panel-title">⛔ 软件限幅(所有指令共用)</div>
+    <div class="panel-title" data-nocollapse="1">⛔ 软件限幅(所有指令共用)</div>
     <div class="row">
       <label>角度下限</label> ${numInp("limMinDeg", lim("limMinDeg"), 85)} <span class="hint">°</span>
       <label>角度上限</label> ${numInp("limMaxDeg", lim("limMaxDeg"), 85)} <span class="hint">°</span>
@@ -1730,7 +1770,7 @@ function limitZeroPanel(m) {
       <label>最大电流</label> ${numInp("limMaxIq", lim("limMaxIq"), 85)} <span class="hint">A</span>
       <button class="primary" onclick="saveLimits()">💾 保存限幅</button>
     </div>
-    <div class="hint">软件限幅为<b>上位机安全层</b>:所有位置/速度/力矩指令发送前自动校验,超限拦截并提示;保存到电机注册表(重启不丢),显示值 = 注册表当前值,未设置则留空放行。</div>
+    <div class="hint">软件限幅为<b>所有控制方式(位置/速度/力矩/前馈)的硬上限</b>:①发送前校验目标,超限拦截;②<b>运行中监控</b>——轮询反馈角度越过限幅立即报警并自动发送 0x81 停止(回到限幅内 2° 后解除);保存到电机注册表(重启不丢),显示值 = 注册表当前值,未设置则留空放行。</div>
     ${fw}`;
 }
 function saveLimits() {
@@ -1768,6 +1808,31 @@ function limitBlock(m, vals) {
     return false;
   }
   return true;
+}
+/* ⚠️ 运行时限幅监控(2026-08-22):限幅是所有控制方式(位置/速度/力矩/前馈)的硬上限——
+   轮询反馈的角度越过限幅即报警并自动发 0x81 停止,不限发送前目标校验。
+   死区:回到限幅内(上下限各回 2°)后解除锁定,可再次触发。 */
+const limitAlarm = {};   // 电机 id → true 越限报警锁定中
+function monitorLimit(m, angOut) {
+  if (!m || typeof angOut !== "number" || isNaN(angOut)) return;
+  const d = k => (typeof m[k] === "number" && isFinite(m[k])) ? m[k] : null;
+  const lo = d("limMinDeg"), hi = d("limMaxDeg");
+  if (lo === null && hi === null) return;   // 未设角度限幅
+  const armed = !!limitAlarm[m.id];
+  const over = (hi !== null && angOut > hi) || (lo !== null && angOut < lo);
+  if (over && !armed) {
+    limitAlarm[m.id] = true;
+    const dir = hi !== null && angOut > hi ? "上限" : "下限";
+    const limV = hi !== null && angOut > hi ? hi : lo;
+    addLog("err", `⛔ 限幅越限报警(${m.name},ID${m.id}):当前角度 ${angOut.toFixed(1)}° 超过${dir} ${limV.toFixed(1)}°,已自动发送 0x81 停止`);
+    alert(`⛔ 限幅越限报警(${m.name}):当前角度 ${angOut.toFixed(1)}° 超过${dir} ${limV.toFixed(1)}°\n已自动发送 0x81 停止。请检查机械状态。`);
+    sendMotor(pad8([0x81]), "⛔ 限幅越限自动停止(0x81)");
+    return;
+  }
+  // 死区解锁:回到限幅内 2° 后允许再次触发
+  if (armed && lo !== null && hi !== null && angOut > lo + 2 && angOut < hi - 2) limitAlarm[m.id] = false;
+  else if (armed && lo === null && hi !== null && angOut < hi - 2) limitAlarm[m.id] = false;
+  else if (armed && hi === null && lo !== null && angOut > lo + 2) limitAlarm[m.id] = false;
 }
 
 /* =====================================================================
@@ -2411,17 +2476,20 @@ function updateStatusPanel(pr) {
       chart.feed({ pos: rot2out(pr.values.ang, m), spd: rot2out(pr.values.spd, m), iq: pr.values.iq * dirOf(m) });
       lastAngle[m.id] = rot2out(pr.values.ang, m);   // V4.3/V4.4:0x9C 自带角度,同步 lastAngle
       lastAngleSrc[m.id] = "0x9C";
+      monitorLimit(m, lastAngle[m.id]);              // ⛔ 运行时限幅监控
     } else if (m.v9cSemantics === "angle") {
       // 部分 V3.x 固件 0x9C 直接带输出轴角度 1°/LSB(由注册表 v9cSemantics="angle" 标记)
       chart.feed({ pos: rot2out(pr.values.ang, m), spd: rot2out(pr.values.spd, m), iq: pr.values.iq * dirOf(m) });
       lastAngle[m.id] = rot2out(pr.values.ang, m);
       lastAngleSrc[m.id] = "0x9C";
+      monitorLimit(m, lastAngle[m.id]);              // ⛔ 运行时限幅监控
     } else {
       // V3.x:单圈绝对值双来源模型——0x9C 编码器脉冲回读相位,最近邻校准 rotDeg
       const rot = v3OnPhase(m, pr.values.enc);
       const a = v3PosDual(m);               // 显示 = (rotDeg−E0)/gear×dir
       if (lastAngleSrc[m.id] !== "0x92") { lastAngle[m.id] = a; lastAngleSrc[m.id] = "0x9C"; }
       chart.feed({ pos: a, spd: rot2out(pr.values.spd, m), iq: pr.values.iq * dirOf(m) });
+      monitorLimit(m, a);                    // ⛔ 运行时限幅监控(V3 输出轴角)
     }
   } else if (pr.cmd === 0x90 && m.proto === "V3") {
     // 0x90 单圈编码器脉冲回读(手动读):同样喂给双来源模型,更新位置显示
@@ -2443,6 +2511,7 @@ function updateStatusPanel(pr) {
       lastAngle[m.id] = rel;
       lastAngleSrc[m.id] = "0x92";
       chart.feed({ pos: rel, spd: null, iq: null });
+      monitorLimit(m, rel);                  // ⛔ 运行时限幅监控(0x92 校准角)
       // 0x92 读数缓存:由 0x9A/0x9C 面板常驻显示(0x92 帧若直接改面板会被同周期
       // 0x9A/0x9C 帧覆盖,用户看不到——2026-08-20 实测教训)
       v3_92info = { rel, raw: a, fw: a * gearOf(m) * dirOf(m), turn: Math.round(v3TrackOf(m).rotDeg / 360) };
@@ -2452,10 +2521,12 @@ function updateStatusPanel(pr) {
     // 0x94 单圈角度(所有协议):仅更新显示角度,不做多圈校准(单圈无圈号)
     lastAngle[m.id] = rot2out(pr.values.pos, m);
     lastAngleSrc[m.id] = "0x94";
+    monitorLimit(m, lastAngle[m.id]);        // ⛔ 运行时限幅监控
   } else if (pr.cmd === 0x92) {
     // V4 的 0x92 多圈角:仅同步 lastAngle(V4 面板角度以 0x9C 为准,此值供增量限幅换算)
     lastAngle[m.id] = rot2out(pr.values.pos, m);
     lastAngleSrc[m.id] = "0x92";
+    monitorLimit(m, lastAngle[m.id]);        // ⛔ 运行时限幅监控
   } else if ((pr.cmd >= 0x60 && pr.cmd <= 0x64) && m.proto !== "V3") {
     const zeroInput = document.getElementById("zoVal");
     if (zeroInput && Number.isFinite(pr.values.encoderOffset)) {
