@@ -310,6 +310,19 @@ canvas.chart { background: var(--log); border: 1px solid var(--border); border-r
   </div>
 </div>
 
+<!-- 限幅越限报警弹窗(0x81 已先发出,此窗供选择恢复方式) -->
+<div class="modal-mask" id="limitModalMask">
+  <div class="modal">
+    <h3 id="limitModalTitle">⛔ 限幅越限报警</h3>
+    <p id="limitModalMsg"></p>
+    <div class="btns">
+      <button class="danger" id="btnLimitDisable" onclick="limitModalDisable()">🛑 失能(掉力)</button>
+      <button class="warn" id="btnLimitHome" onclick="limitModalHome()">🏠 自动归零(需确认)</button>
+      <button onclick="limitModalClose()">关闭</button>
+    </div>
+  </div>
+</div>
+
 <script>
 "use strict";
 /* =====================================================================
@@ -1834,6 +1847,45 @@ function limitBannerHide() {
   const el = document.getElementById("limitBanner");
   if (el) el.classList.remove("show");
 }
+/* 限幅越限报警弹窗:0x81 已先同步发出(停在当前位置),此窗供选择恢复方式——
+   🛑 失能(0x80 掉力,用户主动选择) / 🏠 自动归零(二次确认,低速回机械零点 0°) */
+let limitModalMotorId = null;
+function limitModalShow(m, msg) {
+  limitModalMotorId = m ? m.id : null;
+  const t = document.getElementById("limitModalTitle");
+  const p = document.getElementById("limitModalMsg");
+  if (t) t.textContent = "⛔ 限幅越限报警(" + (m ? m.name : "") + ")";
+  if (p) p.textContent = msg;
+  document.getElementById("limitModalMask").style.display = "flex";
+}
+function limitModalClose() {
+  document.getElementById("limitModalMask").style.display = "none";
+}
+async function limitModalDisable() {
+  const m = motorById(limitModalMotorId);
+  limitModalClose();
+  if (m) await sendMotor(pad8([0x80]), "⛔ 限幅越限:用户选择失能(0x80,掉力)");
+}
+async function limitModalHome() {
+  const m = motorById(limitModalMotorId);
+  if (!m) { limitModalClose(); return; }
+  const d = k => (typeof m[k] === "number" && isFinite(m[k])) ? m[k] : null;
+  const lo = d("limMinDeg"), hi = d("limMaxDeg");
+  // ⚠️ 归零在限幅外也必须可用(电机在限幅外报警后靠它回零点),故不检查 0° 是否在限幅内;
+  //    仅提示:若限幅不含 0°,归零到位后仍会越限报警(限幅配置问题)
+  const zeroInLimit = !((lo !== null && 0 < lo) || (hi !== null && 0 > hi));
+  const warn = zeroInLimit ? "" : "\n⚠️ 当前角度限幅不包含 0°:归零到位后仍会越限报警,建议归零后调整限幅。";
+  const ok = await showConfirm("🏠 自动归零确认",
+    `即将低速自动回到机械零点(0°);归位过程仍在限幅监控下(从限幅外向回走为恢复方向)。\n⚠️ 请确认归零路径上无障碍。${warn}是否继续?`);
+  if (!ok) { limitModalClose(); return; }
+  limitModalClose();
+  if (m.proto === "V3") {
+    await v3Home();   // v3Home 自带确认与低速归位(E0)
+  } else {
+    const spd = Math.min(15, d("limMaxSpd") ?? 15);   // 归零速度不超最大速度限幅
+    await sendMotor(BUILD_V44.POS(0xA4, spd, 0), `⛔ 限幅越限:自动归零(0xA4 目标 0°,${spd}dps)`);
+  }
+}
 function monitorLimit(m, ang, spd, iq) {
   if (!m) return;
   const d = k => (typeof m[k] === "number" && isFinite(m[k])) ? m[k] : null;
@@ -1861,10 +1913,11 @@ function monitorLimit(m, ang, spd, iq) {
     else if (!over && st.iq) st.iq = false;
   }
   if (first) {
-    // ①先停:sendMotor 同步部分立即发出 0x81(bridge.send_frame 入队)②再报警:横幅+日志
+    // ①先停:sendMotor 同步部分立即发出 0x81(bridge.send_frame 入队)②再报警:弹窗(阻塞但停止帧已发出)+横幅+日志
     sendMotor(pad8([0x81]), "⛔ 限幅越限自动停止(0x81)");
     addLog("err", `⛔ 限幅越限报警(${m.name},ID${m.id}):反馈${first}超过限幅,已自动发送 0x81 停止`);
     limitBannerShow(`⛔ 限幅越限报警(${m.name}):反馈${first}超过限幅,已自动发送 0x81 停止(角度 ${typeof ang === "number" ? ang.toFixed(1) + "°" : "—"} / 速度 ${typeof spd === "number" ? spd.toFixed(1) + " dps" : "—"} / 电流 ${typeof iq === "number" ? iq.toFixed(2) + " A" : "—"})`);
+    limitModalShow(m, `反馈${first}超过限幅,已自动发送 0x81 停止(停在当前位置,锁位)。\n请选择恢复方式:\n· 🛑 失能:电机失去输出力,关节可能因重力下落\n· 🏠 自动归零:低速自动回到机械零点(需确认)\n· 关闭:保持停止与越限锁定(回到限幅内自动解锁)`);
   }
   if (!st.ang && !st.spd && !st.iq) limitBannerHide();   // 全部回落 → 清除横幅
 }
