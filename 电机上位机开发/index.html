@@ -2546,16 +2546,8 @@ let lastAngleSrc = {}; // 该角度的来源:"0x92" | "0x9C"
       相位回读用「最近邻校准」修正(相位精度直接继承,圈号误差 ≤±1 圈,
       云台场景转子 ≤6 圈,配合上电自动回机械零点即可完全恢复绝对角)。 */
 const v3Track = {};   // V3 电机编号 → { E0, rotDeg, lastEnc }
-let v3_92info = { rel: null, raw: null, fw: null, turn: null };   // 0x92 读数缓存(状态面板常驻显示)
-/* 状态面板的 0x92 常驻行(相对零点角度/原始 0x92/固件角/圈号)——0x92 帧不直接改面板
-   (会被同周期 0x9A/0x9C 帧覆盖),而是缓存后由 0x9A/0x9C 面板追加显示 */
-function v3_92row() {
-  return `
-    <div><div class="k">角度(相对零点)</div><div class="v">${v3_92info.rel.toFixed(2)} °</div></div>
-    <div><div class="k">0x92 原始</div><div class="v">${v3_92info.raw.toFixed(2)} °</div></div>
-    <div><div class="k">固件角(转子)</div><div class="v">${v3_92info.fw.toFixed(1)} °</div></div>
-    <div><div class="k">当前圈号</div><div class="v">${v3_92info.turn}</div></div>`;
-}
+/* 状态面板只显示「角度(相对零点)」;0x92 固件角/圈号是开发者参考,界面不展示
+   (2026-08-25 用户要求),实现方法见 AGENTS.md/技术归档.md「显示层」 */
 function v3TrackOf(m) {
   let t = v3Track[m.id];
   if (!t) {
@@ -2654,9 +2646,8 @@ function updateStatusPanel(pr) {
       lastAngleSrc[m.id] = "0x92";
       chart.feed({ pos: rel, spd: null, iq: null });
       monitorLimit(m, rel);                  // ⛔ 运行时限幅监控(0x92 校准角)
-      // 0x92 读数缓存:由 0x9A/0x9C 面板常驻显示(0x92 帧若直接改面板会被同周期
-      // 0x9A/0x9C 帧覆盖,用户看不到——2026-08-20 实测教训)
-      v3_92info = { rel, raw: a, fw: a * gearOf(m) * dirOf(m), turn: Math.round(v3TrackOf(m).rotDeg / 360) };
+      // 0x92 读数经 lastAngle 供面板/曲线显示(0x92 帧若直接改面板会被同周期
+      // 0x9A/0x9C 帧覆盖,用户看不到——2026-08-20 实测教训);固件角/圈号不作界面展示
     }
     // a===0:忽略(不覆盖 0x9C 的角度)
   } else if (pr.cmd === 0x94) {
@@ -2692,8 +2683,7 @@ function updateStatusPanel(pr) {
       <div><div class="k">电压</div><div class="v">${voltTxt}</div></div>
       <div><div class="k">抱闸</div><div class="v">${pr.values.brake}</div></div>
       ${m.proto !== "V3" ? `<div><div class="k">MOS 温度</div><div class="v">${pr.values.mosTemp} ℃</div></div>` : ""}
-      <div><div class="k">错误码</div><div class="v">0x${pr.values.err.toString(16).toUpperCase().padStart(4, "0")}</div></div>
-      ${v3_92info.rel !== null ? v3_92row() : ""}`;
+      <div><div class="k">错误码</div><div class="v">0x${pr.values.err.toString(16).toUpperCase().padStart(4, "0")}</div></div>`;
     const errs = (m.proto === "V3" ? ERR_V3 : ERR_V44).filter(e => (pr.values.err & e[0]) === e[0]);
     errBox.innerHTML = errs.length
       ? errs.map(e => `<span class="e">⚠ ${e[1]}</span>`).join("")
@@ -2710,16 +2700,13 @@ function updateStatusPanel(pr) {
     const angCell = m.proto === "V3"
       ? (angOut !== undefined && !isNaN(angOut) ? angOut.toFixed(2) + " °" : "等待数据…")
       : angOut.toFixed(2) + " °";
-    const angSrc = m.proto === "V3"
-      ? (lastAngleSrc[m.id] === "0x9C" ? "(0x9C 相对)" : "(0x92)")
-      : (lastAngleSrc[m.id] === "0x92" ? "(0x92)" : "");
+    // 状态监控只显示「角度(相对零点)」;来源标记(0x92/0x9C)与固件角/圈号属开发者参考,不展示
     kv.innerHTML = `
       <div><div class="k">温度</div><div class="v">${pr.values.temp} ℃</div></div>
       <div><div class="k">力矩电流</div><div class="v">${(pr.values.iq * dirOf(m)).toFixed(2)} A</div></div>
       <div><div class="k">速度${g !== 1 ? "(输出轴)" : ""}</div><div class="v">${spdOut.toFixed(g !== 1 ? 2 : 0)} dps</div></div>
-      <div><div class="k">角度${g !== 1 ? "(输出轴)" : ""}${angSrc}</div>
-           <div class="v">${angCell}</div></div>
-      ${v3_92info.rel !== null ? v3_92row() : ""}`;
+      <div><div class="k">角度(相对零点)${g !== 1 ? " · 输出轴" : ""}</div>
+           <div class="v">${angCell}</div></div>`;
   } else if (pr.cmd >= 0x60 && pr.cmd <= 0x64 && m.proto !== "V3") {
     const encoderValue = Number.isFinite(pr.values.encoderOffset) ? pr.values.encoderOffset : pr.values.enc;
     const names = { 0x60: "多圈位置", 0x61: "多圈原始位置", 0x62: "多圈零偏", 0x63: "零偏写入回显", 0x64: "当前位置设零回读" };
