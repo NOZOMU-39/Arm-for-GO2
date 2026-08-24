@@ -2744,9 +2744,10 @@ function handleFrame(ev) {
   const pr = parseReply(proto, cid, bytes);
   const note = pr ? pr.summary : "";
   const cmd = bytes[0];
-  // 状态轮询帧(0x9A/0x9C)不写收发日志,避免刷屏;面板与曲线照常更新。
-  // ⚠️ 0x92 不在静默名单:用户要求收发日志可见 0.01° 小数角度反馈(2026-08-24)
-  const silent = pollOn && m && m.id === selectedId && (cmd === 0x9A || cmd === 0x9C);
+  // 状态轮询帧(0x9A/0x9C/0x92)一律不写收发日志:日志是给人读的,轮询刷屏会淹没
+  // 手动/控制帧(用户明确要求,2026-08-24 曾误改 0x92 进日志被用户驳回——已恢复);
+  // 0.01° 小数精度看状态面板与曲线,手动读 0x92 时仍正常写日志
+  const silent = pollOn && m && m.id === selectedId && (cmd === 0x9A || cmd === 0x9C || cmd === 0x92);
   if (!probeFrame && !silent) addLog("rx", `← 0x${cid.toString(16).toUpperCase()}  ${ev.data}  ${m ? "#" + n + " " + m.name : "未注册 #" + n}  ${note}`);
   if (!probeFrame && m && m.id === selectedId) {
     updateStatusPanel(pr);
