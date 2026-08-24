@@ -583,18 +583,22 @@ class Device:
         self._file_log(f"{_fmt_ms(ts)} [{level}] {msg}")
 
     def log_line(self, text):
-        """界面摘要同步落盘(2026-08-20):JS addLog 转发,文件日志含帧+摘要便于分析"""
+        """界面摘要同步落盘(2026-08-20):JS addLog 转发,文件日志含帧+摘要便于分析。
+           2026-08-25:失败不再静默吞(曾全程静默失败导致文件日志缺 JS 摘要),显式报错可见"""
         try:
             self._file_log(text)
-        except Exception:
-            pass
+        except Exception as e:
+            self.add_log("err", f"JS 摘要落盘失败:{type(e).__name__}:{e}")
 
-    def _frame_event(self, dir_, can_id, extd, dlc, data):
+    def _frame_event(self, dir_, can_id, extd, dlc, data, note=""):
+        """帧落盘:tx 帧附操作名(note,由 JS sendMotor 传入),rx 帧无——
+           日志可还原「用户点了什么」而不只是裸帧(2026-08-25 用户要求)"""
         ts = _now_ms()
         hexs = " ".join(f"{b:02X}" for b in data)
         self._event("frame", ts=ts, dir=dir_, id=can_id, extd=extd, dlc=dlc, data=hexs)
         arrow = "→ 发" if dir_ == "tx" else "← 收"
-        self._file_log(f"{_fmt_ms(ts)} {arrow} 0x{can_id:03X}  {hexs}")
+        suffix = f"  ({note})" if dir_ == "tx" and note else ""
+        self._file_log(f"{_fmt_ms(ts)} {arrow} 0x{can_id:03X}  {hexs}{suffix}")
 
     # ---- 设备操作 ----
 
@@ -721,8 +725,10 @@ class Device:
             self.add_log("info", "设备已关闭")
             return {"ok": True, "msg": "设备已关闭"}
 
-    def send_frame(self, can_id, extd, data_hex):
-        """发帧:解析十六进制串,补 0 到 8 字节。返回 {ok, msg}"""
+    def send_frame(self, can_id, extd, data_hex, note="", silent=0):
+        """发帧:解析十六进制串,补 0 到 8 字节。返回 {ok, msg}。
+           note = 操作名(JS sendMotor 传入),落盘到 tx 帧行,日志可还原操作意图;
+           silent=1(轮询帧等)不落盘,避免文件日志刷屏"""
         if not self.opened:
             self.add_log("warn", f"发送被拒绝(0x{can_id:03X}):设备未打开")
             return {"ok": False, "msg": "设备未打开"}
@@ -757,7 +763,9 @@ class Device:
                 return {"ok": False, "msg": "发送失败:总线上无设备应答——请检查电机 24V 是否上电、CAN 线是否接好、波特率是否一致"}
         else:
             self._bus_off = False  # 发送成功即总线恢复
-        self._frame_event("tx", can_id, bool(extd), len(data8), data8)
+        # silent=1(JS 轮询帧等):不落盘,避免文件日志刷屏(用户要求日志供人读)
+        if not silent:
+            self._frame_event("tx", can_id, bool(extd), len(data8), data8, note)
         self.status["tx"] += 1
         return {"ok": True, "msg": "已发送"}
 
@@ -847,9 +855,9 @@ class Api:
         self._trace("close_device")
         return self.device.close_device()
 
-    def send_frame(self, can_id, extd, data_hex):
+    def send_frame(self, can_id, extd, data_hex, note="", silent=0):
         self._trace("send_frame")
-        return self.device.send_frame(int(can_id), int(extd), str(data_hex))
+        return self.device.send_frame(int(can_id), int(extd), str(data_hex), note, int(silent))
 
     def get_pending(self):
         self._trace("get_pending")

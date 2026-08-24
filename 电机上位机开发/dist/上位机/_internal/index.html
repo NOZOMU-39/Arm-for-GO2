@@ -842,9 +842,12 @@ function addLog(cls, text) {
   const stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 10;
   box.innerHTML = logLines.join("\n");
   if (document.getElementById("chkScroll").checked && stick) box.scrollTop = box.scrollHeight;
-  // 2026-08-20:界面摘要同步写入文件日志(便于事后按帧+摘要分析,如 0x92 读数)
-  if (window.pywebview && window.pywebview.api && window.pywebview.api.log_line) {
-    try { window.pywebview.api.log_line(ts + " " + text.replace(/<[^>]*>/g, "")); } catch (e) {}
+  // 界面摘要同步写入文件日志(帧行由 main.py 记录,此处补操作/报警/系统摘要,便于还原操作与界面)
+  // 2026-08-25:改用 bridge 兜底(pywebview.api 可能未暴露),失败显式告警不再静默吞
+  const pyapi = (window.pywebview && window.pywebview.api) || (typeof bridge !== "undefined" ? bridge : null);
+  if (pyapi && pyapi.log_line) {
+    try { pyapi.log_line(ts + " " + text.replace(/<[^>]*>/g, "")); }
+    catch (e) { if (typeof console !== "undefined") console.warn("日志落盘失败:", e); }
   }
 }
 
@@ -885,7 +888,7 @@ async function rawSend(canId, extd, hexStr, note, silent) {
     else addLog("warn", msg);
     return false;
   }
-  const r = await bridge.send_frame(canId, extd ? 1 : 0, hexStr);
+  const r = await bridge.send_frame(canId, extd ? 1 : 0, hexStr, note || "", silent ? 1 : 0);
   if (!r.ok) {
     if (typeof protoState !== "undefined" && protoState.active) protoSetText("protoHint", `通信发送失败，已停止确认:${r.msg}`);
     else addLog("err", `发送失败:${r.msg}`);

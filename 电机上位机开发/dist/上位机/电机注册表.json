@@ -20,8 +20,8 @@
     "dir": 1,
     "E0": null,
     "v9cSemantics": "pulse",
-    "limMinDeg": -39,
-    "limMaxDeg": 185
+    "limMinDeg": -120.5,
+    "limMaxDeg": 92.5
   },
   {
     "id": 3,
