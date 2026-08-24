@@ -43,7 +43,6 @@ copy /y zlgcan.dll "dist\上位机\" >nul
 if exist kerneldlls (
     xcopy /e /i /y kerneldlls "dist\上位机\kerneldlls\" >nul
 )
-copy /y 使用说明.md "dist\上位机\" >nul
 copy /y README.md "dist\上位机\" >nul
 
 echo [3/3] 恢复调试日志...
