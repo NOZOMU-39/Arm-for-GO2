@@ -584,9 +584,13 @@ class Device:
 
     def log_line(self, text):
         """界面摘要同步落盘(2026-08-20):JS addLog 转发,文件日志含帧+摘要便于分析。
-           2026-08-25:失败不再静默吞(曾全程静默失败导致文件日志缺 JS 摘要),显式报错可见"""
+           2026-08-25:失败不再静默吞(曾全程静默失败导致文件日志缺 JS 摘要),显式报错可见;
+           首次调用记录一次,便于确认 JS→Python 链路是否打通"""
         try:
             self._file_log(text)
+            if not getattr(self, "_log_line_seen", False):
+                self._log_line_seen = True
+                self.add_log("info", "JS 摘要落盘链路已打通(log_line 首次调用)")
         except Exception as e:
             self.add_log("err", f"JS 摘要落盘失败:{type(e).__name__}:{e}")
 

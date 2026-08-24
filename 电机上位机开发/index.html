@@ -843,11 +843,16 @@ function addLog(cls, text) {
   box.innerHTML = logLines.join("\n");
   if (document.getElementById("chkScroll").checked && stick) box.scrollTop = box.scrollHeight;
   // 界面摘要同步写入文件日志(帧行由 main.py 记录,此处补操作/报警/系统摘要,便于还原操作与界面)
-  // 2026-08-25:改用 bridge 兜底(pywebview.api 可能未暴露),失败显式告警不再静默吞
+  // 2026-08-25:pywebview JS API 调用返回 Promise,异常是异步的——同步 try 捕获不到,
+  // 改用 .catch 显式告警(pywebview 曾全程静默失败导致文件缺 JS 摘要)
   const pyapi = (window.pywebview && window.pywebview.api) || (typeof bridge !== "undefined" ? bridge : null);
   if (pyapi && pyapi.log_line) {
-    try { pyapi.log_line(ts + " " + text.replace(/<[^>]*>/g, "")); }
-    catch (e) { if (typeof console !== "undefined") console.warn("日志落盘失败:", e); }
+    try {
+      const p = pyapi.log_line(ts + " " + text.replace(/<[^>]*>/g, ""));
+      if (p && typeof p.catch === "function") {
+        p.catch(e => { if (typeof console !== "undefined") console.warn("日志落盘失败:", e); });
+      }
+    } catch (e) { if (typeof console !== "undefined") console.warn("日志落盘失败:", e); }
   }
 }
 
@@ -1939,9 +1944,11 @@ function monitorLimit(m, ang, spd, iq) {
   }
   if (first) {
     // ①先停:sendMotor 同步部分立即发出 0x81(bridge.send_frame 入队)②再报警:弹窗(阻塞但停止帧已发出)+横幅+日志
-    sendMotor(pad8([0x81]), "⛔ 限幅越限自动停止(0x81)");
-    addLog("err", `⛔ 限幅越限报警(${m.name},ID${m.id}):反馈${first}超过限幅,已自动发送 0x81 停止`);
-    limitBannerShow(`⛔ 限幅越限报警(${m.name}):反馈${first}超过限幅,已自动发送 0x81 停止(角度 ${typeof ang === "number" ? ang.toFixed(1) + "°" : "—"} / 速度 ${typeof spd === "number" ? spd.toFixed(1) + " dps" : "—"} / 电流 ${typeof iq === "number" ? iq.toFixed(2) + " A" : "—"})`);
+    // 2026-08-25:报警详情并进 0x81 帧的 note——即使 JS 摘要落盘链路异常,文件日志的帧行也能还原报警原因
+    const detail = `反馈${first}超过限幅(角度 ${typeof ang === "number" ? ang.toFixed(1) + "°" : "—"} / 速度 ${typeof spd === "number" ? spd.toFixed(1) + " dps" : "—"} / 电流 ${typeof iq === "number" ? iq.toFixed(2) + " A" : "—"})`;
+    sendMotor(pad8([0x81]), `⛔ 限幅越限自动停止(0x81):${detail}`);
+    addLog("err", `⛔ 限幅越限报警(${m.name},ID${m.id}):${detail},已自动发送 0x81 停止`);
+    limitBannerShow(`⛔ 限幅越限报警(${m.name}):${detail},已自动发送 0x81 停止`);
     limitModalShow(m, `反馈${first}超过限幅,已自动发送 0x81 停止(停在当前位置,锁位)。\n请选择恢复方式:\n· 🛑 失能:电机失去输出力,关节可能因重力下落\n· 🏠 自动归零:低速自动回到机械零点(需确认)\n· 关闭:保持停止与越限锁定(回到限幅内自动解锁)`);
   }
   if (!st.ang && !st.spd && !st.iq) limitBannerHide();   // 全部回落 → 清除横幅
@@ -2609,12 +2616,22 @@ function updateStatusPanel(pr) {
       if (a92 === null) { lastAngle[m.id] = a; lastAngleSrc[m.id] = "0x9C"; }
       monitorLimit(m, lastAngle[m.id], rot2out(pr.values.spd, m), pr.values.iq * dirOf(m));   // ⛔ 反馈角度/速度/电流监控
     } else {
-      // V3.x:单圈绝对值双来源模型——0x9C 编码器脉冲回读相位,最近邻校准 rotDeg
-      const rot = v3OnPhase(m, pr.values.enc);
-      const a = v3PosDual(m);               // 显示 = (rotDeg−E0)/gear×dir
-      if (lastAngleSrc[m.id] !== "0x92") { lastAngle[m.id] = a; lastAngleSrc[m.id] = "0x9C"; }
-      chart.feed({ pos: a, spd: rot2out(pr.values.spd, m), iq: pr.values.iq * dirOf(m) });
-      monitorLimit(m, a, rot2out(pr.values.spd, m), pr.values.iq * dirOf(m));   // ⛔ 反馈角度/速度/电流监控
+      // V3.x:单圈绝对值双来源模型——0x9C 编码器脉冲回读相位,最近邻校准 rotDeg。
+      // ⚠️ 2026-08-25 实测修复:0x92(固件多圈角 0.01°)已轮询到位时,0x9C 相位最近邻
+      // 校准在快速反转瞬间会取错 ±360N(相位两次采样间跳变 >180°,round 取错圈,
+      // 实测 0x92=-632.95° 时相位跳变致 rotDeg 拉到 -809.88°,显示角 90°→119° 虚跳,
+      // 限幅越限误报)——此时以 0x92 为准,0x9C 相位仅作 0x92 未到时的兜底
+      if (lastAngleSrc[m.id] === "0x92" && lastAngle[m.id] !== undefined) {
+        const a = lastAngle[m.id];
+        chart.feed({ pos: a, spd: rot2out(pr.values.spd, m), iq: pr.values.iq * dirOf(m) });
+        monitorLimit(m, a, rot2out(pr.values.spd, m), pr.values.iq * dirOf(m));   // ⛔ 反馈角度/速度/电流监控
+      } else {
+        const rot = v3OnPhase(m, pr.values.enc);
+        const a = v3PosDual(m);             // 显示 = (rotDeg−E0)/gear×dir
+        lastAngle[m.id] = a; lastAngleSrc[m.id] = "0x9C";
+        chart.feed({ pos: a, spd: rot2out(pr.values.spd, m), iq: pr.values.iq * dirOf(m) });
+        monitorLimit(m, a, rot2out(pr.values.spd, m), pr.values.iq * dirOf(m));   // ⛔ 反馈角度/速度/电流监控
+      }
     }
   } else if (pr.cmd === 0x90 && m.proto === "V3") {
     // 0x90 单圈编码器脉冲回读(手动读):同样喂给双来源模型,更新位置显示
