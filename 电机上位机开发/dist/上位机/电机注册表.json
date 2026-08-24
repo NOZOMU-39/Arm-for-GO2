@@ -19,7 +19,9 @@
     "gear": 1,
     "dir": 1,
     "E0": null,
-    "v9cSemantics": "pulse"
+    "v9cSemantics": "pulse",
+    "limMinDeg": -38.5,
+    "limMaxDeg": 184
   },
   {
     "id": 3,

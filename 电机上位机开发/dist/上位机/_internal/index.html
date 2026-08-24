@@ -1584,9 +1584,9 @@ const TAB_RENDER_V44 = [
     </div>
     <div class="panel-title" data-nocollapse="1">🔧 固件角度限幅(0x20 索引 6/7,系统级)</div>
     <div class="row">
-      <label>正向最大角</label> ${numInp("limPos", 360, 90)} <span class="hint">°(输出轴,1°/LSB)</span>
+      <label>正向最大角</label> ${numInp("limPos", 65535, 90)} <span class="hint">°(输出轴,1°/LSB;默认 65535=未设限)</span>
       <button class="danger" onclick="v44LimitWrite(6)">写入 ROM</button>
-      <label>反向最大角</label> ${numInp("limNeg", -360, 90)} <span class="hint">°(输出轴)</span>
+      <label>反向最大角</label> ${numInp("limNeg", 65535, 90)} <span class="hint">°(输出轴;默认 65535=未设限)</span>
       <button class="danger" onclick="v44LimitWrite(7)">写入 ROM</button>
     </div>
     <div class="hint warn">⚠️ 系统级操作:①<b>仅失能状态才能写入 ROM</b>(写入按钮会自动先发 0x80 失能,电机掉力,请先做好机械防护)②<b>默认 65535 = 出厂未设限</b>(官方协议未说明此默认值,读回 65535 属正常,勿当异常)③单位 1°/LSB(2026-08-24 实测:写 360 末端转子最高只能转 360°)④本限位为<b>位置运行</b>模式限制,与软件限幅(独立安全层)无关。</div>
@@ -1737,9 +1737,9 @@ const TAB_RENDER_V43 = [
     <div class="hint warn">⚠️ 索引 4/5 为 V4.3 文档功能,<b>X6-40 真机待验证</b>(掉电记忆、改编号写入 ROM 前请先确认);索引 6/7 角度限幅见下方「固件角度限幅」;索引 8 错误自动恢复为 V4.4 专属,本面板不含。</div>
     <div class="panel-title" data-nocollapse="1">🔧 固件角度限幅(0x20 索引 6/7,系统级)</div>
     <div class="row">
-      <label>正向最大角</label> ${numInp("limPos", 360, 90)} <span class="hint">°(输出轴,1°/LSB)</span>
+      <label>正向最大角</label> ${numInp("limPos", 65535, 90)} <span class="hint">°(输出轴,1°/LSB;默认 65535=未设限)</span>
       <button class="danger" onclick="v44LimitWrite(6)">写入 ROM</button>
-      <label>反向最大角</label> ${numInp("limNeg", -360, 90)} <span class="hint">°(输出轴)</span>
+      <label>反向最大角</label> ${numInp("limNeg", 65535, 90)} <span class="hint">°(输出轴;默认 65535=未设限)</span>
       <button class="danger" onclick="v44LimitWrite(7)">写入 ROM</button>
     </div>
     <div class="hint warn">⚠️ 系统级操作:①<b>仅失能状态才能写入 ROM</b>(写入按钮会自动先发 0x80 失能,电机掉力,请先做好机械防护)②<b>默认 65535 = 出厂未设限</b>(官方协议未说明此默认值,读回 65535 属正常,勿当异常)③单位 1°/LSB(2026-08-24 实测:写 360 末端转子最高只能转 360°)④<b>X6-40 限位语义仍待确认</b>(曾现「限位 ±180° 发 0° 停 +180°」,未定论;此前写入未先失能,疑未存入 ROM,待重测)⑤本限位为<b>位置运行</b>模式限制,与软件限幅(独立安全层)无关。</div>
@@ -2744,8 +2744,9 @@ function handleFrame(ev) {
   const pr = parseReply(proto, cid, bytes);
   const note = pr ? pr.summary : "";
   const cmd = bytes[0];
-  // 状态轮询帧(0x9A/0x9C/0x92)不写收发日志,避免刷屏;面板与曲线照常更新
-  const silent = pollOn && m && m.id === selectedId && (cmd === 0x9A || cmd === 0x9C || cmd === 0x92);
+  // 状态轮询帧(0x9A/0x9C)不写收发日志,避免刷屏;面板与曲线照常更新。
+  // ⚠️ 0x92 不在静默名单:用户要求收发日志可见 0.01° 小数角度反馈(2026-08-24)
+  const silent = pollOn && m && m.id === selectedId && (cmd === 0x9A || cmd === 0x9C);
   if (!probeFrame && !silent) addLog("rx", `← 0x${cid.toString(16).toUpperCase()}  ${ev.data}  ${m ? "#" + n + " " + m.name : "未注册 #" + n}  ${note}`);
   if (!probeFrame && m && m.id === selectedId) {
     updateStatusPanel(pr);
