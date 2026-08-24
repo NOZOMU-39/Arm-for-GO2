@@ -841,6 +841,17 @@ class Api:
         self.device = device
         self._logged = set()
 
+    def log_line(self, text):
+        """JS addLog 摘要落盘(2026-08-25:原 log_line 在 Device 类,js_api 暴露不到 Api 上,
+           JS 侧 window.pywebview.api.log_line 为 undefined 静默跳过 → 文件日志缺 JS 摘要)"""
+        try:
+            self.device._file_log(text)
+            if not getattr(self, "_log_line_seen", False):
+                self._log_line_seen = True
+                self.device.add_log("info", "JS 摘要落盘链路已打通(log_line 首次调用)")
+        except Exception as e:
+            self.device.add_log("err", f"JS 摘要落盘失败:{type(e).__name__}:{e}")
+
     def _trace(self, name):
         """每个方法只记一次,避免轮询刷屏"""
         if name not in self._logged:
