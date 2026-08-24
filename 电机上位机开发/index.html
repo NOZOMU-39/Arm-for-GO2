@@ -528,6 +528,17 @@ function decode79Reply(bytes) {
   return { mode: "unknown", id: null, replyCanId: null, summary: "收到 0x79 回复,操作类型无法确认" };
 }
 
+/* 日志角度显示:0x92 轮询缓存(0.01°,与面板/曲线同源)优先,帧内 1° 值兜底。
+   V4 固件(如 X6-40)的 0x9C/控制回复角度字段为 1°/LSB(手册明文),帧内物理上
+   没有小数——轮询开启且 0.92 已到位时,日志角度改用 0.92 缓存显示 0.01°,
+   保证日志/面板/曲线三处精度一致(2026-08-24 用户要求:控制回复角度到小数)。 */
+function angForLog(rm, fbDeg) {
+  const m = rm || selMotor();
+  if (pollOn && m && m.id === selectedId && lastAngle[m.id] !== undefined && lastAngleSrc[m.id] === "0x92") {
+    return lastAngle[m.id].toFixed(2);
+  }
+  return fbDeg.toFixed(2);
+}
 function parseReply(proto, cid, bytes) {
   /* 返回 { motorId, cmd, summary, values } */
   if (!Array.isArray(bytes) || bytes.length === 0) return null;
@@ -660,7 +671,7 @@ function parseReply(proto, cid, bytes) {
         break;
       case 0x9C:
         out.values = { temp: bytes[1], iq: i16(bytes, 2) / 100, spd: i16(bytes, 4), ang: i16(bytes, 6) };
-        out.summary = `温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A · 速度 ${rot2out(out.values.spd, rm).toFixed(2)}dps · 角度 ${rot2out(out.values.ang, rm).toFixed(2)}°(输出轴${dirOf(rm) === -1 ? ",方向已映射" : ""})`;
+        out.summary = `温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A · 速度 ${rot2out(out.values.spd, rm).toFixed(2)}dps · 角度 ${angForLog(rm, rot2out(out.values.ang, rm))}°(输出轴${dirOf(rm) === -1 ? ",方向已映射" : ""})`;
         break;
       case 0x9D:
         out.values = { ia: i16(bytes, 1) / 100, ib: i16(bytes, 3) / 100, ic: i16(bytes, 5) / 100 };
@@ -750,11 +761,11 @@ function parseReply(proto, cid, bytes) {
       }
       case 0x80: case 0x81: case 0x77: case 0x78:
         out.values = { temp: bytes[1], iq: i16(bytes, 2) / 100, spd: i16(bytes, 4), ang: i16(bytes, 6) };
-        out.summary = `系统回复:温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A · 速度 ${rot2out(out.values.spd, rm).toFixed(2)}dps · 角度 ${rot2out(out.values.ang, rm).toFixed(2)}°`;
+        out.summary = `系统回复:温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A · 速度 ${rot2out(out.values.spd, rm).toFixed(2)}dps · 角度 ${angForLog(rm, rot2out(out.values.ang, rm))}°`;
         break;
       case 0xA1: case 0xA2: case 0xA4: case 0xA8: case 0xA9: case 0x72: case 0x73:
         out.values = { temp: bytes[1], iq: i16(bytes, 2) / 100, spd: i16(bytes, 4), ang: i16(bytes, 6) };
-        out.summary = `控制回复:温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A · 速度 ${rot2out(out.values.spd, rm).toFixed(2)}dps · 角度 ${rot2out(out.values.ang, rm).toFixed(2)}°`;
+        out.summary = `控制回复:温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A · 速度 ${rot2out(out.values.spd, rm).toFixed(2)}dps · 角度 ${angForLog(rm, rot2out(out.values.ang, rm))}°`;
         break;
       default:
         out.summary = "未识别的 V4.4 回复";
