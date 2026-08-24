@@ -279,7 +279,7 @@ canvas.chart { background: var(--log); border: 1px solid var(--border); border-r
           <span><i style="background:#f59e0b"></i>力矩电流 A</span>
           <span style="color:#8aa0c0">(Y 轴量程随数据自动调整,刻度标注主轴;无数据时曲线停留不归零;鼠标悬停可读数)</span>
         </div>
-        <div class="panel-title" style="margin-top:12px">📊 状态监控(0x9A + 0x9C + 0x94 角度 轮询,间隔可调)</div>
+        <div class="panel-title" style="margin-top:12px">📊 状态监控(0x9A + 0x9C + 0x92 角度 轮询,间隔可调)</div>
         <div id="monitorPanel"></div>
         <div class="panel-title" style="margin-top:12px">📥 收发日志
           <button class="small" onclick="uiClearLog()">清空</button>
@@ -1235,7 +1235,6 @@ function numInp(id, val, w = 110, step = "any") {
 const TAB_RENDER_V3 = [
   // 0 状态监控
   () => `
-    <div class="panel-title">📊 实时状态(0x9A + 0x9C + 0x92 角度 轮询,${pollMs}ms)</div>
     <div class="row">
       <label>轮询</label>
       <button class="small primary" onclick="pollToggle(1)">▶ 开始</button>
@@ -1414,7 +1413,6 @@ const TAB_RENDER_V3 = [
 const TAB_RENDER_V44 = [
   // 0 状态监控
   () => `
-    <div class="panel-title">📊 实时状态(0x9A + 0x9C + 0x94 角度 轮询,${pollMs}ms)</div>
     <div class="row">
       <label>轮询</label>
       <button class="small primary" onclick="pollToggle(1)">▶ 开始</button>
@@ -1584,7 +1582,7 @@ const TAB_RENDER_V44 = [
       ${numInp("f20val", 0, 120)} <span class="hint">数值(0 或 1;索引 5 填新编号;索引 6/7 填角度°,按输出轴换算,1°/LSB)</span>
       <button class="danger" onclick="v44Func()">0x20 执行</button>
     </div>
-    <div class="panel-title">🔧 固件角度限幅(0x20 索引 6/7,系统级)</div>
+    <div class="panel-title" data-nocollapse="1">🔧 固件角度限幅(0x20 索引 6/7,系统级)</div>
     <div class="row">
       <label>正向最大角</label> ${numInp("limPos", 360, 90)} <span class="hint">°(输出轴,1°/LSB)</span>
       <button class="danger" onclick="v44LimitWrite(6)">写入 ROM</button>
@@ -1737,7 +1735,7 @@ const TAB_RENDER_V43 = [
       <button class="danger" onclick="v44Func()">0x20 执行</button>
     </div>
     <div class="hint warn">⚠️ 索引 4/5 为 V4.3 文档功能,<b>X6-40 真机待验证</b>(掉电记忆、改编号写入 ROM 前请先确认);索引 6/7 角度限幅见下方「固件角度限幅」;索引 8 错误自动恢复为 V4.4 专属,本面板不含。</div>
-    <div class="panel-title">🔧 固件角度限幅(0x20 索引 6/7,系统级)</div>
+    <div class="panel-title" data-nocollapse="1">🔧 固件角度限幅(0x20 索引 6/7,系统级)</div>
     <div class="row">
       <label>正向最大角</label> ${numInp("limPos", 360, 90)} <span class="hint">°(输出轴,1°/LSB)</span>
       <button class="danger" onclick="v44LimitWrite(6)">写入 ROM</button>
@@ -2507,17 +2505,13 @@ async function pollStep(m) {
   // 轮询帧静默发送(不写收发日志);0x70 已从轮询中移除:X8-PRO 固件实测不回复,且运行模式无需高频查询
   await rawSend(id, 0, hx(pad8([0x9A])), "轮询 0x9A", true);
   await rawSend(id, 0, hx(pad8([0x9C])), "轮询 0x9C", true);
-  // V4 附加轮询 0x94 单圈角度(0.01°/LSB):0x9C 角度仅 1°/LSB 整数分辨率,
-  // 0x94 提供 0.01° 精度显示(2026-08-24 实测反馈:V4 面板/曲线角度呈整数阶梯)
-  if (m.proto !== "V3") {
-    await rawSend(id, 0, hx(pad8([0x94])), "轮询 0x94", true);
-  }
-  // V3 轮询 0x92(2026-08-20 终版定论):0x92 = 固件多圈绝对角(int32,0.01°/LSB,
-  // 手册 2.12 原文)。0xA4 目标 = 多圈角、固件按差值直接执行——上位机 rotDeg 必须
-  // 与固件角一致(0x92 校准),否则发 0xA4 时固件差值 = ±360N 空转。
-  if (m.proto === "V3") {
-    await rawSend(id, 0, hx(pad8([0x92])), "轮询 0x92", true);
-  }
+  // 0x92 = 固件多圈绝对角(int32,0.01°/LSB,手册 V3.9 2.12/V4.3 2.12):
+  //  V3 用于 rotDeg 校准(0xA4 目标 = 多圈角、固件按差值执行——上位机 rotDeg 必须与
+  //  固件角一致,否则发 0xA4 时固件差值 = ±360N 空转);
+  //  V4 用于 0.01° 精度显示——与 0x9C 同基准(2026-08-22 快照实证 0x92≈0x9C)、
+  //  无单圈回绕。⚠️ 勿用 0x94 代替:0x94 是转子单圈相位(2026-08-24 日志实证
+  //  0x9C=0° 时 0x94=334.87°,基准不同 + 360↔0 回绕 → 曲线剧烈震荡,已撤)。
+  await rawSend(id, 0, hx(pad8([0x92])), "轮询 0x92", true);
 }
 let lastAngle = {};    // 电机编号 → 最近输出轴角度(°):双来源模型(相位+圈号)优先,0x92 校准兜底
 let lastAngleSrc = {}; // 该角度的来源:"0x92" | "0x9C"
@@ -2585,15 +2579,20 @@ function updateStatusPanel(pr) {
   /* —— 曲线喂数据:与当前页签无关,任何页签下都持续更新 —— */
   if (pr.cmd === 0x9C) {
     if (m.proto !== "V3") {
-      chart.feed({ pos: rot2out(pr.values.ang, m), spd: rot2out(pr.values.spd, m), iq: pr.values.iq * dirOf(m) });
-      lastAngle[m.id] = rot2out(pr.values.ang, m);   // V4.3/V4.4:0x9C 自带角度,同步 lastAngle
-      lastAngleSrc[m.id] = "0x9C";
+      // V4.3/V4.4:0x9C 自带 1° 角度——但 0x92(0.01°)已到位时不得覆盖,
+      // 否则 0.01° 精度被打回整数(2026-08-24 修复);0x9C 仅作 0x92 未到时的兜底
+      const a92 = (lastAngle[m.id] !== undefined && lastAngleSrc[m.id] === "0x92") ? lastAngle[m.id] : null;
+      const a = a92 !== null ? a92 : rot2out(pr.values.ang, m);
+      chart.feed({ pos: a, spd: rot2out(pr.values.spd, m), iq: pr.values.iq * dirOf(m) });
+      if (a92 === null) { lastAngle[m.id] = a; lastAngleSrc[m.id] = "0x9C"; }
       monitorLimit(m, lastAngle[m.id], rot2out(pr.values.spd, m), pr.values.iq * dirOf(m));   // ⛔ 反馈角度/速度/电流监控
     } else if (m.v9cSemantics === "angle") {
-      // 部分 V3.x 固件 0x9C 直接带输出轴角度 1°/LSB(由注册表 v9cSemantics="angle" 标记)
-      chart.feed({ pos: rot2out(pr.values.ang, m), spd: rot2out(pr.values.spd, m), iq: pr.values.iq * dirOf(m) });
-      lastAngle[m.id] = rot2out(pr.values.ang, m);
-      lastAngleSrc[m.id] = "0x9C";
+      // 部分 V3.x 固件 0x9C 直接带输出轴角度 1°/LSB(由注册表 v9cSemantics="angle" 标记);
+      // 0x92(0.01°)已到位时同样不覆盖
+      const a92 = (lastAngle[m.id] !== undefined && lastAngleSrc[m.id] === "0x92") ? lastAngle[m.id] : null;
+      const a = a92 !== null ? a92 : rot2out(pr.values.ang, m);
+      chart.feed({ pos: a, spd: rot2out(pr.values.spd, m), iq: pr.values.iq * dirOf(m) });
+      if (a92 === null) { lastAngle[m.id] = a; lastAngleSrc[m.id] = "0x9C"; }
       monitorLimit(m, lastAngle[m.id], rot2out(pr.values.spd, m), pr.values.iq * dirOf(m));   // ⛔ 反馈角度/速度/电流监控
     } else {
       // V3.x:单圈绝对值双来源模型——0x9C 编码器脉冲回读相位,最近邻校准 rotDeg
@@ -2630,15 +2629,15 @@ function updateStatusPanel(pr) {
     }
     // a===0:忽略(不覆盖 0x9C 的角度)
   } else if (pr.cmd === 0x94) {
-    // 0x94 单圈角度(所有协议):0.01°/LSB 精度(0x9C 仅 1°),面板/曲线角度以此为准
-    lastAngle[m.id] = rot2out(pr.values.pos, m);
-    lastAngleSrc[m.id] = "0x94";
-    chart.feed({ pos: lastAngle[m.id], spd: null, iq: null });   // 0.01° 精度喂曲线(null 通道不覆盖)
-    monitorLimit(m, lastAngle[m.id]);        // ⛔ 运行时限幅监控
+    // ⚠️ 0x94 单圈角度 = 转子侧单圈相位,与输出轴角度基准不同(2026-08-24 日志实证
+    // 0x9C=0° 时 0x94=334.87°),且 360↔0 回绕——不参与 lastAngle/曲线/限幅监控,
+    // 手动读时仅日志显示原始读数(曾误当输出轴显示导致曲线剧烈震荡,已撤)
   } else if (pr.cmd === 0x92) {
-    // V4 的 0x92 多圈角:仅同步 lastAngle(V4 面板角度以 0x9C 为准,此值供增量限幅换算)
+    // 0.92 = 固件多圈绝对角(0.01°/LSB,与 0x9C 同基准):V3 走 rotDeg 校准(见上),
+    // V4 用于 0.01° 精度显示——面板/曲线角度以此为准,0x9C 仅作兜底
     lastAngle[m.id] = rot2out(pr.values.pos, m);
     lastAngleSrc[m.id] = "0x92";
+    chart.feed({ pos: lastAngle[m.id], spd: null, iq: null });   // 0.01° 精度喂曲线(null 通道不覆盖)
     monitorLimit(m, lastAngle[m.id]);        // ⛔ 运行时限幅监控
   } else if ((pr.cmd >= 0x60 && pr.cmd <= 0x64) && m.proto !== "V3") {
     const zeroInput = document.getElementById("zoVal");
@@ -2673,16 +2672,16 @@ function updateStatusPanel(pr) {
     const g = gearOf(m);
     const spdOut = rot2out(pr.values.spd, m);
     // V3.x:0x9C 无角度字段(只有编码器脉冲),角度取 lastAngle(0x92 绝对优先、0x9C 累积兜底);
-    // V4:0x9C 自带 1° 角度,但优先用 0x94(0.01° 精度)轮询更新过的 lastAngle
+    // V4:0x9C 自带 1° 角度,但优先用 0x92(0.01° 精度,同基准)轮询更新过的 lastAngle
     const angOut = m.proto === "V3"
       ? lastAngle[m.id]
-      : (lastAngle[m.id] !== undefined && lastAngleSrc[m.id] === "0x94" ? lastAngle[m.id] : rot2out(pr.values.ang, m));
+      : (lastAngle[m.id] !== undefined && lastAngleSrc[m.id] === "0x92" ? lastAngle[m.id] : rot2out(pr.values.ang, m));
     const angCell = m.proto === "V3"
       ? (angOut !== undefined && !isNaN(angOut) ? angOut.toFixed(2) + " °" : "等待数据…")
       : angOut.toFixed(2) + " °";
     const angSrc = m.proto === "V3"
       ? (lastAngleSrc[m.id] === "0x9C" ? "(0x9C 相对)" : "(0x92)")
-      : (lastAngleSrc[m.id] === "0x94" ? "(0x94)" : "");
+      : (lastAngleSrc[m.id] === "0x92" ? "(0x92)" : "");
     kv.innerHTML = `
       <div><div class="k">温度</div><div class="v">${pr.values.temp} ℃</div></div>
       <div><div class="k">力矩电流</div><div class="v">${(pr.values.iq * dirOf(m)).toFixed(2)} A</div></div>
@@ -2745,8 +2744,8 @@ function handleFrame(ev) {
   const pr = parseReply(proto, cid, bytes);
   const note = pr ? pr.summary : "";
   const cmd = bytes[0];
-  // 状态轮询帧(0x9A/0x9C/0x92/0x94)不写收发日志,避免刷屏;面板与曲线照常更新
-  const silent = pollOn && m && m.id === selectedId && (cmd === 0x9A || cmd === 0x9C || cmd === 0x92 || cmd === 0x94);
+  // 状态轮询帧(0x9A/0x9C/0x92)不写收发日志,避免刷屏;面板与曲线照常更新
+  const silent = pollOn && m && m.id === selectedId && (cmd === 0x9A || cmd === 0x9C || cmd === 0x92);
   if (!probeFrame && !silent) addLog("rx", `← 0x${cid.toString(16).toUpperCase()}  ${ev.data}  ${m ? "#" + n + " " + m.name : "未注册 #" + n}  ${note}`);
   if (!probeFrame && m && m.id === selectedId) {
     updateStatusPanel(pr);
@@ -2766,10 +2765,10 @@ async function tick() {
       });
       (pend.frames || []).forEach(ev => {
         if (ev.dir === "tx") {
-          // 状态轮询帧(0x9A/0x9C/0x92/0x94)同样不写收发日志:Python 侧回显了发送帧,这里必须再静默一次,否则轮询仍刷屏
+          // 状态轮询帧(0x9A/0x9C/0x92)同样不写收发日志:Python 侧回显了发送帧,这里必须再静默一次,否则轮询仍刷屏
           const tcmd = parseInt((ev.data || "").split(/[\s,]+/)[0], 16);
           const silentTx = probeSilent || (pollOn && selectedId != null && ev.id === 0x140 + selectedId &&
-            (tcmd === 0x9A || tcmd === 0x9C || tcmd === 0x92 || tcmd === 0x94));
+            (tcmd === 0x9A || tcmd === 0x9C || tcmd === 0x92));
           if (!silentTx) {
             addLog("tx", `→ 0x${ev.id.toString(16).toUpperCase().padStart(3, "0")}  ${ev.data}`);
           }
