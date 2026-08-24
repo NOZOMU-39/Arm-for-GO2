@@ -7,7 +7,9 @@
     "gear": 6,
     "dir": -1,
     "E0": -92.97,
-    "E0Date": "2026-08-20"
+    "E0Date": "2026-08-20",
+    "limMinDeg": -91,
+    "limMaxDeg": 91
   },
   {
     "id": 2,
@@ -18,8 +20,19 @@
     "dir": 1,
     "E0": null,
     "v9cSemantics": "pulse",
-    "limMinDeg": -90,
-    "limMaxDeg": 90
+    "limMaxDeg": 184,
+    "limMinDeg": -36
+  },
+  {
+    "id": 3,
+    "name": "X6",
+    "proto": "V43",
+    "note": "",
+    "gear": 1,
+    "dir": 1,
+    "limMinDeg": -39,
+    "limMaxDeg": 183,
+    "E0": null
   },
   {
     "id": 5,

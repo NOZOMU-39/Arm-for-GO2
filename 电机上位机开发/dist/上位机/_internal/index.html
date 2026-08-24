@@ -279,7 +279,7 @@ canvas.chart { background: var(--log); border: 1px solid var(--border); border-r
           <span><i style="background:#f59e0b"></i>力矩电流 A</span>
           <span style="color:#8aa0c0">(Y 轴量程随数据自动调整,刻度标注主轴;无数据时曲线停留不归零;鼠标悬停可读数)</span>
         </div>
-        <div class="panel-title" style="margin-top:12px">📊 状态监控(0x9A + 0x9C 轮询,间隔可调)</div>
+        <div class="panel-title" style="margin-top:12px">📊 状态监控(0x9A + 0x9C + 0x94 角度 轮询,间隔可调)</div>
         <div id="monitorPanel"></div>
         <div class="panel-title" style="margin-top:12px">📥 收发日志
           <button class="small" onclick="uiClearLog()">清空</button>
@@ -660,7 +660,7 @@ function parseReply(proto, cid, bytes) {
         break;
       case 0x9C:
         out.values = { temp: bytes[1], iq: i16(bytes, 2) / 100, spd: i16(bytes, 4), ang: i16(bytes, 6) };
-        out.summary = `温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A · 速度 ${rot2out(out.values.spd, rm)}dps · 角度 ${rot2out(out.values.ang, rm)}°(输出轴${dirOf(rm) === -1 ? ",方向已映射" : ""})`;
+        out.summary = `温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A · 速度 ${rot2out(out.values.spd, rm).toFixed(2)}dps · 角度 ${rot2out(out.values.ang, rm).toFixed(2)}°(输出轴${dirOf(rm) === -1 ? ",方向已映射" : ""})`;
         break;
       case 0x9D:
         out.values = { ia: i16(bytes, 1) / 100, ib: i16(bytes, 3) / 100, ic: i16(bytes, 5) / 100 };
@@ -738,19 +738,23 @@ function parseReply(proto, cid, bytes) {
         out.values = { idx: fidx, val: fval };
         let s = `功能控制 ${V44_FUNC_NAME[fidx] || ("索引" + fidx)} = ${fval}(回显,写入成功)`;
         if (fidx === 6 || fidx === 7) {
+          // 单位 1°/LSB(2026-08-24 实测:写 360 末端转子最高只能转 360°,非 0.01°);
+          // 默认 65535 = 出厂未设限(≈不限制,官方协议未说明此默认值,勿当异常)
           const g = gearOf(selMotor());
-          s += `;输出轴 ${(fval / g / 100).toFixed(2)}°`;
+          s += fval === 65535
+            ? `;输出轴 ${(fval / g).toFixed(0)}°(默认值 65535≈未设限,出厂默认)`
+            : `;输出轴 ${(fval / g).toFixed(0)}°`;
         }
         out.summary = s;
         break;
       }
       case 0x80: case 0x81: case 0x77: case 0x78:
         out.values = { temp: bytes[1], iq: i16(bytes, 2) / 100, spd: i16(bytes, 4), ang: i16(bytes, 6) };
-        out.summary = `系统回复:温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A · 速度 ${rot2out(out.values.spd, rm)}dps · 角度 ${rot2out(out.values.ang, rm)}°`;
+        out.summary = `系统回复:温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A · 速度 ${rot2out(out.values.spd, rm).toFixed(2)}dps · 角度 ${rot2out(out.values.ang, rm).toFixed(2)}°`;
         break;
       case 0xA1: case 0xA2: case 0xA4: case 0xA8: case 0xA9: case 0x72: case 0x73:
         out.values = { temp: bytes[1], iq: i16(bytes, 2) / 100, spd: i16(bytes, 4), ang: i16(bytes, 6) };
-        out.summary = `控制回复:温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A · 速度 ${rot2out(out.values.spd, rm)}dps · 角度 ${rot2out(out.values.ang, rm)}°`;
+        out.summary = `控制回复:温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A · 速度 ${rot2out(out.values.spd, rm).toFixed(2)}dps · 角度 ${rot2out(out.values.ang, rm).toFixed(2)}°`;
         break;
       default:
         out.summary = "未识别的 V4.4 回复";
@@ -1410,7 +1414,7 @@ const TAB_RENDER_V3 = [
 const TAB_RENDER_V44 = [
   // 0 状态监控
   () => `
-    <div class="panel-title">📊 实时状态(0x9A + 0x9C 轮询,${pollMs}ms)</div>
+    <div class="panel-title">📊 实时状态(0x9A + 0x9C + 0x94 角度 轮询,${pollMs}ms)</div>
     <div class="row">
       <label>轮询</label>
       <button class="small primary" onclick="pollToggle(1)">▶ 开始</button>
@@ -1577,9 +1581,17 @@ const TAB_RENDER_V44 = [
         <option value="5">05 设置电机编号</option><option value="6">06 正向最大角度</option>
         <option value="7">07 反向最大角度</option><option value="8">08 错误自动恢复</option>
       </select>
-      ${numInp("f20val", 0, 120)} <span class="hint">数值(0 或 1;索引 5 填新编号;索引 6/7 填角度°,按输出轴换算)</span>
+      ${numInp("f20val", 0, 120)} <span class="hint">数值(0 或 1;索引 5 填新编号;索引 6/7 填角度°,按输出轴换算,1°/LSB)</span>
       <button class="danger" onclick="v44Func()">0x20 执行</button>
     </div>
+    <div class="panel-title">🔧 固件角度限幅(0x20 索引 6/7,系统级)</div>
+    <div class="row">
+      <label>正向最大角</label> ${numInp("limPos", 360, 90)} <span class="hint">°(输出轴,1°/LSB)</span>
+      <button class="danger" onclick="v44LimitWrite(6)">写入 ROM</button>
+      <label>反向最大角</label> ${numInp("limNeg", -360, 90)} <span class="hint">°(输出轴)</span>
+      <button class="danger" onclick="v44LimitWrite(7)">写入 ROM</button>
+    </div>
+    <div class="hint warn">⚠️ 系统级操作:①<b>仅失能状态才能写入 ROM</b>(写入按钮会自动先发 0x80 失能,电机掉力,请先做好机械防护)②<b>默认 65535 = 出厂未设限</b>(官方协议未说明此默认值,读回 65535 属正常,勿当异常)③单位 1°/LSB(2026-08-24 实测:写 360 末端转子最高只能转 360°)④本限位为<b>位置运行</b>模式限制,与软件限幅(独立安全层)无关。</div>
     <div class="panel-title">🔋 掉电记忆(多圈掉电保存,0x20 索引 4)</div>
     <div class="row">
       <button class="primary" onclick="v44FuncQuick(4, 1)">🔋 开启掉电记忆</button>
@@ -1721,10 +1733,18 @@ const TAB_RENDER_V43 = [
         <option value="5">05 设置电机编号</option><option value="6">06 正向最大角度</option>
         <option value="7">07 反向最大角度</option>
       </select>
-      ${numInp("f20val", 0, 120)} <span class="hint">数值(0 或 1;索引 5 填新编号;索引 6/7 填角度°,按输出轴换算)</span>
+      ${numInp("f20val", 0, 120)} <span class="hint">数值(0 或 1;索引 5 填新编号;索引 6/7 填角度°,按输出轴换算,1°/LSB)</span>
       <button class="danger" onclick="v44Func()">0x20 执行</button>
     </div>
-    <div class="hint warn">⚠️ 索引 4/5 为 V4.3 文档功能,<b>X6-40 真机待验证</b>(掉电记忆、改编号写入 ROM 前请先确认);索引 6/7 角度限幅已在 X6-40 实测(限位语义待确认,见限幅与零点模块);索引 8 错误自动恢复为 V4.4 专属,本面板不含。</div>
+    <div class="hint warn">⚠️ 索引 4/5 为 V4.3 文档功能,<b>X6-40 真机待验证</b>(掉电记忆、改编号写入 ROM 前请先确认);索引 6/7 角度限幅见下方「固件角度限幅」;索引 8 错误自动恢复为 V4.4 专属,本面板不含。</div>
+    <div class="panel-title">🔧 固件角度限幅(0x20 索引 6/7,系统级)</div>
+    <div class="row">
+      <label>正向最大角</label> ${numInp("limPos", 360, 90)} <span class="hint">°(输出轴,1°/LSB)</span>
+      <button class="danger" onclick="v44LimitWrite(6)">写入 ROM</button>
+      <label>反向最大角</label> ${numInp("limNeg", -360, 90)} <span class="hint">°(输出轴)</span>
+      <button class="danger" onclick="v44LimitWrite(7)">写入 ROM</button>
+    </div>
+    <div class="hint warn">⚠️ 系统级操作:①<b>仅失能状态才能写入 ROM</b>(写入按钮会自动先发 0x80 失能,电机掉力,请先做好机械防护)②<b>默认 65535 = 出厂未设限</b>(官方协议未说明此默认值,读回 65535 属正常,勿当异常)③单位 1°/LSB(2026-08-24 实测:写 360 末端转子最高只能转 360°)④<b>X6-40 限位语义仍待确认</b>(曾现「限位 ±180° 发 0° 停 +180°」,未定论;此前写入未先失能,疑未存入 ROM,待重测)⑤本限位为<b>位置运行</b>模式限制,与软件限幅(独立安全层)无关。</div>
     <div class="panel-title">🔋 掉电记忆(0x20 索引 4,X6-40 待验证)</div>
     <div class="row">
       <button class="primary" onclick="v44FuncQuick(4, 1)">🔋 开启掉电记忆</button>
@@ -1765,15 +1785,6 @@ const BLOCK_RENDER = {
 function limitZeroPanel(m) {
   const v4 = m.proto !== "V3";
   const lim = k => { const x = m[k]; return (typeof x === "number" && isFinite(x)) ? x : ""; };
-  const fw = v4 ? `
-    <div class="row">
-      <span class="hint">固件角度限幅(V4,0x20 索引 6/7,保存 ROM 立即生效):</span>
-      <label>正向最大角</label> ${numInp("limPos", 360, 90)} <span class="hint">°(输出轴)</span>
-      <button class="danger" onclick="v44LimitWrite(6)">写入固件</button>
-      <label>反向最大角</label> ${numInp("limNeg", -360, 90)} <span class="hint">°(输出轴)</span>
-      <button class="danger" onclick="v44LimitWrite(7)">写入固件</button>
-    </div>
-    <div class="hint warn">⚠️ X6-40(V4.3)固件限位语义待确认(限位 ±180° 时发 0° 停在 +180°):写入前请先核实;下方<b>软件限幅</b>为独立安全层,不受固件限位影响。</div>` : "";
   return `
     <div class="panel-title" data-nocollapse="1">📍 设置当前位置为零点</div>
     <div class="row">
@@ -1788,8 +1799,8 @@ function limitZeroPanel(m) {
       <label>最大电流</label> ${numInp("limMaxIq", lim("limMaxIq"), 85).replace(">", ' onchange="saveLimits()">')} <span class="hint">A</span>
       <span class="hint" style="min-width:0">改动即自动保存到注册表(重启不丢);清空=取消该限幅</span>
     </div>
-    <div class="hint">软件限幅为<b>所有控制方式(位置/速度/力矩/前馈)的硬上限</b>:①发送前校验目标,超限拦截;②<b>运行中监控</b>——轮询反馈的角度/速度/电流任一越过限幅立即报警并自动发送 0x81 停止(回到限幅内自动解除);显示值 = 注册表当前值,未设置则留空放行。</div>
-    ${fw}`;
+    <div class="hint">软件限幅为<b>所有控制方式(位置/速度/力矩/前馈)的硬上限</b>:①发送前校验目标,超限拦截;②<b>运行中监控</b>——轮询反馈的角度/速度/电流任一越过限幅立即报警并自动发送 0x81 停止(回到限幅内自动解除);显示值 = 注册表当前值,未设置则留空放行。<b>固件角度限幅(0x20 索引 6/7)已移至「电机基础参数设置 → 系统功能」页</b>,属系统级写 ROM 操作,与本软件限幅安全层无关。</div>
+    ${v4 ? `<div class="hint warn">⚠️ X6-40(V4.3)固件限位语义待确认(曾现「限位 ±180° 发 0° 停 +180°」,未定论):如需使用固件限位,请到「电机基础参数设置 → 系统功能」操作。</div>` : ""}`;
 }
 function saveLimits() {
   const m = selMotor();
@@ -2433,11 +2444,25 @@ async function v44Acc(cmd, rom) {
   if (cmd === 0x43 && !(acc >= 100 && acc <= 60000)) { addLog("err", `加速度需在 100~60000 dps/s(当前 ${acc})`); return; }
   await sendMotor(BUILD_V44.ACC(cmd, idx, acc), `0x${cmd.toString(16).toUpperCase()} 加速度${cmd === 0x43 ? " 写" : " 读"} 索引${idx}`);
 }
+async function v44LimitWrite(idx) {
+  const m = selMotor();
+  const inp = idx === 6 ? "limPos" : "limNeg";
+  const name = idx === 6 ? "正向最大角度" : "反向最大角度";
+  const outDeg = v(inp, 0);
+  const val = Math.round(out2rot(outDeg, m));
+  const ok = await showConfirm("⚠️ 固件角度限幅写入确认",
+    `即将把${name}限幅写为 ${outDeg}°(输出轴;转子侧 ${val}×1°/LSB),保存 ROM 立即生效。\n` +
+    `系统级操作:①0x20 仅<b>失能</b>状态才能写入 ROM——写入前将自动发送 0x80 失能,电机立即掉力,请先做好机械防护!②出厂默认 65535≈未设限,写入后读回不再显示 65535。是否继续?`);
+  if (!ok) return;
+  await sendMotor(pad8([0x80]), "0x80 失能(0x20 写 ROM 前置条件)");
+  await sendMotor(BUILD_V44.FUNC(idx, val), `0x20 索引${idx} ${name} = ${val}`);
+  addLog("sys", `✅ ${name}已写入 ${outDeg}°(转子 ${val}):ROM 保存立即生效;如需继续运动请重新发闭环指令`);
+}
 async function v44Func() {
   const idx = parseInt(document.getElementById("f20sel").value);
   const m = selMotor();
   let val = Math.round(v("f20val", 0));
-  // 索引 6/7 为正/负最大角度限幅(0.01°),按输出轴换算
+  // 索引 6/7 为正/负最大角度限幅(1°/LSB,2026-08-24 实测定单位),按输出轴换算
   if (idx === 6 || idx === 7) val = Math.round(out2rot(val, m));
   if (idx === 5) {
     const ok = await showConfirm("⚠️ 修改电机编号确认",
@@ -2447,6 +2472,11 @@ async function v44Func() {
     const ok = await showConfirm("⚠️ 编号滤波器确认",
       `即将把编号滤波器设为 ${val}(0=使能 1=失能)。\n多电机 0x280 广播前必须失能。是否继续?`);
     if (!ok) return;
+  } else if (idx === 6 || idx === 7) {
+    const ok = await showConfirm("⚠️ 固件角度限幅确认",
+      `即将把索引${idx}限幅写为 ${v("f20val", 0)}°(输出轴;转子侧 ${val}×1°/LSB),保存 ROM 立即生效。\n` +
+      `系统级操作:仅<b>失能</b>状态才能写入 ROM——请先在「启停与抱闸」中发送 0x80 失能再执行(掉力,注意机械防护);出厂默认 65535≈未设限。是否继续?`);
+    if (!ok) return;
   }
   await sendMotor(BUILD_V44.FUNC(idx, val), `0x20 索引${idx} = ${val}`);
 }
@@ -2455,18 +2485,6 @@ async function v44FuncQuick(idx, val) {
   await sendMotor(BUILD_V44.FUNC(idx, val), `0x20 索引${idx}(多圈掉电保存)= ${val}`);
   addLog("sys", val ? "🔋 已发送「开启掉电记忆」:掉电前固件将自动保存多圈值(重启生效)" : "已发送「关闭掉电记忆」:恢复单圈模式,掉电丢多圈(重启生效)");
 }
-async function v44LimitWrite(idx) {
-  const m = selMotor();
-  const inp = idx === 6 ? "limPos" : "limNeg";
-  const name = idx === 6 ? "正向最大角度" : "反向最大角度";
-  const outDeg = v(inp, 0);
-  const val = Math.round(out2rot(outDeg, m));
-  const ok = await showConfirm("⚠️ 角度限幅确认",
-    `即将把${name}限幅写为 ${outDeg}°(输出轴;转子侧 ${val}×0.01°),保存 ROM 立即生效。是否继续?`);
-  if (!ok) return;
-  await sendMotor(BUILD_V44.FUNC(idx, val), `0x20 索引${idx} ${name} = ${val}`);
-}
-
 /* =====================================================================
  * 十、状态轮询与状态面板
  * ===================================================================== */
@@ -2489,6 +2507,11 @@ async function pollStep(m) {
   // 轮询帧静默发送(不写收发日志);0x70 已从轮询中移除:X8-PRO 固件实测不回复,且运行模式无需高频查询
   await rawSend(id, 0, hx(pad8([0x9A])), "轮询 0x9A", true);
   await rawSend(id, 0, hx(pad8([0x9C])), "轮询 0x9C", true);
+  // V4 附加轮询 0x94 单圈角度(0.01°/LSB):0x9C 角度仅 1°/LSB 整数分辨率,
+  // 0x94 提供 0.01° 精度显示(2026-08-24 实测反馈:V4 面板/曲线角度呈整数阶梯)
+  if (m.proto !== "V3") {
+    await rawSend(id, 0, hx(pad8([0x94])), "轮询 0x94", true);
+  }
   // V3 轮询 0x92(2026-08-20 终版定论):0x92 = 固件多圈绝对角(int32,0.01°/LSB,
   // 手册 2.12 原文)。0xA4 目标 = 多圈角、固件按差值直接执行——上位机 rotDeg 必须
   // 与固件角一致(0x92 校准),否则发 0xA4 时固件差值 = ±360N 空转。
@@ -2607,9 +2630,10 @@ function updateStatusPanel(pr) {
     }
     // a===0:忽略(不覆盖 0x9C 的角度)
   } else if (pr.cmd === 0x94) {
-    // 0x94 单圈角度(所有协议):仅更新显示角度,不做多圈校准(单圈无圈号)
+    // 0x94 单圈角度(所有协议):0.01°/LSB 精度(0x9C 仅 1°),面板/曲线角度以此为准
     lastAngle[m.id] = rot2out(pr.values.pos, m);
     lastAngleSrc[m.id] = "0x94";
+    chart.feed({ pos: lastAngle[m.id], spd: null, iq: null });   // 0.01° 精度喂曲线(null 通道不覆盖)
     monitorLimit(m, lastAngle[m.id]);        // ⛔ 运行时限幅监控
   } else if (pr.cmd === 0x92) {
     // V4 的 0x92 多圈角:仅同步 lastAngle(V4 面板角度以 0x9C 为准,此值供增量限幅换算)
@@ -2648,12 +2672,17 @@ function updateStatusPanel(pr) {
   } else if (pr.cmd === 0x9C) {
     const g = gearOf(m);
     const spdOut = rot2out(pr.values.spd, m);
-    // V3.x:0x9C 无角度字段(只有编码器脉冲),角度取 lastAngle(0x92 绝对优先、0x9C 累积兜底);V4:0x9C 自带角度
-    const angOut = m.proto === "V3" ? lastAngle[m.id] : rot2out(pr.values.ang, m);
+    // V3.x:0x9C 无角度字段(只有编码器脉冲),角度取 lastAngle(0x92 绝对优先、0x9C 累积兜底);
+    // V4:0x9C 自带 1° 角度,但优先用 0x94(0.01° 精度)轮询更新过的 lastAngle
+    const angOut = m.proto === "V3"
+      ? lastAngle[m.id]
+      : (lastAngle[m.id] !== undefined && lastAngleSrc[m.id] === "0x94" ? lastAngle[m.id] : rot2out(pr.values.ang, m));
     const angCell = m.proto === "V3"
       ? (angOut !== undefined && !isNaN(angOut) ? angOut.toFixed(2) + " °" : "等待数据…")
       : angOut.toFixed(2) + " °";
-    const angSrc = m.proto === "V3" ? (lastAngleSrc[m.id] === "0x9C" ? "(0x9C 相对)" : "(0x92)") : "";
+    const angSrc = m.proto === "V3"
+      ? (lastAngleSrc[m.id] === "0x9C" ? "(0x9C 相对)" : "(0x92)")
+      : (lastAngleSrc[m.id] === "0x94" ? "(0x94)" : "");
     kv.innerHTML = `
       <div><div class="k">温度</div><div class="v">${pr.values.temp} ℃</div></div>
       <div><div class="k">力矩电流</div><div class="v">${(pr.values.iq * dirOf(m)).toFixed(2)} A</div></div>
@@ -2716,8 +2745,8 @@ function handleFrame(ev) {
   const pr = parseReply(proto, cid, bytes);
   const note = pr ? pr.summary : "";
   const cmd = bytes[0];
-  // 状态轮询帧(0x9A/0x9C/0x92)不写收发日志,避免刷屏;面板与曲线照常更新
-  const silent = pollOn && m && m.id === selectedId && (cmd === 0x9A || cmd === 0x9C || cmd === 0x92);
+  // 状态轮询帧(0x9A/0x9C/0x92/0x94)不写收发日志,避免刷屏;面板与曲线照常更新
+  const silent = pollOn && m && m.id === selectedId && (cmd === 0x9A || cmd === 0x9C || cmd === 0x92 || cmd === 0x94);
   if (!probeFrame && !silent) addLog("rx", `← 0x${cid.toString(16).toUpperCase()}  ${ev.data}  ${m ? "#" + n + " " + m.name : "未注册 #" + n}  ${note}`);
   if (!probeFrame && m && m.id === selectedId) {
     updateStatusPanel(pr);
@@ -2737,10 +2766,10 @@ async function tick() {
       });
       (pend.frames || []).forEach(ev => {
         if (ev.dir === "tx") {
-          // 状态轮询帧(0x9A/0x9C/0x92)同样不写收发日志:Python 侧回显了发送帧,这里必须再静默一次,否则轮询仍刷屏
+          // 状态轮询帧(0x9A/0x9C/0x92/0x94)同样不写收发日志:Python 侧回显了发送帧,这里必须再静默一次,否则轮询仍刷屏
           const tcmd = parseInt((ev.data || "").split(/[\s,]+/)[0], 16);
           const silentTx = probeSilent || (pollOn && selectedId != null && ev.id === 0x140 + selectedId &&
-            (tcmd === 0x9A || tcmd === 0x9C || tcmd === 0x92));
+            (tcmd === 0x9A || tcmd === 0x9C || tcmd === 0x92 || tcmd === 0x94));
           if (!silentTx) {
             addLog("tx", `→ 0x${ev.id.toString(16).toUpperCase().padStart(3, "0")}  ${ev.data}`);
           }
