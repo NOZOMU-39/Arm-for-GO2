@@ -402,7 +402,13 @@ DEDUP_WINDOW_S = 0.2      # TCP 推送与 UDP 批帧去重窗口
 
 
 class WiFiCANBridge:
-    """ESP32 无线 CAN 中继后端:构造时连接(TCP+协商批帧),起 TCP/UDP 读线程。"""
+    """ESP32 无线 CAN 中继后端:构造时连接(TCP+协商批帧),起 TCP/UDP 读线程。
+
+    ⚠️ 2026-08-26 重构(用户实测"任何指令都不听话/一直转"根因):
+    —— 旧实现用 client._recv_frame 逐帧读 TCP 推送,它持 client._lock 且每次只读一帧;
+       推送量大(批帧+历史缓冲)时锁被长时间占用 → 命令帧(含 0x81 停止)排队延迟 → 电机"一直转";
+    —— 现改为:发送直接对 client.conn sendall(无锁,TCP 全双工),TCP 读线程 socket.recv(4096)
+       批量读 + 内部流式解析,快速排空推送缓冲,发送最坏延迟趋近 0。"""
 
     def __init__(self, host, baud_kbps, on_log=None):
         self.on_log = on_log or (lambda lvl, msg: None)
@@ -414,6 +420,7 @@ class WiFiCANBridge:
         self._handle = 1
         self._tcp_thread = None
         self._udp_thread = None
+        self._tcp_buf = b""         # TCP 流式解析缓冲
 
         # ---- 连接 TCP(host 为空 → 走库内四级自动发现:AP 直连/本机网段/热点网段/串口)----
         try:
@@ -426,6 +433,9 @@ class WiFiCANBridge:
             self.host = self._client.conn.getpeername()[0] if self._client.mode == "tcp" else (host or "?")
         except Exception:
             self.host = host or "?"
+        if self._client.mode == "tcp":
+            self._client.conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            self._client.conn.settimeout(0.05)
 
         # ---- 波特率(非默认 1000 时才下发;ESP32 端 0x0A10 在线切换,NVS 持久化)----
         if int(baud_kbps) != 1000:
@@ -457,10 +467,16 @@ class WiFiCANBridge:
         return True
 
     def transmit(self, ch, can_id, extd, data8):
+        """发送命令帧(0x04):直接 sendall,不走 client._lock(避免被读线程阻塞)。
+        TCP 全双工:send 与 recv 互不等待。"""
         if self._dead:
             return False
+        data = bytes(data8[:8])
+        # 帧格式 [2B 长度大端][1B 类型 0x04][4B CAN ID 大端][1B 扩展标志][N 数据]
+        payload = struct.pack(">I", can_id & 0x1FFFFFFF) + bytes([1 if extd else 0]) + data
+        frame = struct.pack(">H", 1 + len(payload)) + bytes([0x04]) + payload
         try:
-            self._client.send_can(can_id, bytes(data8[:8]), extended=bool(extd), verbose=False)
+            self._client.conn.sendall(frame)
             return True
         except Exception as e:
             self._dead = True
@@ -512,25 +528,45 @@ class WiFiCANBridge:
             self._rxq.append((f.id, f.extd, f.dlc, f.data))
 
     def _tcp_loop(self):
-        """TCP 读线程:短超时排空 ESP32 推送帧(单帧 0x03 / 批帧 0x05),
-        防止固件侧 TCP 发送缓冲堵死;同时承担链路健康监测(_dead)。"""
+        """TCP 读线程:socket.recv(4096) 批量读 + 流式解析(长度头)——
+        快速排空 ESP32 推送(单帧 0x03 / 批帧 0x05),防固件 TCP 发送缓冲堵死命令;
+        无锁,发送不受影响。同时承担链路健康监测(_dead)。"""
         while not self._stop.is_set():
             try:
-                r = self._client._recv_frame(timeout=0.05)
-                if r is None:
-                    continue
-                ftype, payload = r
-                if ftype == 0x03:
-                    self._push_frame(CANFrame.from_bytes(payload))
-                elif ftype == 0x05:
-                    for f in CANFrame.parse_batch(payload):
-                        self._push_frame(f)
-                # 0x02 CMD_RESP:命令响应(查询等),当前界面不用,忽略
+                chunk = self._client.conn.recv(4096)
+            except socket.timeout:
+                continue
             except Exception as e:
                 if not self._stop.is_set():
                     self._dead = True
                     self.on_log("err", f"无线 TCP 读线程异常(链路中断):{type(e).__name__}:{e}")
-                    break
+                break
+            if not chunk:
+                if not self._stop.is_set():
+                    self._dead = True
+                    self.on_log("err", "无线 TCP 连接被对端关闭(链路中断)")
+                break
+            self._tcp_buf += chunk
+            # 流式解析:[2B 长度大端][1B 类型][载荷]
+            while len(self._tcp_buf) >= 3:
+                flen = struct.unpack(">H", self._tcp_buf[0:2])[0]
+                if flen < 1 or flen > 4096:
+                    self._tcp_buf = self._tcp_buf[1:]   # 坏帧头:逐字节滑动
+                    continue
+                if len(self._tcp_buf) < 2 + flen:
+                    break   # 等完整帧
+                ftype = self._tcp_buf[2]
+                payload = self._tcp_buf[3:2 + flen]
+                self._tcp_buf = self._tcp_buf[2 + flen:]
+                try:
+                    if ftype == 0x03:
+                        self._push_frame(CANFrame.from_bytes(payload))
+                    elif ftype == 0x05:
+                        for f in CANFrame.parse_batch(payload):
+                            self._push_frame(f)
+                    # 0x02 CMD_RESP:命令响应,当前界面不用,忽略
+                except Exception:
+                    pass
 
     def _udp_loop(self):
         """UDP 读线程:8889 发任意包即订阅,收 0x05 批帧;每 20s 续订(ESP32 30s 踢出)。"""

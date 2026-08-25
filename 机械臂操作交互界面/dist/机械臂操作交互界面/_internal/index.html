@@ -25,31 +25,18 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: #2a3f66; border-radius: 4px; }
 
-/* ============ hover 悬浮提示(data-tip 统一组件) ============ */
+/* ============ hover 悬浮提示(data-tip 统一组件) ============
+   ⚠️ 2026-08-26 重构:CSS ::after 方案废弃——①input/select 替换元素伪元素不渲染
+   (旧根因)②提示固定在元素上方,页面边缘元素提示跑出视口(用户反馈"跑图幅外")。
+   改为 JS 全局 tooltip:事件委托 mouseover/mouseout,动态定位,视口内自动翻转。 */
 [data-tip] { position: relative; }
-[data-tip]::after {
-  content: attr(data-tip);
-  position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%);
-  background: #0a1120ee; color: var(--text); border: 1px solid var(--line);
-  padding: 6px 10px; border-radius: 6px; font-size: 12px; line-height: 1.45;
-  white-space: nowrap; z-index: 2000; pointer-events: none;
-  opacity: 0; transition: opacity .15s; max-width: 340px; overflow-wrap: break-word;
-  white-space: normal; width: max-content;
+.tipwrap { display: inline-flex; }
+#globalTip {
+  position: fixed; z-index: 3000; background: #0a1120ee; color: var(--text);
+  border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px;
+  font-size: 12px; line-height: 1.45; max-width: 340px; overflow-wrap: break-word;
+  pointer-events: none; display: none; box-shadow: 0 4px 16px #000a;
 }
-[data-tip]:hover::after { opacity: 1; }
-[data-tip=""]::after { display: none; }
-/* ⚠️ input/select 是替换元素,::after 伪元素不渲染 → JS 启动时把 input/select 上的
-   data-tip 移到包裹 span.tipwrap(2026-08-26 用户反馈"图像显示间隔没有提示"根因) */
-.tipwrap { display: inline-flex; position: relative; }
-.tipwrap[data-tip]::after {
-  content: attr(data-tip);
-  position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%);
-  background: #0a1120ee; color: var(--text); border: 1px solid var(--line);
-  padding: 6px 10px; border-radius: 6px; font-size: 12px; line-height: 1.45;
-  z-index: 2000; pointer-events: none; opacity: 0; transition: opacity .15s;
-  max-width: 340px; overflow-wrap: break-word; white-space: normal; width: max-content;
-}
-.tipwrap[data-tip]:hover::after { opacity: 1; }
 
 /* ============ 通用控件 ============ */
 input[type=number], input[type=text], select {
@@ -187,14 +174,20 @@ main { flex: 1; display: flex; min-height: 0; }
 .chart-cell .cHead .dot { width: 7px; height: 7px; border-radius: 50%; background: #334; }
 .chart-cell .cHead .dot.on { background: var(--ok); box-shadow: 0 0 4px var(--ok); }
 .chart-cell .cHead .cname { font-weight: bold; }
-.chart-cell .cHead .cval { color: var(--cyan); font-family: Consolas, monospace; font-size: 11px; }
-.chart-cell .cHead .sep { flex: 1; }
-.chart-cell .cHead button { padding: 0 5px; font-size: 11px; background: transparent; border: none; color: var(--dim); }
+/* 2026-08-26 修复"实时图像文字变形":数值一律不换行不挤压,格子最小宽度保证可读 */
+.chart-cell { min-width: 300px; }
+.chart-cell .cHead .cval {
+  color: var(--cyan); font-family: Consolas, "Microsoft YaHei", monospace; font-size: 11px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 60px;
+}
+.chart-cell .cHead .sep { flex: 1; min-width: 4px; }
+.chart-cell .cHead button { padding: 0 5px; font-size: 11px; background: transparent; border: none; color: var(--dim); flex-shrink: 0; }
 .chart-cell .cHead button:hover { color: var(--warn); }
 .chart-cell canvas { flex: 1; width: 100%; height: 100%; min-height: 70px; }
-.chart-cell .cFoot { display: flex; gap: 8px; font-size: 10px; color: var(--dim); padding-top: 2px; flex-wrap: wrap; }
-.chart-cell .cFoot .item { display: flex; align-items: center; gap: 3px; }
-.chart-cell .cFoot .sw { width: 9px; height: 9px; border-radius: 2px; }
+.chart-cell .cFoot { display: flex; gap: 10px; font-size: 10px; color: var(--dim); padding-top: 2px; flex-wrap: nowrap; overflow: hidden; }
+.chart-cell .cFoot .item { display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+.chart-cell .cFoot .item b { font-family: Consolas, "Microsoft YaHei", monospace; font-weight: normal; }
+.chart-cell .cFoot .sw { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
 
 /* ============ 电机交互:操作区(下 40%) ============ */
 #opArea { height: 40%; min-height: 200px; display: flex; flex-direction: column; padding: 6px 10px 10px; border-top: 1px solid var(--line); }
@@ -1990,17 +1983,20 @@ async function btnSetDefaultPos() {
   addLog("sys", `✅ 已记录全部 ${targets.length} 台电机的默认位置(低势能姿态)`);
 }
 async function btnMoveDefault() {
-  const targets = motors.filter(m => typeof m.defaultPosDeg === "number" && isFinite(m.defaultPosDeg));
+  // 用户 2026-08-26 反馈:移动策略 = 末端→基座(先动 ID 高的,后动 ID 低的),防末端被基座带偏
+  const targets = motors.filter(m => typeof m.defaultPosDeg === "number" && isFinite(m.defaultPosDeg))
+    .sort((a, b) => b.id - a.id);   // ID 降序:末端(ID 高)先移动
   if (!targets.length) { showBanner("尚未设置默认位置(先点「设置当前位置为默认位置」)", true); return; }
   const ok = await showConfirm("移动到默认位置(低势能姿态)",
-    `将移动 ${targets.length} 台电机回到各自的默认位置(低势能安全姿态):\n`
+    `将按「末端→基座」顺序移动 ${targets.length} 台电机回到各自的默认位置:\n`
     + targets.map(m => `· ${m.name}(#${m.id}) → ${m.defaultPosDeg}°`).join("\n")
     + "\n限幅校验通过才发送;未设置默认位置的电机不动。是否继续?");
   if (!ok) return;
   for (const m of targets) {
     await moveToAngle(m, m.defaultPosDeg, "移动到默认位置");
+    await new Promise(r => setTimeout(r, 200));   // 逐台发送间隔,防总线拥塞
   }
-  addLog("sys", `已发送移动请求:${targets.length} 台电机回默认位置(低势能姿态)`);
+  addLog("sys", `已发送移动请求:${targets.length} 台电机回默认位置(末端→基座)`);
 }
 /* 绝对位置发送(含限幅校验;V3 0xA4 多圈目标 = E0+out2rot;V4 目标 = out2rot(deg−E4));
    spdDps 默认 60°/s,归零等场景可传入更低速度 */
@@ -2228,7 +2224,7 @@ async function tick() {
 }
 
 /* ⚠️ input/select 是替换元素,自身 ::after 伪元素不渲染 → 把其上的 data-tip 移到包裹 span
-   (2026-08-26 用户反馈"图像显示间隔没有提示"根因;统一修复所有输入/下拉的悬停提示) */
+   (统一交给 JS tooltip 处理;input 无 data-tip 也能被父级 span 的 hover 触发) */
 function fixTipOnInputs() {
   document.querySelectorAll("input[data-tip], select[data-tip]").forEach(el => {
     const tip = el.getAttribute("data-tip");
@@ -2241,6 +2237,44 @@ function fixTipOnInputs() {
     wrap.appendChild(el);
   });
 }
+
+/* JS 全局 tooltip:动态定位,视口内自动翻转(顶部元素提示显示在下方,左右不出界) */
+let tipEl = null;
+function ensureTipEl() {
+  if (!tipEl) {
+    tipEl = document.createElement("div");
+    tipEl.id = "globalTip";
+    document.body.appendChild(tipEl);
+  }
+  return tipEl;
+}
+function hideTip() { if (tipEl) tipEl.style.display = "none"; }
+function showTipAt(target) {
+  const tip = target.getAttribute("data-tip");
+  if (!tip) { hideTip(); return; }
+  const el = ensureTipEl();
+  el.textContent = tip;
+  el.style.display = "block";
+  const r = target.getBoundingClientRect();
+  const er = el.getBoundingClientRect();
+  let x = r.left + r.width / 2 - er.width / 2;
+  let y = r.top - er.height - 8;
+  if (y < 4) y = r.bottom + 8;                      // 上方放不下 → 显示在下方
+  x = Math.max(4, Math.min(window.innerWidth - er.width - 4, x));
+  if (y + er.height > window.innerHeight - 4) y = Math.max(4, r.top - er.height - 8);
+  el.style.left = x + "px";
+  el.style.top = y + "px";
+}
+document.addEventListener("mouseover", (e) => {
+  const t = (e.target && e.target.closest) ? e.target.closest("[data-tip]") : null;
+  if (!t) { hideTip(); return; }
+  showTipAt(t);
+});
+document.addEventListener("mouseout", (e) => {
+  const to = e.relatedTarget;
+  if (to && to.closest && to.closest("[data-tip]")) return;   // 在提示元素间移动不隐藏
+  hideTip();
+});
 
 function init() {
   fixTipOnInputs();

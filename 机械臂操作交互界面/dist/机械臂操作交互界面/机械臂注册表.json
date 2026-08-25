@@ -10,7 +10,8 @@
     "E0Date": "2026-08-20",
     "limMinDeg": -91,
     "limMaxDeg": 91,
-    "E4": 0
+    "E4": 0,
+    "defaultPosDeg": 0
   },
   {
     "id": 2,
@@ -23,6 +24,7 @@
     "v9cSemantics": "pulse",
     "limMaxDeg": 2.5,
     "limMinDeg": -191.5,
-    "E4": 0
+    "E4": 0,
+    "defaultPosDeg": -89.99
   }
 ]
