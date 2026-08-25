@@ -966,6 +966,7 @@ class Device:
             return {"ok": False, "msg": f"发送异常:{e}"}
         if not ok and not self.mock:
             if not self.opened or self._impl is None:
+                self.add_log("warn", f"发送 0x{can_id:03X} 失败:设备已关闭(断开瞬间轮询竞态,忽略)")
                 return {"ok": False, "msg": "设备已关闭"}
             if not self._bus_off:
                 # 首次失败常见于控制器 bus-off(总线曾无应答):复位通道后重新启动再重试一次
@@ -976,6 +977,9 @@ class Device:
                 self.add_log("warn", f"发送 0x{can_id:03X} 失败,已复位通道并重试…")
                 time.sleep(0.05)
                 try:
+                    if self._impl is None:
+                        self.add_log("warn", f"重试发送 0x{can_id:03X} 跳过:设备已关闭(断开瞬间竞态)")
+                        return {"ok": False, "msg": "设备已关闭"}
                     ok = self._impl.transmit(self._ch_handle, can_id, bool(extd), data8)
                 except Exception as e:
                     self.add_log("err", f"重试发送异常:{e}")

@@ -38,6 +38,18 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 }
 [data-tip]:hover::after { opacity: 1; }
 [data-tip=""]::after { display: none; }
+/* ⚠️ input/select 是替换元素,::after 伪元素不渲染 → JS 启动时把 input/select 上的
+   data-tip 移到包裹 span.tipwrap(2026-08-26 用户反馈"图像显示间隔没有提示"根因) */
+.tipwrap { display: inline-flex; position: relative; }
+.tipwrap[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%);
+  background: #0a1120ee; color: var(--text); border: 1px solid var(--line);
+  padding: 6px 10px; border-radius: 6px; font-size: 12px; line-height: 1.45;
+  z-index: 2000; pointer-events: none; opacity: 0; transition: opacity .15s;
+  max-width: 340px; overflow-wrap: break-word; white-space: normal; width: max-content;
+}
+.tipwrap[data-tip]:hover::after { opacity: 1; }
 
 /* ============ 通用控件 ============ */
 input[type=number], input[type=text], select {
@@ -426,7 +438,8 @@ main { flex: 1; display: flex; min-height: 0; }
                 <option value="fixed">固定</option>
               </select>
               <span class="sep" style="flex:1"></span>
-              <button id="btnHideAll" data-tip="一键关闭所有电机的曲线显示（保留注册表与操作，不删电机）">🙈 关闭全部</button>
+              <button id="btnShowAll" data-tip="显示所有被隐藏的电机曲线（恢复网格）">👁 显示全部</button>
+              <button id="btnHideAll" data-tip="一键隐藏所有电机的曲线显示（保留注册表与操作，不删电机；可点「显示全部」恢复）">🙈 隐藏全部</button>
             </div>
             <div id="chartGrid"></div>
           </div>
@@ -469,16 +482,18 @@ main { flex: 1; display: flex; min-height: 0; }
                 <label data-tip="键盘 ↑/↓ 与速度控制的速度值（°/s，输出轴）。修改后一直保持，切换电机不清零">运动速度</label>
                 <input type="number" step="any" id="kbSpeedIn" value="20" min="0" data-tip="按住 ↑/↓ 时按此速度连续运动；松手即停；到限位自动停住可反向">
                 <span class="hint">°/s</span>
-                <span class="kbHint" data-tip="">键盘:按住 ↑ 逆时针(+) / ↓ 顺时针(-),松手即停</span>
+                <span class="kbHint" data-tip="">键盘:按住 ↑ 逆时针(+) / ↓ 顺时针(-)运动,松手即停;← / → 切换电机(轮转)</span>
               </div>
               <div class="row">
-                <label data-tip="发送绝对位置（目标角度°，相对零点）。超过限位会被拦截并提示，不产生动作">绝对位置</label>
-                <input type="number" step="any" id="svAbsIn" data-tip="目标角度（相对零点）。超限只提示不动作">
+                <label data-tip="发送绝对位置（目标角度，相对零点）。超过限位会被拦截并提示，不产生动作">绝对位置</label>
+                <input type="number" step="any" id="svAbsIn" data-tip="目标角度（相对零点，单位 °）。超限只提示不动作">
+                <span class="hint">°</span>
                 <button id="btnSvAbs" data-tip="执行绝对位置运动（限幅校验通过才发送）">执行</button>
               </div>
               <div class="row">
                 <label data-tip="发送相对位置（以当前位置为起点的增量，+ 逆时针 / − 顺时针）">相对位置</label>
-                <input type="number" step="any" id="svRelIn" data-tip="增量角度：正 = 逆时针(+)，负 = 顺时针(−)。到限位停住可反向回">
+                <input type="number" step="any" id="svRelIn" data-tip="增量角度（单位 °）：正 = 逆时针(+)，负 = 顺时针(−)。到限位停住可反向回">
+                <span class="hint">°</span>
                 <button id="btnSvRel" data-tip="执行相对位置运动（目标 = 当前角度 + 增量，限幅校验）">执行</button>
               </div>
             </div>
@@ -1657,10 +1672,17 @@ function drawAllCells() {
 function toggleChartHidden(id) {
   chartHidden[id] = !chartHidden[id];
   renderChartGrid();
+  addLog("sys", (chartHidden[id] ? "已隐藏" : "已显示") + `曲线:${motorById(id).name}(#${id})`);
 }
 function hideAllCharts() {
   motors.forEach(m => { chartHidden[m.id] = true; });
   renderChartGrid();
+  addLog("sys", "已隐藏全部电机曲线(可点「显示全部」恢复)");
+}
+function showAllCharts() {
+  motors.forEach(m => { chartHidden[m.id] = false; });
+  renderChartGrid();
+  addLog("sys", "已显示全部电机曲线");
 }
 function updateCellNumbers(id, ang, spd, iq) {
   const fmt = v => (typeof v === "number" && !isNaN(v)) ? v.toFixed(2) : "—";
@@ -1831,31 +1853,37 @@ function renderMotorCards() {
         <span class="mang" id="mang_${m.id}">${ang}°</span>
       </div>
       <div class="mrow">
-        <label data-tip="输入角度值 X，确认后把当前位置标定为 X°（输 0 = 当前点成为机械零点；V3 记录零点档案，V4 写固件零点）">设为零点</label>
-        <input type="number" step="any" id="zeroIn_${m.id}" data-tip="输入 0 即当前点 = 机械零点（角度显示以零点为 0°）；输入其他值 X 表示当前点显示为 X°">
-        <button data-tip="确认：把当前位置标定为零点（V4 会先失能，注意机械防护）">确认</button>
+        <label data-tip="把当前位置标定为机械零点（角度显示以零点为 0°；V3 记录零点档案，V4 写固件零点——V4 会先失能，注意机械防护）">设为零点</label>
+        <button id="zeroBtn_${m.id}" data-tip="确认：当前位置 = 零点（0°）。V4 三步含失能，先做好机械防护">📍 设为零点</button>
       </div>
       <div class="mrow">
         <label data-tip="输入角度值，确认后写入该电机角度上限（软件限位：所有控制方式共用，运行中越限自动停止）">设最大角</label>
         <input type="number" step="any" id="maxIn_${m.id}" data-tip="角度上限（输出轴°，相对零点）。运行中角度超过此值会自动停止并报警">
         <button data-tip="确认：写入角度上限">确认</button>
+        <span class="hint">°</span>
       </div>
       <div class="mrow">
         <label data-tip="输入角度值，确认后写入该电机角度下限（软件限位）">设最小角</label>
         <input type="number" step="any" id="minIn_${m.id}" data-tip="角度下限（输出轴°，相对零点）">
         <button data-tip="确认：写入角度下限">确认</button>
+        <span class="hint">°</span>
       </div>
-      <div class="mtip" data-tip="">双击卡片进入单电机操控（键盘 ↑↓ 等）</div>`;
+      <div class="mtip" data-tip="">单击选中 · 双击进入单电机操控（键盘 ↑↓ 运动 / ←→ 切电机）</div>`;
     card.onclick = () => selectMotor(m.id);
     card.ondblclick = () => openSingleView(m.id);
-    const setZero = () => setZeroByInput(m.id);
+    const setZero = () => setZeroNow(m.id);
     const setMax = () => setLimitByInput(m.id, "limMaxDeg", "maxIn_" + m.id, "角度上限");
     const setMin = () => setLimitByInput(m.id, "limMinDeg", "minIn_" + m.id, "角度下限");
+    // ⚠️ 输入框/按钮阻止冒泡:否则点击输入框触发卡片选中 → renderMotorCards 重建 → 输入框销毁(用户反馈"数字无法填写"根因)
     card.querySelectorAll("button")[0].onclick = (e) => { e.stopPropagation(); setZero(); };
     card.querySelectorAll("button")[1].onclick = (e) => { e.stopPropagation(); setMax(); };
     card.querySelectorAll("button")[2].onclick = (e) => { e.stopPropagation(); setMin(); };
+    card.querySelectorAll("input")[0].onclick = (e) => e.stopPropagation();
+    card.querySelectorAll("input")[1].onclick = (e) => e.stopPropagation();
+    card.querySelectorAll("input")[0].onmousedown = (e) => e.stopPropagation();
+    card.querySelectorAll("input")[1].onmousedown = (e) => e.stopPropagation();
     // 回填保留的输入值
-    ["zeroIn", "maxIn", "minIn"].forEach(p => {
+    ["maxIn", "minIn"].forEach(p => {
       const el = card.querySelector("#" + p + "_" + m.id);
       if (el && saved[p + "_" + m.id] !== undefined) el.value = saved[p + "_" + m.id];
     });
@@ -1872,40 +1900,37 @@ function updateCardAngle(id) {
 }
 
 /* 设为零点(当前位置标定为输入值 X) */
-async function setZeroByInput(id) {
+/* 设为零点(当前位置 = 机械零点 0°;用户 2026-08-26 反馈:不需要输入框,直接按钮) */
+async function setZeroNow(id) {
   const m = motorById(id);
   if (!m) return;
-  const inp = document.getElementById("zeroIn_" + id);
-  const X = parseFloat(inp && inp.value);
-  if (!isFinite(X)) { showBanner("请先输入零点角度值(常用 0)", true); return; }
   if (lastAngle[id] === undefined) { showBanner("尚未收到该电机角度反馈,请稍候再操作", true); return; }
-  const name = m.proto === "V3" ? "V3(记录零点档案,不动固件)" : "V4(失能→写零点→复位三步,掉力!)";
   const ok = await showConfirm("📍 设置零点",
-    `将把 ${m.name}(#${id}) 的当前位置标定为 ${X}°(角度显示以零点为 0°)。\n`
-    + `协议方式:${name}\n`
-    + (m.proto === "V3" ? "仅修改本界面注册表档案,不写电机固件。\n" : "⚠️ 三步包含失能:电机失去输出力,关节可能因重力下落,请先做好机械防护!\n")
+    `将把 ${m.name}(#${id}) 的当前位置标定为机械零点(角度显示 0°)。\n`
+    + (m.proto === "V3"
+      ? "V3:仅修改本界面注册表零点档案,不写电机固件。\n"
+      : "V4:自动执行 失能→写零点→复位 三步——⚠️ 失能瞬间电机失去输出力,关节可能因重力下落,请先做好机械防护!\n")
     + "是否继续?");
   if (!ok) return;
   if (m.proto === "V3") {
     const t = v3TrackOf(m);
-    m.E0 = v3E0ForX(t.rotDeg, X, m);
+    m.E0 = Math.round(t.rotDeg * 100) / 100;   // E0 = 当前固件角(0x92 校准后)
     m.E0Date = new Date().toISOString().slice(0, 10);
     t.E0 = m.E0;
-    t.rotDeg = v3E0ForX(t.rotDeg, X, m) + out2rot(X, m);
+    t.rotDeg = m.E0;
     saveMotors();
     const rel = v3PosDual(m);
     lastAngle[id] = rel; lastAngleSrc[id] = "0x92";
-    addLog("sys", `✅ ${m.name} 零点已标定:当前位置 = ${X}°(E0=${m.E0.toFixed(1)}°,V3 档案)`);
+    addLog("sys", `✅ ${m.name} 零点已标定:当前位置 = 0°(E0=${m.E0.toFixed(1)}°,V3 档案)`);
   } else {
     await sendMotor(m, pad8([0x80]), "设置零点:0x80 失能(写零点前置)");
     await sendMotor(m, pad8([0x64]), "设置零点:0x64 当前位置写 ROM 为零点");
     await sendMotor(m, pad8([0x76]), "设置零点:0x76 复位重启(新零点生效)");
-    m.E4 = X;
+    m.E4 = 0;   // V4 显示偏移复位(当前位置即零点)
     m.E0 = null;
     saveMotors();
-    // 固件零点=当前位置,显示 = 0 + E4 = X
-    lastAngle[id] = X; lastAngleSrc[id] = "0x92";
-    addLog("sys", `✅ ${m.name} 零点已写入固件:当前位置 = ${X}°(V4 三步;显示偏移 E4=${X})`);
+    lastAngle[id] = 0; lastAngleSrc[id] = "0x92";
+    addLog("sys", `✅ ${m.name} 零点已写入固件:当前位置 = 0°(V4 三步)`);
   }
   renderMotors(); renderMotorCards();
 }
@@ -1952,30 +1977,30 @@ async function btnDisable() {
   addLog("sys", "已对全部电机失能(0x80)");
 }
 async function btnSetDefaultPos() {
-  const m = selMotor();
-  if (!m) return;
-  const a = lastAngle[m.id];
-  if (a === undefined) { showBanner("尚未收到角度反馈,请稍候", true); return; }
-  const ok = await showConfirm("设置默认位置",
-    `将把 ${m.name}(#${m.id}) 当前位置 ${a.toFixed(2)}° 记为默认位置。\n`
-    + "之后点「移动到默认位置」可让该电机回到此角度。是否继续?");
+  // 用户 2026-08-26 反馈:默认位置针对全部电机同时生效(目的=记录低势能安全姿态)
+  const targets = motors.filter(m => lastAngle[m.id] !== undefined);
+  if (!targets.length) { showBanner("尚未收到任何电机角度反馈,请稍候", true); return; }
+  const ok = await showConfirm("设置默认位置(全部电机)",
+    `将把全部 ${targets.length} 台电机的当前位置记为各自的默认位置(低势能安全姿态):\n`
+    + targets.map(m => `· ${m.name}(#${m.id}) → ${lastAngle[m.id].toFixed(2)}°`).join("\n")
+    + "\n之后点「移动到默认位置」可一键回到此姿态。是否继续?");
   if (!ok) return;
-  m.defaultPosDeg = Math.round(a * 100) / 100;
+  targets.forEach(m => { m.defaultPosDeg = Math.round(lastAngle[m.id] * 100) / 100; });
   saveMotors();
-  addLog("sys", `✅ ${m.name} 默认位置已记录:${m.defaultPosDeg}°`);
+  addLog("sys", `✅ 已记录全部 ${targets.length} 台电机的默认位置(低势能姿态)`);
 }
 async function btnMoveDefault() {
   const targets = motors.filter(m => typeof m.defaultPosDeg === "number" && isFinite(m.defaultPosDeg));
-  if (!targets.length) { showBanner("尚未设置任何默认位置(先选中电机点「设置默认位置」)", true); return; }
-  const ok = await showConfirm("移动到默认位置",
-    `将移动 ${targets.length} 台电机到各自默认位置:\n`
+  if (!targets.length) { showBanner("尚未设置默认位置(先点「设置当前位置为默认位置」)", true); return; }
+  const ok = await showConfirm("移动到默认位置(低势能姿态)",
+    `将移动 ${targets.length} 台电机回到各自的默认位置(低势能安全姿态):\n`
     + targets.map(m => `· ${m.name}(#${m.id}) → ${m.defaultPosDeg}°`).join("\n")
     + "\n限幅校验通过才发送;未设置默认位置的电机不动。是否继续?");
   if (!ok) return;
   for (const m of targets) {
     await moveToAngle(m, m.defaultPosDeg, "移动到默认位置");
   }
-  addLog("sys", `已发送移动请求:${targets.length} 台电机回默认位置`);
+  addLog("sys", `已发送移动请求:${targets.length} 台电机回默认位置(低势能姿态)`);
 }
 /* 绝对位置发送(含限幅校验;V3 0xA4 多圈目标 = E0+out2rot;V4 目标 = out2rot(deg−E4));
    spdDps 默认 60°/s,归零等场景可传入更低速度 */
@@ -2012,6 +2037,16 @@ async function v4Home(m) {
 /* =====================================================================
  * 单电机操控视图(双击电机卡片进入)
  * ===================================================================== */
+/* 单电机视图切换:← 上一个 / → 下一个(按 id 排序,轮转;用户 2026-08-26 反馈) */
+function switchMotor(dir) {
+  if (!motors.length) return;
+  const ids = motors.map(m => m.id).sort((a, b) => a - b);
+  let idx = ids.indexOf(activeMotorId);
+  if (idx < 0) idx = 0;
+  idx = (idx + dir + ids.length) % ids.length;   // 轮转:ID5 → 后回到 ID1
+  kbStopAll();
+  openSingleView(ids[idx]);
+}
 function openSingleView(id) {
   const m = motorById(id);
   if (!m) return;
@@ -2116,6 +2151,16 @@ function kbTick() {
   }
 }
 function onKeyDown(e) {
+  if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+    // ←/→ 轮转切换电机(需在单电机视图且输入框未聚焦)
+    const ae = document.activeElement;
+    if (ae && (ae.tagName === "INPUT" || ae.tagName === "SELECT" || ae.tagName === "TEXTAREA")) return;
+    if (!kbActive()) return;
+    e.preventDefault();
+    if (e.repeat) return;
+    switchMotor(e.key === "ArrowLeft" ? -1 : 1);
+    return;
+  }
   if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
   // 焦点守卫:输入框/下拉聚焦时忽略(防输入角度时误触发)
   const ae = document.activeElement;
@@ -2127,6 +2172,7 @@ function onKeyDown(e) {
   kbStart(e.key === "ArrowUp" ? 1 : -1);          // 后按下的键方向覆盖(多键同按)
 }
 function onKeyUp(e) {
+  if (e.key === "ArrowLeft" || e.key === "ArrowRight") return;   // 切换瞬时,无长按
   if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
   const ae = document.activeElement;
   if (ae && (ae.tagName === "INPUT" || ae.tagName === "SELECT" || ae.tagName === "TEXTAREA")) return;
@@ -2181,7 +2227,23 @@ async function tick() {
   } catch (e) { /* 桥接暂时不可用时静默 */ }
 }
 
+/* ⚠️ input/select 是替换元素,自身 ::after 伪元素不渲染 → 把其上的 data-tip 移到包裹 span
+   (2026-08-26 用户反馈"图像显示间隔没有提示"根因;统一修复所有输入/下拉的悬停提示) */
+function fixTipOnInputs() {
+  document.querySelectorAll("input[data-tip], select[data-tip]").forEach(el => {
+    const tip = el.getAttribute("data-tip");
+    if (!tip) return;
+    const wrap = document.createElement("span");
+    wrap.className = "tipwrap";
+    wrap.setAttribute("data-tip", tip);
+    el.removeAttribute("data-tip");
+    el.parentNode.insertBefore(wrap, el);
+    wrap.appendChild(el);
+  });
+}
+
 function init() {
+  fixTipOnInputs();
   document.getElementById("btnUsbRefresh").onclick = refreshUsbDevices;
   document.getElementById("btnUsbConnect").onclick = () => doConnect("usb");
   document.getElementById("btnWifiConnect").onclick = () => doConnect("wifi");
@@ -2224,6 +2286,7 @@ function init() {
   document.getElementById("kbSpeedIn").addEventListener("change", kbSpeedChanged);
   // 曲线工具栏
   document.getElementById("btnHideAll").onclick = hideAllCharts;
+  document.getElementById("btnShowAll").onclick = showAllCharts;
   document.getElementById("chkPos").onchange = drawAllCells;
   document.getElementById("chkSpd").onchange = drawAllCells;
   document.getElementById("chkIq").onchange = drawAllCells;

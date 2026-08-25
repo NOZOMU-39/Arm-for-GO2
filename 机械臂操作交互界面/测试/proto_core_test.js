@@ -37,6 +37,7 @@ const documentStub = {
   getElementById(id) { if (!elStore[id]) elStore[id] = fakeEl(); return elStore[id]; },
   createElement() { return fakeEl(); },
   addEventListener() {},
+  querySelectorAll() { return []; },   // fixTipOnInputs 用(测试环境无需真包裹)
   activeElement: { tagName: 'BODY' },
   body: { focus() {} },
 };
