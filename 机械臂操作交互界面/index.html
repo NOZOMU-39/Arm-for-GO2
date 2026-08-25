@@ -521,7 +521,7 @@ main { flex: 1; display: flex; min-height: 0; }
     <div class="msg" id="limitModalMsg"></div>
     <div class="btns">
       <button class="danger" id="btnLimitDisable">🛑 失能</button>
-      <button class="warn" id="btnLimitHome">🏠 自动归零</button>
+      <button class="warn" id="btnLimitHome">🏠 全电机回默认位置</button>
       <button id="btnLimitClose">关 闭</button>
     </div>
   </div>
@@ -1740,23 +1740,32 @@ async function limitModalDisable() {
   limitModalClose();
   if (m) await sendMotor(m, pad8([0x80]), "限幅越限:用户选择失能(0x80 掉力)");
 }
-async function limitModalHome() {
-  const m = motorById(limitModalMotorId);
-  if (!m) { limitModalClose(); return; }
-  const d = k => (typeof m[k] === "number" && isFinite(m[k])) ? m[k] : null;
-  const lo = d("limMinDeg"), hi = d("limMaxDeg");
-  const zeroInLimit = !((lo !== null && 0 < lo) || (hi !== null && 0 > hi));
-  const warn = zeroInLimit ? "" : "\n⚠️ 当前角度限幅不包含 0°:归零到位后仍会越限报警,建议归零后调整限幅。";
-  const ok = await showConfirm("🏠 自动归零确认",
-    `即将低速自动回到机械零点(0°);归位过程仍在限幅监控下。\n⚠️ 请确认归零路径上无障碍。${warn}是否继续?`);
+/* 限幅恢复:全电机回默认位置(用户 2026-08-26 规定——机械臂语义:零点不一定是低势能点)。
+   策略:按「末端→基座」(ID 降序)移动设了默认位置的电机;未设置的自动改为停止保持(0x81)。
+   恢复动作豁免 limitBlock(报警电机处于越限锁定态,拦截会阻止恢复)。 */
+async function limitModalMoveDefault() {
+  const withDef = motors.filter(x => typeof x.defaultPosDeg === "number" && isFinite(x.defaultPosDeg))
+    .sort((a, b) => b.id - a.id);
+  const noDef = motors.filter(x => !(typeof x.defaultPosDeg === "number" && isFinite(x.defaultPosDeg)));
+  let msg = withDef.length
+    ? `将按「末端→基座」顺序移动 ${withDef.length} 台电机回默认位置(低势能姿态):\n`
+      + withDef.map(x => `· ${x.name}(#${x.id}) → ${x.defaultPosDeg}°`).join("\n")
+    : "尚未设置任何默认位置——全部电机改为停止保持。";
+  if (noDef.length) msg += `\n未设置默认位置的 ${noDef.length} 台电机自动改为停止保持。`;
+  msg += "\n恢复动作不受限幅锁定拦截;请确认移动路径上无障碍。是否继续?";
+  const ok = await showConfirm("🏠 全电机回默认位置", msg);
   if (!ok) return;
   limitModalClose();
-  if (m.proto === "V3") {
-    await v3Home(m);
-  } else {
-    const spd = Math.min(15, d("limMaxSpd") ?? 15);
-    await moveToAngle(m, 0, "限幅越限:自动归零", spd);
+  for (const m of withDef) {
+    const limSpd = (typeof m.limMaxSpd === "number" && isFinite(m.limMaxSpd)) ? m.limMaxSpd : null;
+    const spd = Math.min(15, limSpd ?? 15);
+    await sendToAngle(m, m.defaultPosDeg, spd, "限幅恢复:全电机回默认位置");
+    await new Promise(r => setTimeout(r, 200));
   }
+  for (const m of noDef) {
+    await sendMotor(m, pad8([0x81]), "限幅恢复:无默认位置,停止保持(0x81)");
+  }
+  addLog("sys", `限幅恢复完成:${withDef.length} 台回默认位置,${noDef.length} 台停止保持`);
 }
 function monitorLimit(m, ang, spd, iq) {
   if (!m) return;
@@ -1786,7 +1795,7 @@ function monitorLimit(m, ang, spd, iq) {
     sendMotor(m, pad8([0x81]), `⛔ 限幅越限自动停止(0x81):${detail}`);
     addLog("err", `⛔ 限幅越限报警(${m.name}):${detail},已自动停止`);
     limitBannerShow(`⛔ 限幅越限报警(${m.name}):${detail},已自动停止`);
-    limitModalShow(m, `反馈${first}超过限幅,已自动停止(停在当前位置)。\n请选择恢复方式:\n· 🛑 失能:电机失去输出力,关节可能因重力下落\n· 🏠 自动归零:低速自动回到机械零点(需确认)\n· 关闭:保持停止与越限锁定(回到限幅内自动解锁)`);
+    limitModalShow(m, `反馈${first}超过限幅,已自动停止(停在当前位置)。\n请选择恢复方式:\n· 🛑 失能:电机失去输出力,关节可能因重力下落\n· 🏠 全电机回默认位置:按末端→基座回低势能姿态(未设置默认位置的电机自动停止保持)\n· 关闭:保持停止与越限锁定(回到限幅内自动解锁)`);
   }
   if (!st.ang && !st.spd && !st.iq) limitBannerHide();
 }
@@ -2003,6 +2012,11 @@ async function btnMoveDefault() {
 async function moveToAngle(m, deg, note, spdDps) {
   const spd = spdDps || 60;
   if (!limitBlock(m, { deg, spd })) return false;
+  return await sendToAngle(m, deg, spd, note);
+}
+/* 发送绝对位置(免 limitBlock——限幅恢复等动作豁免,报警电机处于越限锁定态也能恢复) */
+async function sendToAngle(m, deg, spdDps, note) {
+  const spd = spdDps || 60;
   if (m.proto === "V3") {
     const t = v3TrackOf(m);
     if (t.lastEnc === null) { addLog("err", `${m.name}:尚未收到角度反馈,无法发送绝对位置`); return false; }
@@ -2297,7 +2311,7 @@ function init() {
   document.getElementById("btnAddMotor").onclick = uiAddMotor;
   document.getElementById("btnImport").onclick = uiImportRegistry;
   document.getElementById("btnLimitDisable").onclick = limitModalDisable;
-  document.getElementById("btnLimitHome").onclick = limitModalHome;
+  document.getElementById("btnLimitHome").onclick = limitModalMoveDefault;
   document.getElementById("btnLimitClose").onclick = limitModalClose;
   document.getElementById("modalCancel").onclick = () => closeModal(false);
   document.getElementById("modalOk").onclick = () => closeModal(true);
