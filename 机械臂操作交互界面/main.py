@@ -417,6 +417,9 @@ class WiFiCANBridge:
         self._stop = threading.Event()
         self._rxq = collections.deque()
         self._rxq_lock = threading.Lock()
+        # ⚠️ 2026-08-26 致命回归修复:重构去 UDP 时误删本行 → _push_frame 每帧抛
+        # AttributeError → 读线程 except pass 静默吞 → 所有帧丢失(用户实测"收不到电机信息"根因)
+        self._dedup = {}            # 帧签名 -> 时间戳,去重窗口
         self._handle = 1
         self._tcp_thread = None
         self._tcp_buf = b""         # TCP 流式解析缓冲
@@ -436,14 +439,20 @@ class WiFiCANBridge:
             self._client.conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             self._client.conn.settimeout(0.05)
 
-        # ---- 波特率:总是强制下发一次(2026-08-26 实测定论:ESP32 的 NVS 波特率可能被改过
-        #      非 1000——界面选 1000 若不下发,ESP32 以错误波特率挂总线 → 无线收不到电机。
-        #      强制对齐界面选择,0x0A10 在线切换 + NVS 持久化)----
-        try:
-            self._client.set_can_rate(int(baud_kbps))
-            time.sleep(0.3)  # 等固件 stop→uninstall→reinstall 完成
-        except Exception as e:
-            self.on_log("err", f"设置 ESP32 波特率失败:{e}")
+        # ---- 波特率(仅界面选择非 1000 时下发;0x0A10 在线切换 + NVS 持久化)----
+        # ⚠️ 2026-08-26 实测定论:协商批帧成功后 set_can_rate 会使 ESP32 停止推送
+        #    (固件行为,recv 恒 timeout)——下发后必须重新协商批帧(0x0A13)恢复推送。
+        #    界面选 1000 时不下发(ESP32 默认 1000),避免无谓触发该问题。
+        if int(baud_kbps) != 1000:
+            try:
+                self._client.set_can_rate(int(baud_kbps))
+                time.sleep(0.3)  # 等固件 stop→uninstall→reinstall 完成
+                try:
+                    self._client._negotiate_batch()   # 重新协商,恢复 ESP32 推送
+                except Exception:
+                    pass
+            except Exception as e:
+                self.on_log("err", f"设置 ESP32 波特率失败:{e}")
 
         # ---- TCP 读线程(反馈全部走 TCP 批帧推送)----
         self._tcp_thread = threading.Thread(target=self._tcp_loop, daemon=True, name="wifi-tcp-rx")
@@ -561,8 +570,9 @@ class WiFiCANBridge:
                         for f in CANFrame.parse_batch(payload):
                             self._push_frame(f)
                     # 0x02 CMD_RESP:命令响应,当前界面不用,忽略
-                except Exception:
-                    pass
+                except Exception as e:
+                    # ⚠️ 帧解析异常绝不静默(曾因静默吞异常致全部帧丢失无法定位)
+                    self.on_log("err", f"帧解析异常({type(e).__name__}):{e}")
 
 
 # =====================================================================
