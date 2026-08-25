@@ -1078,8 +1078,15 @@ class Api:
         return {"ok": True, "data": self.device.list_devices()}
 
     def open_usb(self, dev_type, dev_index, ch, baud_kbps):
+        """USB 连接(参数安全转换:JS 下拉为空时可能传 NaN,静默失败无日志——2026-08-26 排查加防护)"""
         self._trace("open_usb")
-        return self.device.open_device(int(dev_type), int(dev_index), int(ch), int(baud_kbps))
+        try:
+            dev_type = int(dev_type); dev_index = int(dev_index)
+            ch = int(ch); baud_kbps = int(baud_kbps)
+        except (TypeError, ValueError):
+            self.device.add_log("err", f"open_usb 参数非法:{dev_type!r}/{dev_index!r}/{ch!r}/{baud_kbps!r}")
+            return {"ok": False, "msg": "连接参数非法:请先在 USB 卡片「刷新」选择设备型号"}
+        return self.device.open_device(dev_type, dev_index, ch, baud_kbps)
 
     def open_wifi(self, host, baud_kbps):
         self._trace("open_wifi")

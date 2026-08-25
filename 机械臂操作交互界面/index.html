@@ -1162,8 +1162,18 @@ async function sendMotorSilent(m, bytes, note) {
 async function refreshUsbDevices() {
   const sel = document.getElementById("usbDev");
   if (!sel) return;
-  const r = await bridge.list_devices();
-  const items = (r && r.ok && Array.isArray(r.data)) ? r.data : [];
+  let r;
+  try { r = await bridge.list_devices(); } catch (e) { r = { ok: false, msg: String((e && e.message) || e) }; }
+  if (!r.ok) {
+    // 枚举失败:给出可见错误(横幅)+ 占位选项(可手动选型号再试)
+    sel.innerHTML = "";
+    const opt = document.createElement("option");
+    opt.value = "41"; opt.textContent = "枚举失败,可手动选择";
+    sel.appendChild(opt);
+    if (r.msg) showBanner("USB 设备枚举失败:" + r.msg, true);
+    return;
+  }
+  const items = Array.isArray(r.data) ? r.data : [];
   sel.innerHTML = "";
   if (!items.length) {
     const opt = document.createElement("option");
@@ -1186,6 +1196,11 @@ async function doConnect(kind) {
   try {
     if (kind === "usb") {
       const devType = parseInt(document.getElementById("usbDev").value, 10);
+      if (isNaN(devType)) {
+        showBanner("请先在 USB 卡片点「刷新」选择设备型号", true);
+        btn.disabled = false; btn.textContent = "连 接";
+        return;
+      }
       const idx = parseInt(document.getElementById("usbIdx").value || "0", 10);
       const ch = parseInt(document.getElementById("usbCh").value || "0", 10);
       r = await bridge.open_usb(devType, idx, ch, baud);
