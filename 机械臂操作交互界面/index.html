@@ -281,7 +281,7 @@ main { flex: 1; display: flex; min-height: 0; }
     <div class="connectCard">
       <h2>🔌 USB 直连</h2>
       <div class="row">
-        <label data-tip="电脑上已插入的 USBCAN 模块；列表为空时点「刷新」重试，若仍为空请检查驱动或改用无线连接">设备型号</label>
+        <label data-tip="电脑上已插入的 USBCAN 模块（自动探测，带 ✓ 的为实际探测成功）；列表为空时点「刷新」重试，若仍为空请检查驱动或改用无线连接">设备型号</label>
         <select id="usbDev"></select>
         <button id="btnUsbRefresh" data-tip="重新扫描 USB 上的 CAN 模块">刷新</button>
       </div>
@@ -1177,12 +1177,13 @@ async function refreshUsbDevices() {
   sel.innerHTML = "";
   if (!items.length) {
     const opt = document.createElement("option");
-    opt.value = "41"; opt.textContent = "未枚举到设备(可手动选择)";
+    opt.value = "41"; opt.textContent = "未探测到设备(可手动选择)";
     sel.appendChild(opt);
   }
   items.forEach(d => {
     const opt = document.createElement("option");
-    opt.value = d.type; opt.textContent = d.name;
+    opt.value = d.type;
+    opt.textContent = d.probed ? d.name + " ✓" : d.name;
     sel.appendChild(opt);
   });
 }

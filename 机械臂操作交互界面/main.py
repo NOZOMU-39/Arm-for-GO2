@@ -797,26 +797,29 @@ class Device:
     # ---- 设备操作 ----
 
     def list_devices(self):
-        """列出可用设备(真机枚举;模拟返回虚拟列表)"""
+        """列出可用设备。
+        ⚠️ 2026-08-26 实测定论:ZCAN_GetAvailableDevices 枚举 API 在本 zlgcan.dll 版本
+        返回垃圾值(stdcall/cdecl 均实测无效,ret=垃圾/count 未写)——**不可依赖**。
+        改用「探测式」:对常见设备类型逐个 open(毫秒级,成功即 close),探测到的列入列表。
+        实测:老 VCI 系类型 4(USBCAN2)打开成功,41/76(CANFD 系)在本模块上失败。"""
         if self.mock:
             return [{"type": 41, "name": "模拟 USBCANFD-200U"}, {"type": 4, "name": "模拟 USBCAN2"}]
         try:
             impl = ZLGCan()
         except OSError as e:
             return {"err": str(e)}
-        buf = (ZCAN_DEVICE_INFO * 64)()
-        count = ctypes.c_uint(64)
-        try:
-            ret = impl.dll.ZCAN_GetAvailableDevices(buf, ctypes.byref(count))
-        except OSError as e:
-            return {"err": str(e)}
-        if ret != 1:
-            return {"err": "枚举设备失败"}
+        # 常见类型探测顺序:CANFD 系(脉塔标配)在前,老 VCI 系在后(99 虚拟设备不探测,避免误选)
+        probe_types = [41, 76, 59, 44, 42, 43, 4, 3, 20, 21, 31, 34]
         devices = []
-        for i in range(count.value):
-            devices.append({"type": buf[i].dev_type,
-                            "name": ZLGCan.dev_type_name(buf[i].dev_type)})
-        # 没有任何设备/枚举失败时仍给出候选下拉,便于用户手动选择
+        for dt in probe_types:
+            try:
+                h = impl.open(dt, 0)
+                if h:
+                    devices.append({"type": dt, "name": ZLGCan.dev_type_name(dt), "probed": True})
+                    impl.close(h)
+            except Exception:
+                continue
+        # 没有任何探测成功时仍给出候选下拉,便于用户手动选择(打开设备有自动回退逻辑)
         if not devices:
             devices = [{"type": 41, "name": ZLGCan.dev_type_name(41)},
                        {"type": 76, "name": ZLGCan.dev_type_name(76)},
