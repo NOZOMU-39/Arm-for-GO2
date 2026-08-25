@@ -140,7 +140,11 @@ function T(name, cond, extra) {
   T('spd 超限拦截', R('limitBlock(motorById(4), {spd:80})') === false);
   T('iq 超限拦截', R('limitBlock(motorById(4), {iq:8})') === false);
   R('limitAlarm[4] = {ang:true, spd:false, iq:false}');
-  T('越限锁定态拦截一切运动', R('limitBlock(motorById(4), {deg:0})') === false);
+  R('lastAngle[4] = 9.9');   // 当前位置接近上限 10
+  T('锁定态+同向(往限幅外 15°)拦截', R('limitBlock(motorById(4), {deg:15})') === false);
+  T('锁定态+反向(回限幅内 5°)放行', R('limitBlock(motorById(4), {deg:5})') === true);
+  T('锁定态+无当前位置信息拦截', R('delete lastAngle[4]; limitBlock(motorById(4), {deg:0})') === false);
+  R('lastAngle[4] = 9.9');
   // 安全指令(0x80/0x81)不走 limitBlock——sendMotor 直接放行
   sent.length = 0;
   R('sendMotor(motorById(4), pad8([0x81]), "测试安全指令不受锁定限制")');

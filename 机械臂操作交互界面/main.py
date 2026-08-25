@@ -396,19 +396,20 @@ class ZLGCan:
 #        不可用 client.monitor()(每次持锁 0.5s 会阻塞 send_can)。
 # =====================================================================
 
-UDP_PUSH_PORT = 8889
-UDP_RENEW_S = 20          # UDP 订阅续订周期(ESP32 30s 无续订踢出,20s 续订留余量)
-DEDUP_WINDOW_S = 0.2      # TCP 推送与 UDP 批帧去重窗口
+# UDP 8889 通道已停用(2026-08-26:双推徒增 ESP32 负载挤占命令处理,反馈全走 TCP 批帧)
+DEDUP_WINDOW_S = 0.2      # 帧去重窗口(仅剩 TCP 单源,保留防固件重发)
 
 
 class WiFiCANBridge:
-    """ESP32 无线 CAN 中继后端:构造时连接(TCP+协商批帧),起 TCP/UDP 读线程。
+    """ESP32 无线 CAN 中继后端:构造时连接(TCP+协商批帧),TCP 读线程。
 
     ⚠️ 2026-08-26 重构(用户实测"任何指令都不听话/一直转"根因):
     —— 旧实现用 client._recv_frame 逐帧读 TCP 推送,它持 client._lock 且每次只读一帧;
        推送量大(批帧+历史缓冲)时锁被长时间占用 → 命令帧(含 0x81 停止)排队延迟 → 电机"一直转";
     —— 现改为:发送直接对 client.conn sendall(无锁,TCP 全双工),TCP 读线程 socket.recv(4096)
-       批量读 + 内部流式解析,快速排空推送缓冲,发送最坏延迟趋近 0。"""
+       批量读 + 内部流式解析,快速排空推送缓冲,发送最坏延迟趋近 0。
+    —— 2026-08-26 二轮:去掉 UDP 8889 订阅——TCP 批帧推送(已协商 0x0A13)足够反馈,
+       UDP 双推徒增 ESP32 推送负载挤占命令处理(用户实测键盘停止延迟无线明显)。"""
 
     def __init__(self, host, baud_kbps, on_log=None):
         self.on_log = on_log or (lambda lvl, msg: None)
@@ -416,19 +417,17 @@ class WiFiCANBridge:
         self._stop = threading.Event()
         self._rxq = collections.deque()
         self._rxq_lock = threading.Lock()
-        self._dedup = {}            # 帧签名 -> 时间戳,200ms 窗口去重(UDP 权威)
         self._handle = 1
         self._tcp_thread = None
-        self._udp_thread = None
         self._tcp_buf = b""         # TCP 流式解析缓冲
 
-        # ---- 连接 TCP(host 为空 → 走库内四级自动发现:AP 直连/本机网段/热点网段/串口)----
+        # ---- 连接 TCP(host 为空 → 走库内四级自动发现:AP 直连/本机网段/热点网段/串口,最多约 1 分钟)----
         try:
             self._client = WiFiCANClient(host=host or None)
         except Exception as e:
             raise OSError(f"无线连接失败(请检查 ESP32 上电/网络与地址):{type(e).__name__}:{e}") from e
         if self._client.mode != "tcp":
-            self.on_log("warn", f"无线通道为 {self._client.mode} 模式(非 TCP 无线),UDP 高频反馈不可用")
+            self.on_log("warn", f"无线通道为 {self._client.mode} 模式(非 TCP 无线)")
         try:
             self.host = self._client.conn.getpeername()[0] if self._client.mode == "tcp" else (host or "?")
         except Exception:
@@ -445,12 +444,9 @@ class WiFiCANBridge:
             except Exception as e:
                 self.on_log("err", f"设置 ESP32 波特率失败:{e}")
 
-        # ---- 读线程 ----
+        # ---- TCP 读线程(反馈全部走 TCP 批帧推送)----
         self._tcp_thread = threading.Thread(target=self._tcp_loop, daemon=True, name="wifi-tcp-rx")
         self._tcp_thread.start()
-        if self._client.mode == "tcp":
-            self._udp_thread = threading.Thread(target=self._udp_loop, daemon=True, name="wifi-udp-rx")
-            self._udp_thread.start()
 
     # ---- 与 ZLGCan 相同的外部接口(通道句柄风格)----
 
@@ -501,9 +497,8 @@ class WiFiCANBridge:
 
     def close(self, handle):
         self._stop.set()
-        for t in (self._tcp_thread, self._udp_thread):
-            if t and t.is_alive():
-                t.join(timeout=2)
+        if self._tcp_thread and self._tcp_thread.is_alive():
+            self._tcp_thread.join(timeout=2)
         try:
             self._client.close()
         except Exception:
@@ -565,37 +560,6 @@ class WiFiCANBridge:
                         for f in CANFrame.parse_batch(payload):
                             self._push_frame(f)
                     # 0x02 CMD_RESP:命令响应,当前界面不用,忽略
-                except Exception:
-                    pass
-
-    def _udp_loop(self):
-        """UDP 读线程:8889 发任意包即订阅,收 0x05 批帧;每 20s 续订(ESP32 30s 踢出)。"""
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.settimeout(UDP_RENEW_S)
-        except OSError as e:
-            self.on_log("err", f"UDP 通道创建失败:{e}")
-            return
-        last_sub = 0.0
-        while not self._stop.is_set():
-            now = time.time()
-            if now - last_sub > UDP_RENEW_S - 2:
-                try:
-                    s.sendto(b"\x01", (self.host, UDP_PUSH_PORT))
-                    last_sub = now
-                except OSError:
-                    pass
-            try:
-                data, _addr = s.recvfrom(65535)
-            except socket.timeout:
-                continue
-            except OSError:
-                break
-            # 帧格式 [2B 长度大端][1B 类型][载荷];批帧类型 0x05
-            if len(data) >= 3 and data[2] == 0x05:
-                try:
-                    for f in CANFrame.parse_batch(data[3:]):
-                        self._push_frame(f)
                 except Exception:
                     pass
 

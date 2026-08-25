@@ -241,10 +241,14 @@ main { flex: 1; display: flex; min-height: 0; }
 .mcard .mtip { font-size: 10px; color: #556; margin-top: 4px; }
 
 /* ============ 弹窗 ============ */
+/* ⚠️ z-index 分层(2026-08-26 用户实测"回默认位置没反应"根因):
+   两个弹窗曾同为 1001,DOM 在后的 limitModalMask 盖住 modalMask → 确认框按不到。
+   现:modalMask(确认框)1002 永远在 limitModalMask(限幅报警)1001 之上 */
 #modalMask, #limitModalMask {
   position: fixed; inset: 0; background: #000a; display: none; align-items: center; justify-content: center;
-  z-index: 1001;   /* ⚠️ 确认框永远在限幅报警弹窗之上(防「确认框被报警窗盖住按不到」教训) */
 }
+#modalMask { z-index: 1002; }
+#limitModalMask { z-index: 1001; }
 #modalMask.show, #limitModalMask.show { display: flex; }
 .modal {
   background: #0d1b2a; border: 1px solid var(--line); border-radius: 12px;
@@ -330,7 +334,7 @@ main { flex: 1; display: flex; min-height: 0; }
         </select>
         <span class="hint">kbps</span>
       </div>
-      <div class="row"><span class="hint">留空地址自动搜索时约需 2~5 秒</span></div>
+      <div class="row"><span class="hint">留空地址自动搜索：逐网段扫描，最多约 1 分钟</span></div>
       <button class="btnConnect" id="btnWifiConnect" data-tip="通过 ESP32 无线连接 CAN 总线（ESP32 已上电、WiFi 已连上）">连 接</button>
     </div>
   </div>
@@ -1145,7 +1149,10 @@ async function rawSend(canId, extd, hexStr, note, silent) {
   if (!dev.opened) { addLog("err", "未连接设备,请先连接"); return false; }
   const r = await bridge.send_frame(canId, extd ? 1 : 0, hexStr, note || "", silent ? 1 : 0);
   if (!r.ok) {
-    if (!silent) addLog("err", `发送失败:${r.msg}`);
+    if (!silent) {
+      addLog("err", `发送失败:${r.msg}`);
+      showBanner("发送失败：" + r.msg + "（无线链路中断时请断开重连）", true);
+    }
     return false;
   }
   if (!silent) {
@@ -1560,6 +1567,13 @@ function chartScaleOf(k, def) {
 function drawChartCell(id) {
   const cv = document.getElementById("chart_" + id);
   if (!cv) return;
+  // ⚠️ 2026-08-26 修复"坐标文字变形":canvas 内部分辨率固定 640×180 被 CSS 拉伸到格子
+  // 尺寸会变形(文字细竖线/过宽)。动态分辨率:按实际格子尺寸设置,长宽比恒定。
+  const cw = cv.clientWidth, chh = cv.clientHeight;
+  if (cw > 10 && chh > 10 && (cv.width !== cw * 2 || cv.height !== chh * 2)) {
+    cv.width = cw * 2;   // 2x 分辨率保证文字清晰
+    cv.height = chh * 2;
+  }
   const ctx = cv.getContext("2d");
   const W = cv.width, H = cv.height;
   const L = 42, R = 10, T = 8, B = 18;
@@ -1706,10 +1720,34 @@ function limitBlock(m, vals) {
   if (!m) return true;
   const st = limitAlarm[m.id];
   if (st && (st.ang || st.spd || st.iq)) {
-    const msg = `⛔ 限幅越限锁定中(${m.name}):已拦截运动指令。请先使电机回到限幅内(角度回落后自动解锁),或调整限幅设置。`;
-    addLog("err", msg);
-    limitBannerShow(msg);
-    return false;
+    const d2 = k => (typeof m[k] === "number" && isFinite(m[k])) ? m[k] : null;
+    // ⚠️ 方向性拦截(2026-08-26 用户规定):限幅到达停住,反向(回限幅内)操作放行,同向(继续越限)拦截
+    let block = false, why = "";
+    if (st.ang && typeof vals.deg === "number") {
+      const lo = d2("limMinDeg"), hi = d2("limMaxDeg");
+      const cur = lastAngle[m.id];
+      if (typeof cur === "number" && !isNaN(cur)) {
+        // 同向 = 目标方向继续越过限幅线(vals.deg 越过 hi/lo);目标在限幅内一律放行
+        const outward = (hi !== null && vals.deg > cur && vals.deg > hi)
+                     || (lo !== null && vals.deg < cur && vals.deg < lo);
+        if (outward) { block = true; why = "目标越过限幅线"; }
+      } else { block = true; why = "角度锁定且无当前位置"; }
+    } else if (st.ang) { block = true; why = "角度锁定"; }
+    if (!block && st.spd && typeof vals.spd === "number") {
+      const limSpd = d2("limMaxSpd");
+      const curSpd = lastSpd[m.id];
+      if (limSpd !== null && typeof curSpd === "number" && Math.abs(curSpd) > limSpd && vals.spd * curSpd > 0) {
+        block = true; why = "速度同向越限";
+      }
+    } else if (st.spd) { block = true; why = "速度锁定"; }
+    if (st.iq) { block = true; why = "电流锁定(无方向,保持拦截)"; }
+    if (block) {
+      const msg = `⛔ 限幅越限锁定中(${m.name}):${why},已拦截该运动指令。请反向操作回到限幅内(角度回落后自动解锁),或调整限幅设置。`;
+      addLog("err", msg);
+      limitBannerShow(msg);
+      return false;
+    }
+    return true;   // 反向(回限幅内)放行
   }
   const d = k => (typeof m[k] === "number" && isFinite(m[k])) ? m[k] : null;
   const msgs = [];
@@ -1760,7 +1798,7 @@ async function limitModalMoveDefault() {
     const limSpd = (typeof m.limMaxSpd === "number" && isFinite(m.limMaxSpd)) ? m.limMaxSpd : null;
     const spd = Math.min(15, limSpd ?? 15);
     await sendToAngle(m, m.defaultPosDeg, spd, "限幅恢复:全电机回默认位置");
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 1000));   // 逐台间隔 1s:依次启动
   }
   for (const m of noDef) {
     await sendMotor(m, pad8([0x81]), "限幅恢复:无默认位置,停止保持(0x81)");
@@ -2003,7 +2041,7 @@ async function btnMoveDefault() {
   if (!ok) return;
   for (const m of targets) {
     await moveToAngle(m, m.defaultPosDeg, "移动到默认位置");
-    await new Promise(r => setTimeout(r, 200));   // 逐台发送间隔,防总线拥塞
+    await new Promise(r => setTimeout(r, 1000));   // 逐台间隔 1s:电机依次启动,肉眼可辨(用户要求"一个一个动")
   }
   addLog("sys", `已发送移动请求:${targets.length} 台电机回默认位置(末端→基座)`);
 }
