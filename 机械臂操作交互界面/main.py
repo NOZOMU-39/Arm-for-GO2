@@ -810,12 +810,16 @@ class Device:
             return {"err": str(e)}
         # 常见类型探测顺序:CANFD 系(脉塔标配)在前,老 VCI 系在后(99 虚拟设备不探测,避免误选)
         probe_types = [41, 76, 59, 44, 42, 43, 4, 3, 20, 21, 31, 34]
+        # ⚠️ 设备名用短名(2026-08-26 用户反馈长名撑爆下拉 UI)
+        SHORT = {41: "USBCANFD-200U", 76: "USBCANFD-200U", 59: "USBCANFD-800U", 44: "CANFDCOM",
+                 42: "USBCANFD-100U", 43: "USBCANFD-400U", 4: "USBCAN2", 3: "USBCAN",
+                 20: "USBCAN_E", 21: "USBCAN_E", 31: "USBCAN_4E_U", 34: "USBCAN_8E_U"}
         devices = []
         for dt in probe_types:
             try:
                 h = impl.open(dt, 0)
                 if h:
-                    devices.append({"type": dt, "name": ZLGCan.dev_type_name(dt), "probed": True})
+                    devices.append({"type": dt, "name": SHORT.get(dt, ZLGCan.dev_type_name(dt)), "probed": True})
                     impl.close(h)
             except Exception:
                 continue

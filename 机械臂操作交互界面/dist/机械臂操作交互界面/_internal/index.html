@@ -75,7 +75,8 @@ button.ghost:hover:not(:disabled) { background: #1a2a4a; }
 .connectCard h2 { font-size: 16px; color: var(--cyan); margin-bottom: 4px; }
 .connectCard .row { display: flex; align-items: center; gap: 8px; }
 .connectCard label { min-width: 74px; color: var(--dim); }
-.connectCard input, .connectCard select { flex: 1; }
+/* ⚠️ select/input 必须可收缩(min-width:0),否则内容撑破卡片(2026-08-26 用户反馈) */
+.connectCard input, .connectCard select { flex: 1; min-width: 0; width: 100%; max-width: 100%; }
 .connectCard .btnConnect { margin-top: auto; padding: 9px; font-size: 14px; background: #14532d; border-color: #166534; }
 .connectCard .btnConnect:hover:not(:disabled) { background: #166534; }
 .connectCard .btnConnect:disabled { background: #1e293b; }
@@ -1183,7 +1184,7 @@ async function refreshUsbDevices() {
     // 枚举失败:给出可见错误(横幅)+ 占位选项(可手动选型号再试)
     sel.innerHTML = "";
     const opt = document.createElement("option");
-    opt.value = "41"; opt.textContent = "枚举失败,可手动选择";
+    opt.value = "41"; opt.textContent = "枚举失败";
     sel.appendChild(opt);
     if (r.msg) showBanner("USB 设备枚举失败:" + r.msg, true);
     return;
@@ -1192,7 +1193,7 @@ async function refreshUsbDevices() {
   sel.innerHTML = "";
   if (!items.length) {
     const opt = document.createElement("option");
-    opt.value = "41"; opt.textContent = "未探测到设备(可手动选择)";
+    opt.value = "41"; opt.textContent = "未探测到设备";
     sel.appendChild(opt);
   }
   items.forEach(d => {
