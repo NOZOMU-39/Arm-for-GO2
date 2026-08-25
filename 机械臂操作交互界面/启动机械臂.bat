@@ -1,5 +1,5 @@
 @echo off
-chcp 65001 >/dev/null
+chcp 65001 >nul
 title 机械臂操作交互界面(开发模式)
 
 set PY32=E:\Program Files\Python312-32\python.exe
