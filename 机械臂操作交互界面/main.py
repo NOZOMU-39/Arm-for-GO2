@@ -436,13 +436,14 @@ class WiFiCANBridge:
             self._client.conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             self._client.conn.settimeout(0.05)
 
-        # ---- 波特率(非默认 1000 时才下发;ESP32 端 0x0A10 在线切换,NVS 持久化)----
-        if int(baud_kbps) != 1000:
-            try:
-                self._client.set_can_rate(int(baud_kbps))
-                time.sleep(0.3)  # 等固件 stop→uninstall→reinstall 完成
-            except Exception as e:
-                self.on_log("err", f"设置 ESP32 波特率失败:{e}")
+        # ---- 波特率:总是强制下发一次(2026-08-26 实测定论:ESP32 的 NVS 波特率可能被改过
+        #      非 1000——界面选 1000 若不下发,ESP32 以错误波特率挂总线 → 无线收不到电机。
+        #      强制对齐界面选择,0x0A10 在线切换 + NVS 持久化)----
+        try:
+            self._client.set_can_rate(int(baud_kbps))
+            time.sleep(0.3)  # 等固件 stop→uninstall→reinstall 完成
+        except Exception as e:
+            self.on_log("err", f"设置 ESP32 波特率失败:{e}")
 
         # ---- TCP 读线程(反馈全部走 TCP 批帧推送)----
         self._tcp_thread = threading.Thread(target=self._tcp_loop, daemon=True, name="wifi-tcp-rx")
