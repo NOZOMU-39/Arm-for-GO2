@@ -907,6 +907,13 @@ function chartFmt(span) {
   if (span >= 1) return v => v.toFixed(2);
   return v => v.toFixed(3);
 }
+/* 曲线刻度步长取整(1/2/5×10^n,VOFA+ 风格):给定粗略间距 → 最近的漂亮步长 */
+function niceStep(raw) {
+  if (!(raw > 0) || !isFinite(raw)) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const m = raw / p;
+  return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * p;
+}
 
 /* ---------- 设零点数学(机械臂新增,纯函数) ----------
    V3:当前位置标定为 X → E0 = rotDeg_cur − out2rot(X)(X=0 即原记录机械零点)
@@ -1577,7 +1584,11 @@ function drawChartCell(id) {
   }
   const ctx = cv.getContext("2d");
   const W = cv.width, H = cv.height;
-  const L = 42, R = 10, T = 8, B = 18;
+  // ⚠️ 2026-08-27 字体固定(用户规定:刻度数随格子缩放增减、字体恒定,VOFA+ 风格):
+  //   旧实现 fs = 11*W/640 随格子放大 → 展开图文字过大、缩略图过小;
+  //   现固定 24px(2x 画布 → 显示 12px,与格子标题 X8/X6 一致)。
+  //   L 加宽到 58 容纳 7 字符数值(-999.99),B 加高容纳 X 轴时间文字。
+  const L = 58, R = 10, T = 8, B = 28;
   const pw = W - L - R, ph = H - T - B;
   const cx = L, cy = T + ph / 2;
   ctx.clearRect(0, 0, W, H);
@@ -1588,37 +1599,44 @@ function drawChartCell(id) {
   const scales = {};
   chans.forEach(c => { scales[c.k] = chartScaleOf(c.k, c.scale); });
   const Yof = (k, v) => cy - (v - scales[k].mid) / scales[k].half * (ph / 2 - 5);
-  // ⚠️ 2026-08-26 修复"坐标文字太小":canvas 已按 2x 分辨率绘制,字体必须按比例放大
-  // (10px 在 2x 画布 = 显示 5px)。按 640 基准缩放,保证显示约 11px ≈ 外围文字。
-  const fs = Math.round(Math.max(10, 11 * W / 640));
+  const fs = 24;   // 固定字号:2x 画布 → 显示 12px,不随格子缩放变化
   ctx.font = fs + "px Consolas, monospace";
   ctx.lineWidth = 1;
   if (main) {
     const { lo, hi } = scales[main.k];
     const fmt = chartFmt(hi - lo);
-    for (let i = 0; i <= 3; i++) {
-      const v = hi - (i / 3) * (hi - lo);
-      const y = T + (i / 3) * ph;
-      ctx.strokeStyle = i === 1 ? "#ffffff33" : "#0f346055";
+    // ⚠️ 刻度数自适应(用户规定,VOFA+ 风格):格子越高刻度越多(3~9 个),
+    //   步长取整 1/2/5×10^n;刻度数变化不影响字体大小(fs 恒定)
+    const nY = Math.max(3, Math.min(9, Math.round(ph / 48)));
+    const step = niceStep((hi - lo) / (nY - 1));
+    const first = Math.ceil(lo / step) * step;
+    const ticks = [];
+    for (let v = first; v <= hi + step * 1e-6; v += step) ticks.push(v);
+    ticks.forEach(v => {
+      const y = cy - (v - scales[main.k].mid) / scales[main.k].half * (ph / 2 - 5);
+      // 零点线高亮(原中间线逻辑改为零点线)
+      ctx.strokeStyle = Math.abs(v) < step * 0.5 ? "#ffffff33" : "#0f346055";
       ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(W - R, y); ctx.stroke();
       ctx.fillStyle = main.color;
       ctx.textAlign = "right"; ctx.textBaseline = "middle";
       ctx.fillText(fmt(v), L - 4, y);
-    }
+    });
     ctx.fillStyle = main.color;
     ctx.textAlign = "left"; ctx.textBaseline = "top";
     ctx.fillText(`${main.name} [${fmt(lo)}, ${fmt(hi)}]`, L + 2, T + 1);
   }
   const now = Date.now();
   ctx.textAlign = "center"; ctx.textBaseline = "top";
-  for (let i = 0; i <= 3; i++) {
-    const x = L + (i / 3) * pw;
+  // X 轴时间刻度自适应:格子越宽刻度越多(2~10 条)
+  const nX = Math.max(2, Math.min(10, Math.round(pw / 70)));
+  for (let i = 0; i < nX; i++) {
+    const x = L + (i / (nX - 1)) * pw;
     ctx.strokeStyle = "#0f346055";
     ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, T + ph); ctx.stroke();
     ctx.fillStyle = "#8aa0c0";
     let label = "0s";
     if (N >= 2) {
-      const t = b.ts[Math.min(N - 1, Math.round((i / 3) * (N - 1)))];
+      const t = b.ts[Math.min(N - 1, Math.round((i / (nX - 1)) * (N - 1)))];
       label = `${Math.round((t - now) / 100) / 10}s`;
     }
     ctx.fillText(label, x, T + ph + 3);
