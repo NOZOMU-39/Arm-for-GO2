@@ -1107,6 +1107,9 @@ function toast(msg) {
  * ===================================================================== */
 let confirmResolve = null;
 function showConfirm(title, msg) {
+  // ⚠️ 并发防御(2026-08-26):confirmResolve 是单变量,上一个确认未决时再次 showConfirm
+  // 会覆盖 → 旧 Promise 永挂(设为零点曾疑似卡在 await,日志零落盘)。先作废旧确认再弹新窗。
+  if (confirmResolve) { const r = confirmResolve; confirmResolve = null; r(false); }
   document.getElementById("modalTitle").textContent = title;
   document.getElementById("modalMsg").textContent = msg;
   document.getElementById("modalMask").classList.add("show");
@@ -1996,19 +1999,30 @@ function updateCardAngle(id) {
   if (el && typeof lastAngle[id] === "number") el.textContent = lastAngle[id].toFixed(2) + "°";
 }
 
-/* 设为零点(当前位置标定为输入值 X) */
-/* 设为零点(当前位置 = 机械零点 0°;用户 2026-08-26 反馈:不需要输入框,直接按钮) */
+/* 设为零点(当前位置 = 机械零点 0°;用户 2026-08-26 反馈:不需要输入框,直接按钮)
+   ⚠️ 2026-08-26 重写(用户实测「一瞬间归零又恢复」):V4 三步背靠背连发 → 0x64 写 ROM
+   未完成就被 0x76 复位打断 → 新零点不进 ROM → 复位后 0x92 读回旧值覆盖前端强制置 0。
+   修法 = 三步之间留间隔(写 ROM 是慢操作)+ 复位等待 + 每步结果落盘(下次定位不靠猜)。 */
 async function setZeroNow(id) {
   const m = motorById(id);
   if (!m) return;
   if (typeof lastAngle[id] !== "number") { showBanner("尚未收到该电机角度反馈,请稍候再操作", true); return; }
+  addLog("sys", `📍 设置零点开始:${m.name}(#${id}) 当前显示 ${lastAngle[id].toFixed(2)}°(来源 ${lastAngleSrc[id] || "?"})`);
+  if (m.proto === "V3" && lastAngleSrc[id] !== "0x92") {
+    // ⚠️ 0x92 未到位时 rotDeg 由 0x9C 相位积分维护,可能差 ±360N 整圈(V3 丢圈号坑)
+    // → E0 记错圈 → 设零后显示偏离;提示等 0x92 到位再设
+    addLog("warn", `${m.name}:0x92 绝对角尚未到位,拒绝设零(防 E0 记错圈)`);
+    showBanner("0x92 绝对角尚未到位,此时设零可能记错圈数,请稍候再操作", true);
+    return;
+  }
   const ok = await showConfirm("📍 设置零点",
     `将把 ${m.name}(#${id}) 的当前位置标定为机械零点(角度显示 0°)。\n`
     + (m.proto === "V3"
       ? "V3:仅修改本界面注册表零点档案,不写电机固件。\n"
       : "V4:自动执行 失能→写零点→复位 三步——⚠️ 失能瞬间电机失去输出力,关节可能因重力下落,请先做好机械防护!\n")
     + "是否继续?");
-  if (!ok) return;
+  if (!ok) { addLog("sys", `取消设置零点:${m.name}`); return; }
+  addLog("sys", `已确认设置零点,开始执行:${m.name}(#${id})`);
   if (m.proto === "V3") {
     const t = v3TrackOf(m);
     m.E0 = Math.round(t.rotDeg * 100) / 100;   // E0 = 当前固件角(0x92 校准后)
@@ -2020,14 +2034,25 @@ async function setZeroNow(id) {
     lastAngle[id] = rel; lastAngleSrc[id] = "0x92";
     addLog("sys", `✅ ${m.name} 零点已标定:当前位置 = 0°(E0=${m.E0.toFixed(1)}°,V3 档案)`);
   } else {
-    await sendMotor(m, pad8([0x80]), "设置零点:0x80 失能(写零点前置)");
-    await sendMotor(m, pad8([0x64]), "设置零点:0x64 当前位置写 ROM 为零点");
-    await sendMotor(m, pad8([0x76]), "设置零点:0x76 复位重启(新零点生效)");
+    // ⚠️ 无线节奏(实测教训,同 pollAll 的 sleep(60)):0x80/0x64/0x76 均无回复确认,
+    // 发送成功 ≠ 执行成功;背靠背连发 → 0x64 写 ROM 被 0x76 复位打断 → 新零点丢失
+    const step1 = await sendMotor(m, pad8([0x80]), "设置零点:0x80 失能(写零点前置)");
+    addLog("sys", `设置零点 1/3 失能:${step1 ? "已发送" : "发送失败"}`);
+    if (!step1) { showBanner("0x80 失能发送失败,已中止设置零点", true); return; }
+    await sleep(300);   // 等待失能生效(掉力)
+    const step2 = await sendMotor(m, pad8([0x64]), "设置零点:0x64 当前位置写 ROM 为零点");
+    addLog("sys", `设置零点 2/3 写零点:${step2 ? "已发送" : "发送失败"}——等待 ROM 写入完成`);
+    if (!step2) { showBanner("0x64 写零点发送失败,已中止设置零点", true); return; }
+    await sleep(1000);  // 写 ROM 是慢操作,间隔不足会写入失败
+    const step3 = await sendMotor(m, pad8([0x76]), "设置零点:0x76 复位重启(新零点生效)");
+    addLog("sys", `设置零点 3/3 复位:${step3 ? "已发送" : "发送失败"}——电机复位中,数秒内不响应属正常`);
+    if (!step3) { showBanner("0x76 复位发送失败,请检查链路后重试", true); return; }
     m.E4 = 0;   // V4 显示偏移复位(当前位置即零点)
     m.E0 = null;
     saveMotors();
     lastAngle[id] = 0; lastAngleSrc[id] = "0x92";
-    addLog("sys", `✅ ${m.name} 零点已写入固件:当前位置 = 0°(V4 三步)`);
+    await sleep(3000);  // 等待复位完成(期间电机不响应,轮询自然空转)
+    addLog("sys", `✅ ${m.name} 零点已写入固件:当前位置 = 0°(V4 三步)。复位完成,观察角度显示——归零并保持 = 写入成功;回到原值 = 写入失败,请重试`);
   }
   renderMotors(); renderMotorCards();
 }
