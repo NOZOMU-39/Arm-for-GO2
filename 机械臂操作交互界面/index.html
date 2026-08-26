@@ -416,8 +416,8 @@ main { flex: 1; display: flex; min-height: 0; }
         <span class="sep"></span>
         <span class="pollRow">
           刷新周期
-          <input type="number" id="pollInt" value="500" min="200" max="2000" step="100"
-            data-tip="状态刷新周期：200~2000ms，默认 500ms，数值越小刷新越快（总线与无线负载越高）">ms
+          <input type="number" id="pollInt" value="300" min="200" max="2000" step="100"
+            data-tip="状态刷新周期：200~2000ms，默认 300ms，数值越小刷新越快（总线与无线负载越高）">ms
         </span>
       </div>
       <div id="deviceContent">
@@ -1588,7 +1588,10 @@ function drawChartCell(id) {
   const scales = {};
   chans.forEach(c => { scales[c.k] = chartScaleOf(c.k, c.scale); });
   const Yof = (k, v) => cy - (v - scales[k].mid) / scales[k].half * (ph / 2 - 5);
-  ctx.font = "10px Consolas, monospace";
+  // ⚠️ 2026-08-26 修复"坐标文字太小":canvas 已按 2x 分辨率绘制,字体必须按比例放大
+  // (10px 在 2x 画布 = 显示 5px)。按 640 基准缩放,保证显示约 11px ≈ 外围文字。
+  const fs = Math.round(Math.max(10, 11 * W / 640));
+  ctx.font = fs + "px Consolas, monospace";
   ctx.lineWidth = 1;
   if (main) {
     const { lo, hi } = scales[main.k];
@@ -1673,6 +1676,9 @@ function renderChartGrid() {
     // 悬停十字线(复用简单版:不实现,双击聚焦为主要交互)
   });
   drawAllCells();
+  // ⚠️ 重建后延迟重绘一次:canvas 刚插入 DOM 时 clientWidth 可能为 0(未布局),
+  // 立即绘制会按 640×180 画,延迟后按真实尺寸(2x)重画,防"点选电机后曲线空白"
+  setTimeout(drawAllCells, 60);
 }
 function drawAllCells() {
   motors.forEach(m => drawChartCell(m.id));
@@ -2113,6 +2119,7 @@ function openSingleView(id) {
 }
 function closeSingleView() {
   kbStopAll();
+  if (kb.stopTimer) { clearInterval(kb.stopTimer); kb.stopTimer = null; }
   activeMotorId = null;
   document.getElementById("singleView").classList.remove("show");
 }
@@ -2152,12 +2159,13 @@ async function svMoveRel() {
 /* =====================================================================
  * 键盘控制(↑ 逆时针+ / ↓ 顺时针-;按住连续,松手停)
  * ===================================================================== */
-const kb = { keys: new Set(), timer: null, lastLog: 0, hintShown: false };
+const kb = { keys: new Set(), timer: null, stopTimer: null, lastLog: 0, hintShown: false };
 function kbActive() { return activeMotorId !== null && document.getElementById("singleView").classList.contains("show"); }
 function kbStart(dir) {
   if (!kbActive()) return;
   const m = motorById(activeMotorId);
   if (!m) return;
+  if (kb.stopTimer) { clearInterval(kb.stopTimer); kb.stopTimer = null; }
   kb.dir = dir;
   if (!kb.hintShown) { toast("按住 ↑/↓ 连续运动,松手即停;到限位自动停住,可反向"); kb.hintShown = true; }
   if (kb.timer) clearInterval(kb.timer);
@@ -2170,7 +2178,17 @@ function kbStop(reason) {
   kb.dir = 0;
   if (kb.timer) { clearInterval(kb.timer); kb.timer = null; }
   const m = motorById(activeMotorId);
-  if (m && dev.opened) sendMotor(m, pad8([0x81]), "键盘控制停止(0x81)");
+  if (m && dev.opened) {
+    sendMotor(m, pad8([0x81]), "键盘控制停止(0x81)");
+    // ⚠️ 停止确认保险(2026-08-26 用户反馈"松手偶尔继续前进"):无线延迟/偶发丢帧时
+    // 0x81 可能未及时到达电机(速度模式会一直转)——1 秒内每 200ms 重发,停止保持幂等重复无害
+    if (kb.stopTimer) clearInterval(kb.stopTimer);
+    let n = 0;
+    kb.stopTimer = setInterval(() => {
+      if (n++ >= 5 || !dev.opened) { clearInterval(kb.stopTimer); kb.stopTimer = null; return; }
+      sendMotor(m, pad8([0x81]), "键盘停止确认重发(0x81)");
+    }, 200);
+  }
   if (reason) addLog("sys", `键盘运动停止:${reason}`);
 }
 function kbStopAll() { kbStop(null); }
