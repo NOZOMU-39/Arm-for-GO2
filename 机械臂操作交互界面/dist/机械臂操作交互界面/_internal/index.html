@@ -1128,10 +1128,14 @@ function normMotors(list) {
 }
 async function loadMotors() {
   if (!bridgeReady()) return;
-  try {
-    const r = await bridge.get_registry();
-    if (r && r.ok && Array.isArray(r.data)) motors = normMotors(r.data);
-  } catch (e) { /* 读文件失败则保留 localStorage 内容 */ }
+  // ⚠️ 2026-08-27 兜底:get_registry 桥接调用可能挂起(用户实测卡片区消失)——
+  // 3 秒超时后用现有 motors(localStorage)渲染,不再让 renderMotorCards 永远不执行
+  const r = await Promise.race([
+    bridge.get_registry(),
+    new Promise(res => setTimeout(() => res({ ok: false, timeout: true }), 3000)),
+  ]);
+  if (r && r.ok && Array.isArray(r.data)) motors = normMotors(r.data);
+  else if (r && r.timeout) addLog("warn", "注册表读取超时,使用本地缓存电机");
   renderMotors();
   renderChartGrid();
   renderMotorCards();
@@ -1230,6 +1234,8 @@ async function doConnect(kind) {
       r = await bridge.open_usb(devType, idx, ch, baud);
     } else {
       const host = document.getElementById("wifiHost").value.trim();
+      // ⚠️ 2026-08-27 记住无线地址(下次打开自动回填,免重输/免等自动发现 26 秒)
+      try { localStorage.setItem("wifi_host", host); } catch (e) {}
       r = await bridge.open_wifi(host, baud);
     }
   } catch (e) {
@@ -1253,6 +1259,9 @@ function showMainView() {
   document.getElementById("mainView").classList.add("show");
   updateCanCard();
   pollToggle(true);
+  // ⚠️ 2026-08-27 兜底:确保连接后电机卡片存在(用户实测连接后卡片区消失——
+  // loadMotors 的 get_registry 挂起时 renderMotorCards 未执行,此处强制补渲染)
+  if (motors.length) renderMotorCards();
   addLog("sys", "已进入主界面,开始状态刷新");
 }
 function showConnectView() {
@@ -2433,13 +2442,40 @@ function init() {
   };
   // 主循环
   setInterval(tick, 50);
-  setInterval(() => { renderMotors(); updateAllCardAngles(); }, 1000);
+  setInterval(() => {
+    renderMotors();
+    updateAllCardAngles();
+    // ⚠️ 2026-08-27 兜底:卡片区意外为空(渲染失败/异常)时每秒重建,防"电机控制区消失"
+    const mc = document.getElementById("motorCards");
+    if (mc && !mc.childElementCount && motors.length) renderMotorCards();
+  }, 1000);
   setInterval(drawAllCells, 300);
+  // ⚠️ 2026-08-27 记住上次无线地址(用户反馈每次都要重新输入/默认不连接)
+  const savedHost = (() => { try { return localStorage.getItem("wifi_host") || ""; } catch (e) { return ""; } })();
+  if (savedHost) {
+    const wh = document.getElementById("wifiHost");
+    if (wh) wh.value = savedHost;
+  }
   loadMotors();
   refreshUsbDevices();
   renderMethodBtn();
   addLog("sys", "机械臂操作交互界面已就绪" + (JS_MOCK ? "(浏览器演示模式)" : ""));
 }
+/* ⚠️ 2026-08-27 诊断:JS 异常/未处理 Promise 落盘到文件日志(此前异常静默无法定位) */
+window.addEventListener("error", (e) => {
+  try {
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.log_line) {
+      window.pywebview.api.log_line("[JS异常] " + (e.message || "") + " @ " + (e.filename || "") + ":" + (e.lineno || ""));
+    }
+  } catch (err) {}
+});
+window.addEventListener("unhandledrejection", (e) => {
+  try {
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.log_line) {
+      window.pywebview.api.log_line("[JS未处理Promise] " + String((e.reason && e.reason.message) || e.reason || "").slice(0, 200));
+    }
+  } catch (err) {}
+});
 </script>
 </body>
 </html>
