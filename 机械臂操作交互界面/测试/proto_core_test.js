@@ -180,6 +180,14 @@ function T(name, cond, extra) {
   T('全 NaN 回落默认量程', c3[0] === -360 && c3[1] === 360, c3);
   const c4 = R('chartAutoScale([42], 360)');
   T('单值 → 以 42 为中心扩地板', Math.abs((c4[0] + c4[1]) / 2 - 42) < 1e-9, c4);
+  const ns1 = R('niceStep(12.5)');
+  T('niceStep(12.5) → 20(1/2/5 取整)', ns1 === 20, ns1);
+  const ns2 = R('niceStep(0.0625)');
+  T('niceStep(0.0625) → 0.1(小数步长)', Math.abs(ns2 - 0.1) < 1e-9, ns2);
+  const ns3 = R('niceStep(90)');
+  T('niceStep(90) → 100', ns3 === 100, ns3);
+  const ns4 = R('niceStep(-5)');
+  T('niceStep(非正) → 1 兜底', ns4 === 1, ns4);
 
   console.log('\n== 12. decode79Reply ==');
   const d79 = R('decode79Reply([0x79,0,1,0,0,0,0x42,0x02])');
