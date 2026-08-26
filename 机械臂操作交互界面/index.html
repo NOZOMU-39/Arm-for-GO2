@@ -658,7 +658,7 @@ function e4Of(m) { const x = m && m.E4; return (typeof x === "number" && isFinit
 /* ---------- 回复解析(三协议;V4.3 走 V44 分支,0x94/0x79 分叉) ---------- */
 function angForLog(rm, fbDeg) {
   const m = rm || selMotor();
-  if (pollOn && m && m.id === selectedId && lastAngle[m.id] !== undefined && lastAngleSrc[m.id] === "0x92") {
+  if (pollOn && m && m.id === selectedId && typeof lastAngle[m.id] === "number" && lastAngleSrc[m.id] === "0x92") {
     return lastAngle[m.id].toFixed(2);
   }
   return fbDeg.toFixed(2);
@@ -1507,25 +1507,29 @@ function updateMotorState(m, pr) {
     const iq = pr.values.iq * dirOf(m);
     lastSpd[id] = spd; lastIq[id] = iq;
     if (m.proto !== "V3") {
-      const a92 = (lastAngle[id] !== undefined && lastAngleSrc[id] === "0x92") ? lastAngle[id] : null;
+      const a92 = (typeof lastAngle[id] === "number" && lastAngleSrc[id] === "0x92") ? lastAngle[id] : null;
       const a = a92 !== null ? a92 : rot2out(pr.values.ang, m) + e4Of(m);
       chartFeed(id, { pos: a, spd, iq });
       if (a92 === null) { lastAngle[id] = a; lastAngleSrc[id] = "0x9C"; }
       monitorLimit(m, lastAngle[id], spd, iq);
     } else if (m.v9cSemantics === "angle") {
-      const a92 = (lastAngle[id] !== undefined && lastAngleSrc[id] === "0x92") ? lastAngle[id] : null;
+      const a92 = (typeof lastAngle[id] === "number" && lastAngleSrc[id] === "0x92") ? lastAngle[id] : null;
       const a = a92 !== null ? a92 : rot2out(pr.values.ang, m);
       chartFeed(id, { pos: a, spd, iq });
       if (a92 === null) { lastAngle[id] = a; lastAngleSrc[id] = "0x9C"; }
       monitorLimit(m, lastAngle[id], spd, iq);
     } else {
       // V3:0x92 已到位时相位仅兜底(快速反转取错圈坑,2026-08-25 实测修复)
-      if (lastAngleSrc[id] === "0x92" && lastAngle[id] !== undefined) {
+      if (lastAngleSrc[id] === "0x92" && typeof lastAngle[id] === "number") {
         chartFeed(id, { pos: lastAngle[id], spd, iq });
         monitorLimit(m, lastAngle[id], spd, iq);
       } else {
         const rot = v3OnPhase(m, pr.values.enc);
         const a = v3PosDual(m);
+        // ⚠️ 2026-08-27 null 防护:v3PosDual 在 lastEnc 未就绪时返回 null,直接写入会让
+        // lastAngle[id]=null → 界面 `!== undefined` 判空失效 → null.toFixed() 崩 →
+        // renderMotorCards 中断致控制区空白(用户实测);null 时跳过本轮不污染
+        if (a === null) return;
         lastAngle[id] = a; lastAngleSrc[id] = "0x9C";
         chartFeed(id, { pos: a, spd, iq });
         monitorLimit(m, a, spd, iq);
@@ -1537,6 +1541,7 @@ function updateMotorState(m, pr) {
       if (a !== 0) {
         v3TrackOf(m).rotDeg = a * gearOf(m) * dirOf(m);
         const rel = v3PosDual(m);
+        if (rel === null) return;   // ⚠️ 同上:lastEnc 未就绪时跳过本轮
         lastAngle[id] = rel; lastAngleSrc[id] = "0x92";
         chartFeed(id, { pos: rel, spd: null, iq: null });
         monitorLimit(m, rel);
@@ -1934,7 +1939,8 @@ function renderMotorCards() {
     const card = document.createElement("div");
     card.className = "mcard" + (m.id === selectedId ? " sel" : "");
     card.id = "mcard_" + m.id;
-    const ang = (lastAngle[m.id] !== undefined) ? lastAngle[m.id].toFixed(2) : "—";
+    // ⚠️ typeof number 判空(null 曾导致 toFixed 崩 → 卡片区空白)
+    const ang = (typeof lastAngle[m.id] === "number") ? lastAngle[m.id].toFixed(2) : "—";
     const on = lastRecv[m.id] && (Date.now() - lastRecv[m.id] < 2500);
     card.innerHTML = `
       <div class="mHead">
@@ -1986,7 +1992,8 @@ function updateAllCardAngles() {
 }
 function updateCardAngle(id) {
   const el = document.getElementById("mang_" + id);
-  if (el && lastAngle[id] !== undefined) el.textContent = lastAngle[id].toFixed(2) + "°";
+  // ⚠️ typeof number 判空(null 曾导致 toFixed 崩 → 每秒刷新中断 → 卡片兜底不执行)
+  if (el && typeof lastAngle[id] === "number") el.textContent = lastAngle[id].toFixed(2) + "°";
 }
 
 /* 设为零点(当前位置标定为输入值 X) */
@@ -1994,7 +2001,7 @@ function updateCardAngle(id) {
 async function setZeroNow(id) {
   const m = motorById(id);
   if (!m) return;
-  if (lastAngle[id] === undefined) { showBanner("尚未收到该电机角度反馈,请稍候再操作", true); return; }
+  if (typeof lastAngle[id] !== "number") { showBanner("尚未收到该电机角度反馈,请稍候再操作", true); return; }
   const ok = await showConfirm("📍 设置零点",
     `将把 ${m.name}(#${id}) 的当前位置标定为机械零点(角度显示 0°)。\n`
     + (m.proto === "V3"
@@ -2068,7 +2075,7 @@ async function btnDisable() {
 }
 async function btnSetDefaultPos() {
   // 用户 2026-08-26 反馈:默认位置针对全部电机同时生效(目的=记录低势能安全姿态)
-  const targets = motors.filter(m => lastAngle[m.id] !== undefined);
+  const targets = motors.filter(m => typeof lastAngle[m.id] === "number");
   if (!targets.length) { showBanner("尚未收到任何电机角度反馈,请稍候", true); return; }
   const ok = await showConfirm("设置默认位置(全部电机)",
     `将把全部 ${targets.length} 台电机的当前位置记为各自的默认位置(低势能安全姿态):\n`
@@ -2156,7 +2163,7 @@ function openSingleView(id) {
   document.getElementById("singleName").textContent = `${m.name}  (#${m.id})`;
   const spdEl = document.getElementById("kbSpeedIn");
   if (spdEl && !spdEl.dataset.userSet) spdEl.value = kbSpeed;
-  document.getElementById("svAng").textContent = (lastAngle[id] !== undefined ? lastAngle[id].toFixed(2) : "—") + "°";
+  document.getElementById("svAng").textContent = (typeof lastAngle[id] === "number" ? lastAngle[id].toFixed(2) : "—") + "°";
   document.getElementById("svLim").textContent = limitText(m);
   addLog("sys", `进入单电机操控:${m.name}(#${m.id})(控制方法:位置控制)`);
 }
