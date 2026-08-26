@@ -1441,14 +1441,16 @@ function v3PosDual(m) {
  * 轮询(多电机:全部注册电机依次 9A/9C/92,静默)
  * ===================================================================== */
 let polling = false;   // 轮询忙标志:周期小于一轮耗时时不并发(见下)
+let pollPaused = false;   // ⚠️ 设零等独占流程暂停轮询:命令帧与轮询帧并发挤入总线
+                          // → 背靠背突发损坏(173e22b 根因)→ 0x76 偶发未执行(日志实证)
 function pollToggle(on) {
   pollOn = on;
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   if (on) {
-    // ⚠️ 忙则跳过:避免 pollAll 未完成时下一轮又启动(帧间隔加入后一轮约 360ms,
+    // ⚠️ 忙/暂停则跳过:避免 pollAll 未完成时下一轮又启动(帧间隔加入后一轮约 360ms,
     // 轮询周期手动调小(如 200ms)时并发会让命令更密集,触发总线损坏)
     const iv = () => {
-      if (dev.opened && motors.length && !polling) {
+      if (dev.opened && motors.length && !polling && !pollPaused) {
         polling = true;
         pollAll().finally(() => { polling = false; });
       }
@@ -2023,36 +2025,45 @@ async function setZeroNow(id) {
     + "是否继续?");
   if (!ok) { addLog("sys", `取消设置零点:${m.name}`); return; }
   addLog("sys", `已确认设置零点,开始执行:${m.name}(#${id})`);
-  if (m.proto === "V3") {
-    const t = v3TrackOf(m);
-    m.E0 = Math.round(t.rotDeg * 100) / 100;   // E0 = 当前固件角(0x92 校准后)
-    m.E0Date = new Date().toISOString().slice(0, 10);
-    t.E0 = m.E0;
-    t.rotDeg = m.E0;
-    saveMotors();
-    const rel = v3PosDual(m);
-    lastAngle[id] = rel; lastAngleSrc[id] = "0x92";
-    addLog("sys", `✅ ${m.name} 零点已标定:当前位置 = 0°(E0=${m.E0.toFixed(1)}°,V3 档案)`);
-  } else {
-    // ⚠️ 无线节奏(实测教训,同 pollAll 的 sleep(60)):0x80/0x64/0x76 均无回复确认,
-    // 发送成功 ≠ 执行成功;背靠背连发 → 0x64 写 ROM 被 0x76 复位打断 → 新零点丢失
-    const step1 = await sendMotor(m, pad8([0x80]), "设置零点:0x80 失能(写零点前置)");
-    addLog("sys", `设置零点 1/3 失能:${step1 ? "已发送" : "发送失败"}`);
-    if (!step1) { showBanner("0x80 失能发送失败,已中止设置零点", true); return; }
-    await sleep(300);   // 等待失能生效(掉力)
-    const step2 = await sendMotor(m, pad8([0x64]), "设置零点:0x64 当前位置写 ROM 为零点");
-    addLog("sys", `设置零点 2/3 写零点:${step2 ? "已发送" : "发送失败"}——等待 ROM 写入完成`);
-    if (!step2) { showBanner("0x64 写零点发送失败,已中止设置零点", true); return; }
-    await sleep(1000);  // 写 ROM 是慢操作,间隔不足会写入失败
-    const step3 = await sendMotor(m, pad8([0x76]), "设置零点:0x76 复位重启(新零点生效)");
-    addLog("sys", `设置零点 3/3 复位:${step3 ? "已发送" : "发送失败"}——电机复位中,数秒内不响应属正常`);
-    if (!step3) { showBanner("0x76 复位发送失败,请检查链路后重试", true); return; }
-    m.E4 = 0;   // V4 显示偏移复位(当前位置即零点)
-    m.E0 = null;
-    saveMotors();
-    lastAngle[id] = 0; lastAngleSrc[id] = "0x92";
-    await sleep(3000);  // 等待复位完成(期间电机不响应,轮询自然空转)
-    addLog("sys", `✅ ${m.name} 零点已写入固件:当前位置 = 0°(V4 三步)。复位完成,观察角度显示——归零并保持 = 写入成功;回到原值 = 写入失败,请重试`);
+  // ⚠️ 2026-08-26 日志实证:设零期间 pollAll 并发轮询 → 命令帧与轮询帧挤入总线 →
+  // 背靠背突发(173e22b 根因)→ 0x76 偶发未执行(实测 3 次设零 2 次无复位空窗=命令丢失)。
+  // 执行期间独占总线:暂停轮询,三步命令独享节奏;结束(含失败/异常)恢复。
+  const wasPaused = pollPaused;
+  pollPaused = true;
+  try {
+    if (m.proto === "V3") {
+      const t = v3TrackOf(m);
+      m.E0 = Math.round(t.rotDeg * 100) / 100;   // E0 = 当前固件角(0x92 校准后)
+      m.E0Date = new Date().toISOString().slice(0, 10);
+      t.E0 = m.E0;
+      t.rotDeg = m.E0;
+      saveMotors();
+      const rel = v3PosDual(m);
+      lastAngle[id] = rel; lastAngleSrc[id] = "0x92";
+      addLog("sys", `✅ ${m.name} 零点已标定:当前位置 = 0°(E0=${m.E0.toFixed(1)}°,V3 档案)`);
+    } else {
+      // ⚠️ 无线节奏(实测教训,同 pollAll 的 sleep(60)):0x80/0x64/0x76 均无回复确认,
+      // 发送成功 ≠ 执行成功;背靠背连发 → 0x64 写 ROM 被 0x76 复位打断 → 新零点丢失
+      const step1 = await sendMotor(m, pad8([0x80]), "设置零点:0x80 失能(写零点前置)");
+      addLog("sys", `设置零点 1/3 失能:${step1 ? "已发送" : "发送失败"}`);
+      if (!step1) { showBanner("0x80 失能发送失败,已中止设置零点", true); return; }
+      await sleep(500);   // 等待失能稳定(实测 300ms 时偶发 0x64 写 ROM 被拒)
+      const step2 = await sendMotor(m, pad8([0x64]), "设置零点:0x64 当前位置写 ROM 为零点");
+      addLog("sys", `设置零点 2/3 写零点:${step2 ? "已发送" : "发送失败"}——等待 ROM 写入完成`);
+      if (!step2) { showBanner("0x64 写零点发送失败,已中止设置零点", true); return; }
+      await sleep(1000);  // 写 ROM 是慢操作,间隔不足会写入失败
+      const step3 = await sendMotor(m, pad8([0x76]), "设置零点:0x76 复位重启(新零点生效)");
+      addLog("sys", `设置零点 3/3 复位:${step3 ? "已发送" : "发送失败"}——电机复位中,约 10 秒内不响应属正常`);
+      if (!step3) { showBanner("0x76 复位发送失败,请检查链路后重试", true); return; }
+      m.E4 = 0;   // V4 显示偏移复位(当前位置即零点)
+      m.E0 = null;
+      saveMotors();
+      lastAngle[id] = 0; lastAngleSrc[id] = "0x92";
+      await sleep(10000); // ⚠️ 实测复位耗时约 10s(10:42:00 空窗后才读到 0.00°),等足再恢复轮询
+      addLog("sys", `✅ ${m.name} 零点已写入固件:当前位置 = 0°(V4 三步)。复位完成,观察角度显示——归零并保持 = 写入成功;回到原值 = 写入失败,请重试`);
+    }
+  } finally {
+    if (!wasPaused) pollPaused = false;
   }
   renderMotors(); renderMotorCards();
 }
