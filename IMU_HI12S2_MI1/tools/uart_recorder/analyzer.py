@@ -88,8 +88,8 @@ def main():
     try:
         with open(meta_path, encoding="utf-8") as mf:
             for line in mf:
-                if line.startswith("baud="):
-                    baud = int(line.split("=")[1].split()[0])
+                if "baud=" in line:
+                    baud = int(line.split("baud=")[1].split()[0])
                     gap_ms = 1 if baud >= 921600 else 2
     except FileNotFoundError:
         pass
