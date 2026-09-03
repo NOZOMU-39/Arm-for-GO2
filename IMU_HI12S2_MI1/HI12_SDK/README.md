@@ -1,0 +1,55 @@
+[English](README.md) | [中文](README_zh.md)
+
+![Logo](img/logo.png)
+
+# HiPNUC Product Software Examples Package
+
+## Directory Structure
+
+- usb_uart_drivers/: CP210x USB-to-UART Bridge Driver
+  - Linux: Generally plug-and-play for Ubuntu 18.04 and above. If the device is not recognized, please refer to the installation guide on Silabs [official website](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers?tab=overview), or search for "CP210x driver installation on Linux" for solutions.
+  - Windows: Execute the driver installer directly
+
+- examples/: Example programs and source code for various platforms and languages, including STM32, ROS, Linux, MATLAB, etc.
+
+- drivers: HiPNUC driver source code
+
+## Quick Start
+
+### Windows
+
+1. Driver Installation: Install the USB-to-UART bridge driver from the `usb_uart_drivers` folder.
+2. Host Software: Download and install [CHCenter](https://download.hipnuc.com/internal/pc_host/CHCenter.7z)
+3. Hardware Connection: Connect the evaluation board's USB port to your PC, launch CHCenter, establish connection to the corresponding COM port to begin product evaluation.
+
+### Linux
+
+1. Recommended to start with the [C - Linux examples](examples/C)
+
+## Example Code
+
+Example code is provided for multiple languages and platforms:
+
+- [Python Examples](examples/python): Includes data reading and module configuration
+- [STM32 Serial Examples](examples/stm32_serial)
+- [Arduino Examples](examples/arduino)
+- [ROS Melodic Examples](examples/ROS_Melodic)
+- [ROS2 Examples](examples/ROS2)
+- [C - Linux Examples](examples/C): Includes module configuration, firmware, reading examples, and **data recording capabilities** - recommended for Linux users
+- [Matlab Examples](examples/matlab): Includes reading CHCenter log files and Allan variance analysis example code
+- [CAN Examples](examples/CAN): Includes DBC format CAN frame parsing files
+
+## Module Configuration
+
+For first-time configuration, it is strongly recommended to use the Windows host software CHCenter. Once familiar, if you plan to use command scripts or work in a Linux environment, refer to the other examples.
+
+## Resources
+
+- Official Website: [www.hipnuc.com](http://www.hipnuc.com)
+- Product Documentation: [GitHub Repository](https://github.com/hipnuc/products.git)
+
+## Contact Us
+
+Follow us and get the latest updates through:
+
+![QR Code](img/qr_qqq.jpg)

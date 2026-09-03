@@ -1,0 +1,12 @@
+output
+settings
+*.sfr
+*.dep
+rel_*
+rel.py
+*.vscode
+*.trae
+build
+find_new_firwamre.py
+copy_um.py
+__pycache__
