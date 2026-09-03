@@ -7,7 +7,7 @@
 - 任务：双端 IMU 测量链 = HIPNUC 精浦 HI12S2-MI1-000 ×2（枪口端＋基座端），服务论文「后坐扰动抑制」——枪口角/角速度测量 + Jetson 统一时间戳测量链（论文侧叫「测量链 P3」，通过门＝同一事件多通道可靠关联、可复现）。
 - 硬件事实：**S2 型号 = IMU/VRU，无磁力计**（规格书型号表实锤；S3 才有磁力计/AHRS）。只能用 6 轴模式：yaw 上电归零、相对航向。这不可惜——手册明示室内/机器人/电机磁场环境慎用 9 轴，本场景全是电机，6DoF 选型正确（2026-08-16 用户确认）。
 - 接口：UART（0x91 二进制，**921600 波特实测 1kHz 全量达成**）＋ CAN（CANopen/J1939，默认 500K/100Hz，硬件未到货未实测）＋ 外部 SYNC 触发（800µs）。
-- 外设状态（2026-09-03）：本体 ×2 已到手一只在测（USB/UART 直连 CHCenter 可读）；**链路定案：IMU 不走 CAN——双端各 921600 UART 经双通道 USB 串口桥（CP2105/CH342 类）进 Jetson USB**（T801 板载 CAN 弃用、电机总线走 ZLG USBCAN 双通道，详见情报第六节「Jetson 链路架构定案」）。**USBCAN(Linux 版)在途 → CAN 侧实测锁死，但不阻塞 IMU 主线（IMU 链路已全通）**。
+- 外设状态（2026-09-03）：本体 ×2 已到手一只在测（USB/UART 直连 CHCenter 可读）；**Jetson 侧 CAN 收发器（T801 无板载收发器，需 SN65HVD230 类）与 USBCAN 均未到货 → CAN 侧一切实测锁死**。
 
 ```
 IMU_HI12S2_MI1\
@@ -98,11 +98,11 @@ IMU_HI12S2_MI1\
 3. 安装坐标系定案：枪口端/基座端机械装法 → 选 URFR 码（等模拟器/枪座 CAD 或实物定位）
 4. CHCenter 配置项截图归档（安装方向/坐标系/输出勾选在哪）
 
-等硬件到货：
-5. 双通道 USB 串口桥（CP2105/CH342 类）到货 → Jetson 侧 921600×2 双 IMU 同采验证（recorder.py 收帧源换成 /dev/ttyUSB0/1）
-6. USBCAN(Linux 版)到货 → Jetson CAN 层 controlcan 适配（电机域，非 IMU 主线）；IMU CAN 摸底降级为可选兴趣项（canhost 为 SocketCAN 工具在 USBCAN 不可用；仅当 IMU 将来考虑上 CAN 时再移植 hipnuc C 例程思路）
-7. SYNC 外部触发 800µs 实测（后坐力模拟器相位霍尔 → TTL → 双 IMU SYNC 并联 → Jetson 记录）——随模拟器进度
-8. 装机后：URFR 码按丝印填＋上电对准 SOP＋敲击刚度快检（推狗身有读数、敲背板边缘无感即合格）
+等 CAN 硬件（收发器＋USBCAN 到货）：
+5. canhost 编译跑通（Windows 源 → Jetson 同步）
+6. CAN 波特率×频率对照实验（500K/1M × 100/500/1000Hz 实际帧率，验证 2.4 推算）
+7. 双 IMU node ID 区分、与电机总线共存拓扑验证（推荐独立第二路 CAN，射击瞬态不与电机抢总线）
+8. SYNC 外部触发 800µs 实测（后坐力模拟器相位霍尔 → TTL → HI12S2 SYNC → Jetson 时间戳）
 
 ## 6. 文档分工
 
