@@ -82,16 +82,28 @@ def main():
     print(f"===== 静态基线分析: {n} 帧 =====")
     print(f"时长(按帧内system_time): {dur_s:.2f} s | 平均帧率: {n / dur_s:.1f} fps" if dur_s > 0 else "system_time 异常")
 
+    # 丢帧检测阈值按采样率自适应:读同目录 .meta 的 baud(460800→500Hz 期望2ms,921600→1000Hz 期望1ms)
+    gap_ms = 2
+    meta_path = sys.argv[1] + ".meta"
+    try:
+        with open(meta_path, encoding="utf-8") as mf:
+            for line in mf:
+                if line.startswith("baud="):
+                    baud = int(line.split("=")[1].split()[0])
+                    gap_ms = 1 if baud >= 921600 else 2
+    except FileNotFoundError:
+        pass
+
     # 帧间隔/丢帧检测:system_time ms 单调性
     sts = [f["st"] for f in frames]
     jumps = 0
     max_gap = 0
     for a, b in zip(sts, sts[1:]):
         gap = (b - a) % 86400000  # 24h 回绕
-        if gap > 2:  # 期望 ~2ms@500Hz;>2ms 视为丢帧
+        if gap > gap_ms:  # 期望 1ms@1kHz / 2ms@500Hz;超阈值视为丢帧
             jumps += 1
             max_gap = max(max_gap, gap)
-    print(f"丢帧(间隔>2ms)次数: {jumps} | 最大间隔: {max_gap} ms")
+    print(f"丢帧(间隔>{gap_ms}ms)次数: {jumps} | 最大间隔: {max_gap} ms")
 
     # 温度
     temps = [f["temp"] for f in frames]
@@ -115,7 +127,6 @@ def main():
               f"(前半均值{stats(first)[0]:+.3f} 后半均值{stats(second)[0]:+.3f})")
 
     # system_time 与真实采集时长的差(每帧实际间隔)
-    print("\n注: 丢帧检测阈值2ms基于500Hz假设,若用1000Hz采集请按1ms重判。")
 
 
 if __name__ == "__main__":
