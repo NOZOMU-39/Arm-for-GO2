@@ -1,0 +1,11 @@
+# colcon 构建产物（在 Jetson 端生成，不入库）
+build/
+install/
+log/
+
+# Python
+__pycache__/
+*.pyc
+
+# 运行产物
+*.bag
