@@ -4,7 +4,7 @@
 > **技术路线与 `电机上位机开发\` 同源**（协议/角度/限位经验全部继承），无线通信走 ESP32 无线 CAN 中继（固件 v2.1.3）。
 > AI 对接文档见同目录 `AGENTS.md`。
 >
-> **当前角色（2026-09-05 用户定案）**：在 Jetson 主控方案下，本界面定位为 Jetson 控制栈的 **Windows 操作前端**——与 `Jetson_Orin_NX\` 是客户端-服务端关系，目录保持顶层独立；协议逻辑将单一源化到 `Jetson_Orin_NX\control\arm_protocol`（届时直连降级为调试模式），当前保留 USB/ESP32 直连，供 A 段只读验收与无 Jetson 兜底调试。
+> **当前角色（2026-09-05 用户定案）**：在 Jetson 主控方案下，本界面定位为 Jetson 控制栈的 **Windows 操作前端**——与 `Jetson_Orin_NX\` 是客户端-服务端关系，目录保持顶层独立；协议逻辑将单一源化到 `Jetson_Orin_NX\ROS2\arm_ws\src\arm_protocol`（届时直连降级为调试模式），当前保留 USB/ESP32 直连，供 A 段只读验收与无 Jetson 兜底调试。
 
 ---
 

@@ -2,7 +2,7 @@
 
 > 本目录 = Jetson 主控（图为 T801 + Orin NX 16GB）开发侧；人看 `README.md`；AI 看本文件。
 > 事实层（硬件/协议/结论）以 `AI间交流\情报.md` Jetson 条目为准；本文件只放 AI 干活要用的对接信息。
-> **目录边界（2026-09-05 用户定案）**：本目录只放 Jetson 板上运行的内容（`control\`＝ROS2 源码单一源）；Windows 操作前端＝顶层 `机械臂操作交互界面\`，与本目录是客户端-服务端关系（tcp_gateway 接入），**不并入本目录**；其协议逻辑第 1 步单一源化时改指向本目录 `control/arm_protocol`。
+> **目录边界（2026-09-05 用户定案）**：本目录只放 Jetson 板上运行的内容（`ROS2\arm_ws\`＝ROS2 源码单一源，与 Jetson 侧 `~/ROS2/arm_ws` 同名镜像）；Windows 操作前端＝顶层 `机械臂操作交互界面\`，与本目录是客户端-服务端关系（tcp_gateway 接入），**不并入本目录**；其协议逻辑第 1 步单一源化时改指向 `ROS2\arm_ws\src\arm_protocol`。
 
 ## 快速接入
 
@@ -43,7 +43,9 @@
 
 ## 下一步（接手入口）
 
-- Jetson 控制核心服务（协议库移植 + CAN 通信 + 轮询 + 安全逻辑，供 Windows 界面与手柄双前端连接）——尚未开始
+- **第一期包（定案顺序）**：arm_interfaces → arm_protocol → can_bridge → arm_controller → tcp_gateway → arm_bringup，源码在 `ROS2\arm_ws\`，Jetson `~/ROS2/arm_ws` 为构建副本——尚未开始
+- **tcp_gateway 演进备忘（不许止步 v1）**：v1 帧透传(ESP32 TCP 兼容，界面零改动) → 二期界面语义化+安全链下沉 arm_controller（界面 PROTO_CORE 退役）→ 三期多前端接入；每期完成即触发下一期（详见情报「tcp_gateway 演进路线」条目）
+- Windows 仓库 ↔ Jetson 同步机制待敲定（本仓库含大二进制不可整体 clone；候选 sftp/rsync 定向推送或 git over ssh）
 - 收发/链路已验证；电机闭环待接电机实测
 
 ## 日志与验证

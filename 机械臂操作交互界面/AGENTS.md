@@ -8,7 +8,7 @@
 > - 通信模式/日志/注册表/限幅链与上位机同源(Device/Api 事件队列 + 50ms 拉取 + 三层日志)。
 > 发现其他模块的问题,通过 `AI间交流\` 同步(更新前先问用户)。
 >
-> **目录定位（2026-09-05 用户定案）**：本界面＝Jetson 主控栈的 **Windows 操作前端**,与 `Jetson_Orin_NX\` 是客户端-服务端关系、**顶层目录保持独立不并入**;终态协议逻辑单一源化——**第 1 步在 arm_protocol 移植完成时执行**(PROTO_CORE 停止自维护、改指向 `Jetson_Orin_NX\control\arm_protocol`),当前保留 USB/ESP32 直连(A 段只读验收/无 Jetson 兜底调试)。
+> **目录定位（2026-09-05 用户定案）**：本界面＝Jetson 主控栈的 **Windows 操作前端**,与 `Jetson_Orin_NX\` 是客户端-服务端关系、**顶层目录保持独立不并入**;终态协议逻辑单一源化——**第 1 步在 arm_protocol 移植完成时执行**(PROTO_CORE 停止自维护、改指向 `Jetson_Orin_NX\ROS2\arm_ws\src\arm_protocol`),当前保留 USB/ESP32 直连(A 段只读验收/无 Jetson 兜底调试)。
 
 ## 1. 项目定位与目录
 
