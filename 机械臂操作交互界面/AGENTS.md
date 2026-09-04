@@ -7,6 +7,8 @@
 > - 无线通信走 `ESP32 for WiFi and BLE CAN\ESP32 for WiFi CAN Custom\examples\wifi_can_client.py`(本目录为原样复制,一行不改);
 > - 通信模式/日志/注册表/限幅链与上位机同源(Device/Api 事件队列 + 50ms 拉取 + 三层日志)。
 > 发现其他模块的问题,通过 `AI间交流\` 同步(更新前先问用户)。
+>
+> **目录定位（2026-09-05 用户定案）**：本界面＝Jetson 主控栈的 **Windows 操作前端**,与 `Jetson_Orin_NX\` 是客户端-服务端关系、**顶层目录保持独立不并入**;终态协议逻辑单一源化——**第 1 步在 arm_protocol 移植完成时执行**(PROTO_CORE 停止自维护、改指向 `Jetson_Orin_NX\control\arm_protocol`),当前保留 USB/ESP32 直连(A 段只读验收/无 Jetson 兜底调试)。
 
 ## 1. 项目定位与目录
 
@@ -21,7 +23,7 @@
 ├── wifi_can_client.py # ESP32 无线客户端库(原样复制,勿改;仅在其上包装 WiFiCANBridge)
 ├── 启动机械臂.bat      # 开发模式(32 位 Python 直跑,可选模拟模式)
 ├── 打包机械臂.bat      # 一键打包(⚠️ GBK 编码,勿用编辑器改;改时用 Python GBK 重写)
-├── 测试\proto_core_test.js  # Node vm 沙箱回归(46 项,无硬件无浏览器)
+├── 测试\proto_core_test.js  # Node vm 沙箱回归(52 项,无硬件无浏览器)
 ├── zlgcan.dll + kerneldlls\  # ZLG CAN 驱动(打包时从 ..\电机上位机开发\ 拷入)
 ├── 机械臂注册表.json   # 电机参数(独立临时参数,与上位机注册表互不影响;可导入上位机注册表)
 ├── 日志\调试日志_时间戳.txt   # 收发帧+操作名+界面摘要,每次运行一个文件(UTF-8)
@@ -34,13 +36,13 @@
 | 后端 | 连接方式 | 说明 |
 |---|---|---|
 | `ZLGCan` | USB 直连 | 从上位机 main.py 原样移植(zlgcan.dll ctypes,枚举/波特率/收发) |
-| `WiFiCANBridge` | ESP32 无线 | 新写:TCP 8888 命令(WiFiCANClient)+ UDP 8889 高频反馈(独立线程) |
+| `WiFiCANBridge` | ESP32 无线 | TCP 8888 命令与批帧反馈（当前交互界面仅用 TCP 单源） |
 | `MockCan` | --mock 模拟 | 从上位机移植(回复逻辑同源,写死在线 1~4 号) |
 
 **WiFiCANBridge 关键设计(勿改架构)**:
-- 命令走 `client.send_can()`(TCP,可靠,批帧协商 0x0A13 自动);反馈走 UDP 8889 订阅(`sendto b'\x01'` 即订阅,20s 续订,ESP32 30s 踢出);
-- **不用 `client.monitor()`**:其 `_recv_frame` 持锁最长 0.5s 会阻塞发送。TCP 读线程自写循环调 `_recv_frame(timeout=0.05)`(50ms 短超时,发送最坏 +50ms 可接受),解析 0x03/0x05 帧入 `_rxq`;
-- 两条读线程(TCP/UDP)汇入线程安全 deque `_rxq`,按 (id,data) 签名 200ms 窗口去重(UDP 权威);`Device._rx_loop` 每 1ms 排空;
+- 命令与反馈均走 TCP 8888：`client.send_can()` 发送并自动协商批帧 `0x0A13`，TCP 读线程批量解析 `0x03/0x05` 帧；交互界面已停用 UDP 8889 订阅（2026-08-26，避免双推挤占命令处理）;
+- **不用 `client.monitor()`**:其 `_recv_frame` 持锁最长 0.5s 会阻塞发送。当前 TCP 读线程使用 socket 批量读取与流式解析，发送与接收互不阻塞;
+- TCP 接收帧汇入线程安全 deque `_rxq`，按 (id,data) 签名 200ms 窗口去重；`Device._rx_loop` 每 1ms 排空;
 - `set_baud` → `client.set_can_rate(kbps)`(0x0A10);仅非 1000 时调用 + 提示影响总线全部设备;
 - 连接失败(OSError)返回中文错误;`bridge_dead` 置位后 transmit 快速失败;界面徽章变红;**不做自动重连**(半连通误判更危险);
 - host 留空 → 走库内四级自动发现(AP 192.168.4.1 → 本机网段 → 热点网段 → 串口,2~5 秒)。
@@ -85,7 +87,7 @@
 node 测试\proto_core_test.js
 ```
 
-- 46 项断言:字节工具边界、V3/V4 组帧字节布局、0x92 解析(D1-D4/D4-D7 分叉)、V3 相位最近邻(快速反转场景)、显示公式含 E0/dir、**设零点数学(V3 E0=rotDeg−out2rot(X);V4 E4 与 out2rot(deg−E4))**、limitBlock 判定矩阵、monitorLimit 状态机(先 0x81 后报警/死区解锁)、键盘限位停、chartAutoScale(±15%+2% 地板)、decode79Reply、扫描一致性比对、界面 HTML 无指令号;
+- 52 项断言:字节工具边界、V3/V4 组帧字节布局、0x92 解析(D1-D4/D4-D7 分叉)、V3 相位最近邻(快速反转场景)、显示公式含 E0/dir、**设零点数学(V3 E0=rotDeg−out2rot(X);V4 E4 与 out2rot(deg−E4))**、limitBlock 判定矩阵、monitorLimit 状态机(先 0x81 后报警/死区解锁)、键盘限位停、chartAutoScale(±15%+2% 地板)、decode79Reply、扫描一致性比对、界面 HTML 无指令号;
 - 套路:正则提取全部 `<script>` 段 → vm 执行(DOM/bridge stub)→ 断言;`setInterval` stub 为 noop、`setTimeout` 同步立即执行(否则事件循环不退出);**在 vm 内执行 `delete limitAlarm[4]` 等状态清理,不能 delete vm 返回值**;
 - 真机验证步骤(精确到按钮)见 README「真机验证步骤」章节:只读验证(A 1~5)通过前不进入运动验证(B 6~10)。
 
@@ -112,7 +114,7 @@ powershell -NoProfile -Command "& '.\打包机械臂.bat'" </dev/null 2>&1 | ico
 | 固件限位(0x20 索引 6/7) | 语义未定论,本界面不提供;只用软件限幅 |
 | log_line 静默失败 | 必须挂 Api 类(js_api 暴露 Api 非 Device)+ .catch 显式告警 |
 | 轮询帧刷日志 | 轮询 9A/9C/92 收发静默(silent 参数 + 接收端判定两层),日志供人读 |
-| WiFiCANClient 锁竞争 | _recv_frame 持锁:TCP 读线程 50ms 短超时,不用 monitor();UDP 独立通道 |
+| WiFiCANClient 锁竞争 | 当前 TCP 批量读线程不用 monitor()；交互界面已停用 UDP 双推，避免反馈挤占命令 |
 | 批帧协商常量 | CMD_ENABLE_BATCH=0x0A13(0x0A12 留给心跳看门狗勿占);直接复用库逻辑 |
 | ESP32 空数据帧被丢 | 固件 len<7 丢弃:发送恒 8 字节补零(Device.send_frame 已 ljust) |
 | 键盘误触发 | 焦点守卫 + 单电机视图激活 + 首次按下提示 + 四重停止 |
