@@ -44,7 +44,9 @@ class GatewayNode(Node):
         self.sub_rx = self.create_subscription(CanFrame, "/arm/can/rx", self._on_rx, Q())
         self._rx_frames: list[tuple[int, bool, int, bytes]] = []
         self._rx_lock = threading.Lock()
-        self._clients: set[socket.socket] = set()
+        self._tcp_clients: set[socket.socket] = set()
+        # ⚠️ socket 是 C 扩展类型不可动态加属性(conn._batch 曾 AttributeError)——批帧标志按 fileno 存表
+        self._batch_flags: dict[int, bool] = {}
         self._stop = threading.Event()
         self._server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -67,15 +69,16 @@ class GatewayNode(Node):
             frames, self._rx_frames = self._rx_frames, []
         if not frames:
             return
-        for c in list(self._clients):
+        for c in list(self._tcp_clients):
             try:
-                if c._batch:
+                if self._batch_flags.get(c.fileno()):
                     c.sendall(encode_batch_push(frames))
                 else:
                     for cid, extd, ts, data in frames:
                         c.sendall(encode_single_push(cid, extd, ts, data))
             except OSError:
-                self._clients.discard(c)
+                self._tcp_clients.discard(c)
+                self._batch_flags.pop(c.fileno(), None)
                 try:
                     c.close()
                 except OSError:
@@ -91,8 +94,8 @@ class GatewayNode(Node):
             except OSError:
                 break
             conn.settimeout(1.0)
-            conn._batch = False
-            self._clients.add(conn)
+            self._tcp_clients.add(conn)
+            self._batch_flags[conn.fileno()] = False
             self.get_logger().info(f"客户端接入: {addr[0]}:{addr[1]}")
             threading.Thread(target=self._client_loop, args=(conn, addr), daemon=True).start()
 
@@ -121,7 +124,8 @@ class GatewayNode(Node):
         except OSError:
             pass
         finally:
-            self._clients.discard(conn)
+            self._tcp_clients.discard(conn)
+            self._batch_flags.pop(conn.fileno(), None)
             try:
                 conn.close()
             except OSError:
@@ -134,7 +138,7 @@ class GatewayNode(Node):
             return
         cmd = (payload[0] << 8) | payload[1]
         if cmd == CMD_ENABLE_BATCH:            # 批帧协商 → 回 BATCH
-            conn._batch = True
+            self._batch_flags[conn.fileno()] = True
             conn.sendall(encode_frame(FRAME_CMD_RESP, b"BATCH"))
             self.get_logger().info("批帧模式已协商")
         elif cmd == CMD_QUERY_IP:              # 查 IP → 回本机地址
