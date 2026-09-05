@@ -432,7 +432,8 @@ const ERR_V44 = [
 ];
 const ERR_V3 = [
   [0x0002, "电机堵转"], [0x0004, "低压保护"], [0x0008, "过压保护"], [0x0010, "过流保护"],
-  [0x0040, "功率超限"], [0x0100, "超速"], [0x1000, "电机过温"], [0x2000, "编码器校准错误"],
+  [0x0040, "功率超限"], [0x0080, "标定参数写入错误"], [0x0100, "超速"], [0x1000, "电机过温"],
+  [0x2000, "编码器校准错误"],
 ];
 
 /* ---------- 字节工具 ---------- */
@@ -582,8 +583,10 @@ function parseReply(proto, cid, bytes) {
         break;
       }
       case 0x9D:
-        out.values = { ia: i16(bytes, 1) / 100, ib: i16(bytes, 3) / 100, ic: i16(bytes, 5) / 100 };
-        out.summary = `相电流 A ${out.values.ia.toFixed(1)}A · B ${out.values.ib.toFixed(1)}A · C ${out.values.ic.toFixed(1)}A`;
+        /* 布局修正(2026-09-05 真机+手册实证, 与交互界面/arm_protocol 同源联动): D1=温度(uint8),
+           A/B/C 相电流在 D2-3/D4-5/D6-7——旧布局把温度吞进 A 相致静止电流伪影 -27A 级 */
+        out.values = { temp: bytes[1], ia: i16(bytes, 2) / 100, ib: i16(bytes, 4) / 100, ic: i16(bytes, 6) / 100 };
+        out.summary = `温度 ${out.values.temp}℃ · 相电流 A ${out.values.ia.toFixed(1)}A · B ${out.values.ib.toFixed(1)}A · C ${out.values.ic.toFixed(1)}A`;
         break;
       case 0x30: case 0x31: case 0x32: {
         // 六参数 uint8 一次读写:D2~D7 = 电流KP/KI、速度KP/KI、位置KP/KI
@@ -655,7 +658,13 @@ function parseReply(proto, cid, bytes) {
         out.summary = `功能控制 ${V3_FUNC_NAME[fidx] || ("索引" + fidx)} = ${fval}(回显,写入成功)`;
         break;
       }
-      case 0xA1: case 0xA2: case 0xA4: case 0xA6: case 0xA8: case 0x80: case 0x81: case 0x77: case 0x78:
+      case 0x80: case 0x81:
+        /* 全零回显帧(2026-09-05 真机实测+手册, 与交互界面/arm_protocol 同源联动): 回复=与发送相同,
+           非状态帧——勿按 temp/iq/spd/enc 解析(假 0 读数) */
+        out.values = {};
+        out.summary = cmd === 0x80 ? "关闭命令已回显(电机已失能)" : "停止命令已回显(全零帧)";
+        break;
+      case 0xA1: case 0xA2: case 0xA4: case 0xA6: case 0xA8: case 0x77: case 0x78:
         out.values = { temp: bytes[1], iq: i16(bytes, 2) / 100, spd: i16(bytes, 4), enc: u16(bytes, 6) };
         out.summary = `回复:温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A(输出轴) · 速度 ${rot2out(out.values.spd, rm).toFixed(2)}dps(输出轴) · 编码器 ${out.values.enc}`;
         break;
@@ -674,8 +683,10 @@ function parseReply(proto, cid, bytes) {
         out.summary = `温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A · 速度 ${rot2out(out.values.spd, rm).toFixed(2)}dps · 角度 ${angForLog(rm, rot2out(out.values.ang, rm))}°(输出轴${dirOf(rm) === -1 ? ",方向已映射" : ""})`;
         break;
       case 0x9D:
-        out.values = { ia: i16(bytes, 1) / 100, ib: i16(bytes, 3) / 100, ic: i16(bytes, 5) / 100 };
-        out.summary = `相电流 A ${out.values.ia.toFixed(2)}A · B ${out.values.ib.toFixed(2)}A · C ${out.values.ic.toFixed(2)}A`;
+        /* 布局修正(2026-09-05 真机+手册实证, 与交互界面/arm_protocol 同源联动): D1=温度(uint8),
+           A/B/C 相电流在 D2-3/D4-5/D6-7 */
+        out.values = { temp: bytes[1], ia: i16(bytes, 2) / 100, ib: i16(bytes, 4) / 100, ic: i16(bytes, 6) / 100 };
+        out.summary = `温度 ${out.values.temp}℃ · 相电流 A ${out.values.ia.toFixed(2)}A · B ${out.values.ib.toFixed(2)}A · C ${out.values.ic.toFixed(2)}A`;
         break;
       case 0x92:
         out.values = { pos: i32(bytes, 4) / 100 * dirOf(rm) };
@@ -732,8 +743,11 @@ function parseReply(proto, cid, bytes) {
         out.summary = `波特率索引 ${out.values.idx}(` + { 0: "1M", 1: "500K", 2: "250K" }[out.values.idx] + ")";
         break;
       case 0xB5:
-        out.values = { part: bytes[1], text: String.fromCharCode(...bytes.slice(2, 7)) };
-        out.summary = `型号片段 ${out.values.part}:${out.values.text}`;
+        /* V44/X2-7 带参分段(2026-09-05 真机三段实测, 与交互界面/arm_protocol 同源联动):
+           读取需发 B5 01 索引(1~3), 回复 = D1=0x01 固定标记 + D2=索引回显 + D3-7=5 字符 ASCII,
+           型号≤15 字符需三段拼接; 无参发送回全 0 */
+        out.values = { idx: bytes[2], text: String.fromCharCode(...bytes.slice(3, 8)) };
+        out.summary = `型号片段${bytes[2]}:${out.values.text}`;
         break;
       case 0xB6:
         out.values = { on: bytes[7] };
@@ -759,7 +773,13 @@ function parseReply(proto, cid, bytes) {
         out.summary = s;
         break;
       }
-      case 0x80: case 0x81: case 0x77: case 0x78:
+      case 0x80: case 0x81:
+        /* 全零回显帧(2026-09-05 真机实测+手册, 与交互界面/arm_protocol 同源联动): 回复=与发送相同,
+           非状态帧——勿按 temp/iq/spd/ang 解析(假 0 读数) */
+        out.values = {};
+        out.summary = cmd === 0x80 ? "关闭命令已回显(电机已失能)" : "停止命令已回显(全零帧)";
+        break;
+      case 0x77: case 0x78:
         out.values = { temp: bytes[1], iq: i16(bytes, 2) / 100, spd: i16(bytes, 4), ang: i16(bytes, 6) };
         out.summary = `系统回复:温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A · 速度 ${rot2out(out.values.spd, rm).toFixed(2)}dps · 角度 ${angForLog(rm, rot2out(out.values.ang, rm))}°`;
         break;
