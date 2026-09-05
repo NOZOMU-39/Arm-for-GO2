@@ -113,7 +113,7 @@ class ArmControllerNode(Node):
         self.pub_tx.publish(msg)
 
     # ---------------- rx 回复 ----------------
-    def _on_rx(self, msg: rclpy.serialization.Message):
+    def _on_rx(self, msg):
         self._rx_count += 1
         cid = msg.can_id
         n = None
@@ -186,7 +186,8 @@ def main(args=None):
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():          # 防重复 shutdown 报错(KeyboardInterrupt 路径怪癖)
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":
