@@ -24,7 +24,18 @@ arm_ws/
 
 tcp_gateway 演进（二期界面语义化、三期多前端）见情报「tcp_gateway 演进路线」条目——不许止步 v1。
 
-## 同步机制（现状）
+## 同步机制（已实践 2026-09-05）
 
-- 仓库含 Database/ 大二进制，Jetson **不可整体 clone**——Windows ↔ Jetson 同步机制待敲定（候选：sftp/rsync 定向推送 src、或 git over ssh 子目录）
-- 暂定工作流：Windows 本机开发 → pytest/模拟验证 → 推送 `src/` 到 Jetson `~/ROS2/arm_ws/src` → `colcon build --packages-select <包>` → 真机只读小步验证
+- 仓库含 Database/ 大二进制，Jetson **不可整体 clone**——用免密 SSH + `scp -r` 定向推送 `src/` 各包（key：`~/.ssh/id_ed25519_jetson_go2`）
+- 标准工作流（已跑通三轮）：Windows 本机开发 → pytest 全绿 → `scp -r src/<包> → ~/ROS2/arm_ws/src/` → Jetson `colcon build --packages-select <包>` → 真机小步验证
+- Jetson 新终端必须显式 `source /opt/ros/humble/setup.bash && source ~/ROS2/arm_ws/install/setup.bash`（bashrc 未配）
+
+## 开发进度（2026-09-05）
+
+| 包 | 状态 |
+|---|---|
+| arm_interfaces | ✅ 5 msg/7 srv 契约（含 CanFrame） |
+| arm_protocol | ✅ 全移植，pytest 5212（黄金向量+随机对拍），真机只读验收过 |
+| can_bridge | ✅ 真机双向验证通过 |
+| arm_controller | ⏳ 下一步（V3 相位跟踪/限幅判定归此包） |
+| tcp_gateway / arm_bringup | ⏳ 待做 |

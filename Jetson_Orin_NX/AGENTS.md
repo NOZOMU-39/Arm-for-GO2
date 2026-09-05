@@ -6,7 +6,7 @@
 
 ## 快速接入
 
-- SSH：`192.168.31.114` / `nvidia` / 密码 `1`（登录界面有提示；sudo 密码同 `1`）
+- SSH：`192.168.31.114` / `nvidia` / 密码 `1`（登录界面有提示；sudo 密码同 `1`）；**免密已配（2026-09-05）**：Windows `~/.ssh/id_ed25519_jetson_go2`（无口令，`ssh -i` 直连；旧带口令密钥备份为 `.old-passphrase`）
 - **远程操作可见性（用户规定）**：一切 Jetson 操作在 Jetson 的 tmux `ops` 会话内执行（send-keys + capture-pane），用户桌面「查看Claude操作」实时可见；不得旁路 SSH 直连（详见 `AI间交流\AGENTS.md` 规则 8）
 - 临时文件一律 `/tmp/claude/`（重启自动清，不留垃圾）；Jetson 重启后 tmux 会话需重建
 - 日常写码环境：Jetson 上已装 VS Code + Claude Code（DeepSeek 供应商）
@@ -41,12 +41,17 @@
 - **领域边界**：IMU 域工作归 IMU 会话（`Database\IMU`），跨域只讨论不定案不落盘；情报写入须用户明确同意
 - 禁更新包列表（hold）：nvidia-l4t-display-kernel / nvidia-l4t-kernel / -dtbs / -headers / -oot-headers / -oot-modules
 
-## 下一步（接手入口）
+## ROS2 控制栈（开发进度 2026-09-05）
 
-- **第一期包（定案顺序）**：arm_interfaces → arm_protocol → can_bridge → arm_controller → tcp_gateway → arm_bringup，源码在 `ROS2\arm_ws\`，Jetson `~/ROS2/arm_ws` 为构建副本——尚未开始
-- **tcp_gateway 演进备忘（不许止步 v1）**：v1 帧透传(ESP32 TCP 兼容，界面零改动) → 二期界面语义化+安全链下沉 arm_controller（界面 PROTO_CORE 退役）→ 三期多前端接入；每期完成即触发下一期（详见情报「tcp_gateway 演进路线」条目）
-- Windows 仓库 ↔ Jetson 同步机制待敲定（本仓库含大二进制不可整体 clone；候选 sftp/rsync 定向推送或 git over ssh）
-- 收发/链路已验证；电机闭环待接电机实测
+- **第一期六包已完三**：arm_interfaces（5 msg/7 srv）→ arm_protocol（协议库全移植，pytest 5212）→ can_bridge（真机双向打通）——详见情报「Jetson 控制栈开发进度」条目；剩 arm_controller → tcp_gateway → arm_bringup
+- **同步机制（已实践）**：Windows 改源码 → `scp -i ~/.ssh/id_ed25519_jetson_go2 -r ROS2/arm_ws/src/<包> nvidia@…:~/ROS2/arm_ws/src/` → tmux ops 内 `cd ~/ROS2/arm_ws && source /opt/ros/humble/setup.bash && colcon build --packages-select <包>` → `source install/setup.bash`
+- **⚠️ 新终端环境**：bashrc 未配 ROS——每个新 tmux 会话必须显式 `source /opt/ros/humble/setup.bash && source ~/ROS2/arm_ws/install/setup.bash`（否则 ros2 命令找不到）
+- **⚠️ Humble 兼容（2026-09-05 真机踩坑）**：无 `QoSPresetProfile`（用 `QoSProfile(depth=100, history=HistoryPolicy.KEEP_LAST)`）；CLI `topic pub/echo` 默认 BEST_EFFORT 与节点 RELIABLE 不匹配——CLI 测试要加 `--qos-reliability reliable`；接口包构建需 rosidl_default_generators（已装）
+- **ROS2 节点跑法**：`ros2 run` 找 executable 有兼容怪癖（setuptools 新版装 bin/）→ 直接跑命令名（`can_bridge`）更稳
+- **can_bridge 真机验证工具链**：tools/real_probe.py（0x9A/0x92 快速探测）、tools/full_read_probe.py（全只读命令 static/dynamic 两段）；跑法见文件头注释
+- **协议改动联动纪律**：改交互界面 index.html（JS 源）→ 界面 Node 回归 → arm_protocol 重跑 `tools/gen_golden.js` + `gen_rand_vectors.js` → pytest 全绿 → 同步 Jetson
+- **tcp_gateway 演进备忘（不许止步 v1）**：v1 帧透传(ESP32 TCP 兼容，界面零改动) → 二期界面语义化+安全链下沉 arm_controller → 三期多前端接入（详见情报）
+- V3 相位跟踪/限幅判定（v3TrackOf/v3PosDual/limitBlock）归 arm_controller 轮移植（见界面测试文件）；电机闭环运动验证按 SOP 待 controller 阶段
 
 ## 日志与验证
 

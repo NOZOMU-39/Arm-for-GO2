@@ -9,6 +9,9 @@
 > 发现其他模块的问题,通过 `AI间交流\` 同步(更新前先问用户)。
 >
 > **目录定位（2026-09-05 用户定案）**：本界面＝Jetson 主控栈的 **Windows 操作前端**,与 `Jetson_Orin_NX\` 是客户端-服务端关系、**顶层目录保持独立不并入**;终态协议逻辑单一源化——**第 1 步在 arm_protocol 移植完成时执行**(PROTO_CORE 停止自维护、改指向 `Jetson_Orin_NX\ROS2\arm_ws\src\arm_protocol`),当前保留 USB/ESP32 直连(A 段只读验收/无 Jetson 兜底调试)。
+>
+> **⚠️ 协议改动联动纪律（2026-09-05 起）**：本文件是 arm_protocol 的 **JS 移植源**——改任何协议逻辑（组帧/解析/角度模型）后必须三同步：
+> ① 界面侧 Node 回归（`测试\proto_core_test.js`）全绿 → ② Jetson 侧重跑两个黄金生成器（`arm_protocol\tools\gen_golden.js` + `gen_rand_vectors.js`，输入本 index.html）→ pytest 全绿 → ③ 同步 Jetson 副本 + colcon build。**不许只改一边**（黄金向量是 Python 版与 JS 版逐字节一致的验收尺）。
 
 ## 1. 项目定位与目录
 
