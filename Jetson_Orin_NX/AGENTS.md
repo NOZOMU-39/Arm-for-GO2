@@ -43,6 +43,11 @@
 
 ## ROS2 控制栈（开发进度 2026-09-05）
 
+- **包地图与边界规则（2026-09-05 架构决议，勿破）**：
+  - **命名规律**：`arm_` 前缀 = 臂脉塔电机域专属（interfaces/protocol/can_bridge/controller）；**外设（IMU/摄像头/手柄）独立 driver 包、用自己的名**（如 hi12s2_imu），不并入臂域；ROS 惯例=协议随设备走，**arm_protocol 只装脉塔电机协议**，其余设备协议归各自 driver，不得并入（边界声明在包 README）
+  - **arm_controller = 臂主控总包，一名到底**（命名决议：曾议拆 supervisor+controller，撤销——中小型项目一包演进更常用）：一期=档案/轮询/安全链/流程服务；**二期控制算法模块（后坐抑制等）挂入本包 control/ 或作扩展节点**，届时安全语义=controller 持总闸与授权包络、算法在包络内自主（生成 vs 执行判据写架构文档）
+  - **tcp_gateway = Windows 前端（公用）↔ Jetson 统一入口**（非 arm 专属，故不叫 arm_gateway）：一期 v1 帧透传（臂域）→ 二期语义化接 controller → 三期接入外设监控（IMU 曲线/手柄回显/摄像头状态）；**边界：视频走独立流不进帧网关；实验高频数据不出 Jetson（1kHz 采样本地 rosbag），前端只看降频**
+  - **单主纪律**：任何时刻总线只有一个轮询/命令主（Windows 界面或 Jetson 栈，二选一，v1 透传期=界面主、controller 只旁听不轮询）
 - **第一期六包已完三**：arm_interfaces（5 msg/7 srv）→ arm_protocol（协议库全移植，pytest 5212）→ can_bridge（真机双向打通）——详见情报「Jetson 控制栈开发进度」条目；剩 arm_controller → tcp_gateway → arm_bringup
 - **同步机制（已实践）**：Windows 改源码 → `scp -i ~/.ssh/id_ed25519_jetson_go2 -r ROS2/arm_ws/src/<包> nvidia@…:~/ROS2/arm_ws/src/` → tmux ops 内 `cd ~/ROS2/arm_ws && source /opt/ros/humble/setup.bash && colcon build --packages-select <包>` → `source install/setup.bash`
 - **⚠️ 新终端环境**：bashrc 未配 ROS——每个新 tmux 会话必须显式 `source /opt/ros/humble/setup.bash && source ~/ROS2/arm_ws/install/setup.bash`（否则 ros2 命令找不到）
