@@ -138,7 +138,7 @@
                 <span><button class="ok">🎯 位置控制</button></span>
               </div>
               <div class="grp">
-                <button id="btnMarkRest" data-tip="上电位置">📍 记为上电位置</button>
+                <button id="btnMarkRest" data-tip="上电位置">📍 记录机械臂上电位置</button>
                 <button id="btnSetDefault" data-tip="把当前选中电机的当前位置记为默认位置（每个电机独立）">📍 设置当前位置为默认位置</button>
                 <button id="btnMoveDefault" data-tip="所有已设置默认位置的电机移动到各自默认位置（限幅校验通过才发送，需确认）">🏠 移动到默认位置</button>
               </div>
@@ -320,36 +320,27 @@ function renderCards() {
   });
 }
 
-/* ---------- 上电位置按钮状态(选中电机联动) ---------- */
-function updateBtn() {
-  const m = mById(selectedId);
-  if (!m || m.proto === "V3") {
-    btnMarkRest.disabled = true;
-    btnMarkRest.dataset.tip = m ? `${m.name}:V3 无上电位置机制(用零点档案/E0 体系)` : "";
-    return;
-  }
-  btnMarkRest.disabled = false;
-  const has = typeof m.restDeg === "number";
-  btnMarkRest.dataset.tip = (has
-    ? (m.restStale ? "⚠️ 设零后已失效!\n" : `当前记录 ${m.restDeg.toFixed(2)}°(${m.restDegDate.slice(5)}),点击更新\n`)
-    : "未记录\n")
-    + "开电前必须人工把臂摆到的固定位置（建议低势能安全位，有刻度/凸点辅助更准）。"
-    + "上电后系统以此核对角度、纠正急停丢的圈数。\n"
-    + "换结构/换电机/重新设零后必须重新记录。";
-}
+/* ---------- 记录机械臂上电位置(臂级一键:全部 V4,不需选中电机) ---------- */
+function updateBtn() { /* 臂级按钮不依赖选中,常亮 */ }
+btnMarkRest.disabled = false;
+btnMarkRest.dataset.tip =
+  "一键记录全部 V4 电机的当前位置为「上电位置」(V3 除外)。\n"
+  + "开电前人工把整臂摆到固定姿态(建议低势能安全位+刻度/凸点),上电后系统以此核对角度、纠正急停丢圈。\n"
+  + "换结构/换电机/重新设零后必须重新记录。";
 btnMarkRest.onclick = async () => {
-  const m = mById(selectedId);
-  if (!m || m.proto === "V3") return;
-  const has = typeof m.restDeg === "number";
-  const ok = await showConfirm("记录上电位置",
-    `把 ${m.name}(#${m.id}) 当前位置 ${m.ang.toFixed(2)}° 记为上电位置?\n\n`
-    + (has ? `当前记录:${m.restDeg}°(${m.restDegDate})\n` : "当前未记录\n")
-    + "\n用途:每次开电前人工把臂摆到此位置,上电后核对角度纠正急停丢圈。\n换结构/换电机/重新设零后必须重新记录。");
+  const v4 = motors.filter(x => x.proto !== "V3");
+  if (!v4.length) return;
+  const stale = v4.filter(x => x.restStale);
+  const ok = await showConfirm("记录机械臂上电位置",
+    "把以下电机的当前位置记录为上电位置?\n"
+    + v4.map(x => `· ${x.name}(#${x.id}) → ${x.ang.toFixed(2)}°`).join("\n")
+    + (stale.length ? `\n(其中 ${stale.length} 台标记「需重标」,一并更新)` : "")
+    + "\n\n用途:每次开电前人工把整臂摆到此姿态,上电后核对角度纠正急停丢圈。\n换结构/换电机/重新设零后必须重新记录。");
   if (!ok) return;
-  m.restDeg = Math.round(m.ang * 100) / 100; m.restDegDate = "2026-09-06"; m.restStale = false;
-  addLog("sys", `${m.name}:上电位置记录 ${m.restDeg}°(${m.restDegDate})`);
-  renderCards(); updateBtn();
-  showBanner(`✅ ${m.name} 上电位置已记录 ${m.restDeg}°——开电前请把臂摆到此位置`);
+  v4.forEach(x => { x.restDeg = Math.round(x.ang * 100) / 100; x.restDegDate = "2026-09-06"; x.restStale = false; });
+  addLog("sys", "机械臂上电位置已记录:" + v4.map(x => `${x.name} ${x.restDeg}°`).join(" / "));
+  renderCards();
+  showBanner(`✅ 机械臂上电位置已记录(${v4.length} 台)——开电前请把整臂摆到此姿态`);
 };
 
 /* ---------- 设零流程(mock:V4 三步 + 上电位置失效联动提示 = 本次新增逻辑展示) ---------- */
@@ -378,7 +369,7 @@ async function setZeroMock(id) {
     addLog("sys", `✅ ${m.name} 零点已写入固件:当前位置 = 0°(V4 三步)`);
     if (typeof m.restDeg === "number") {
       m.restStale = true;
-      showBanner(`⚠️ ${m.name} 零点已更新——之前记录的上电位置(${m.restDeg.toFixed(2)}°)已失效:请把臂摆回上电参考位,点「📍 记为上电位置」重新记录`, true);
+      showBanner(`⚠️ ${m.name} 零点已更新——上电位置档案已失效(参考位显示角变了):把整臂摆回上电参考位后,点「📍 记录机械臂上电位置」重新记录`, true);
       addLog("warn", `${m.name}:上电位置档案失效,需重标`);
     }
   }

@@ -456,7 +456,7 @@ main { flex: 1; display: flex; min-height: 0; }
                 </span>
               </div>
               <div class="grp">
-                <button id="btnMarkRest" data-tip="上电位置">📍 记为上电位置</button>
+                <button id="btnMarkRest" data-tip="上电位置">📍 记录机械臂上电位置</button>
                 <button id="btnSetDefault" data-tip="把当前选中电机的当前位置记为默认位置（每个电机独立）">📍 设置当前位置为默认位置</button>
                 <button id="btnMoveDefault" data-tip="所有已设置默认位置的电机移动到各自默认位置（限幅校验通过才发送，需确认）">🏠 移动到默认位置</button>
               </div>
@@ -1335,7 +1335,7 @@ function selectMotor(id) {
   renderMotors();
   renderMotorCards();
   renderChartGrid();
-  updateMarkRestTip();
+  markRestTip();
   addLog("sys", `选中电机:${motorById(id).name}(#${id})`);
 }
 function uiAddMotor() {
@@ -2046,57 +2046,45 @@ function updateCardAngle(id) {
 }
 
 /* 上电位置按钮动态提示:选中电机(V4)显示档案值/失效态;V3 禁用提示(2026-09-06 demo 定稿) */
-function updateMarkRestTip() {
+/* 记录机械臂上电位置(2026-09-06 用户定稿:臂级一键,记录全部 V4 电机当前协议角)。
+   内部字段 restDeg/restDegDate/turnDeg;取值基准 = 协议角(显示角 − E4),
+   与 Jetson rest_calib 读角(raw 0x92)同基准;turnDeg = 转子 1 圈输出角
+   (X6-40 36:1→10°,X2-7 28.17:1→12.78),首次记录自动填。
+   用途:开电前人工把整臂摆到此姿态,上电后校正工具以此核对角度、纠正急停丢圈。
+   重标触发:换结构/换电机/重新设零后必须重新记录(设零会自动标失效)。 */
+function markRestTip() {
   const btn = document.getElementById("btnMarkRest");
   if (!btn) return;
-  const m = motorById(selectedId);
-  if (m && m.proto === "V3") {
-    btn.disabled = true;
-    btn.dataset.tip = `${m.name}:V3 无上电位置机制(用零点档案/E0 体系)`;
-    return;
-  }
-  btn.disabled = false;
-  if (!m) {
-    btn.dataset.tip = "未选中电机——先点选一台 V4 电机(如大臂/小臂/腕/末端)";
-    return;
-  }
-  const has = typeof m.restDeg === "number" && isFinite(m.restDeg);
-  btn.dataset.tip = (has
-    ? (m.restStale ? "⚠️ 设零后已失效!请重标\n" : `当前记录 ${m.restDeg.toFixed(2)}°(${m.restDegDate ? m.restDegDate.slice(5) : "?"}),点击更新\n`)
-    : "未记录\n")
-    + "开电前必须人工把臂摆到的固定位置（建议低势能安全位，有刻度/凸点辅助更准）。"
-    + "上电后系统以此核对角度、纠正急停丢的圈数。\n"
+  btn.disabled = false;   // 臂级按钮不依赖选中,常亮
+  btn.dataset.tip =
+    "一键记录全部 V4 电机的当前位置为「上电位置」(V3 除外)。\n"
+    + "开电前人工把整臂摆到固定姿态(建议低势能安全位+刻度/凸点),上电后系统以此核对角度、纠正急停丢圈。\n"
     + "换结构/换电机/重新设零后必须重新记录。";
 }
-
-/* 记为上电位置(2026-09-06 用户定名;内部字段 restDeg = 掉电自落谷位的协议角档案)。
-   用途:掉电/急停甩动丢圈后,臂自落回此位置,校正工具(rest_calib, Jetson 侧)以此核对圈数。
-   ⚠️ 取值基准 = 协议角(显示角 − E4),与 Jetson rest_calib 读角(raw 0x92)同基准;
-      turnDeg = 转子 1 圈对应输出角(X6-40 36:1→10°,X2-7 28.17:1→12.78),首次记录自动填。
-   重标触发:换结构/换电机/重新设零后必须重新记录(否则校正会按旧位置错判)。 */
-async function markRest(id) {
-  const m = motorById(id); if (!m) return;
-  if (typeof lastAngle[id] !== "number") { showBanner("尚无角度读数,请稍候再试", true); return; }
-  const raw = lastAngle[id] - e4Of(m);
-  const old = (typeof m.restDeg === "number" && isFinite(m.restDeg))
-    ? `当前记录:${m.restDeg.toFixed(2)}°${m.restDegDate ? "(" + m.restDegDate.slice(5) + ")" : ""}\n` : "";
-  const ok = await showConfirm("记录上电位置",
-    `把 ${m.name}(#${id}) 当前位置 ${raw.toFixed(2)}° 记为上电位置?\n\n` +
-    `用途:以后每次开电前,人工把臂摆到此位置,上电后系统以此核对角度、纠正急停丢的圈数。\n` +
-    old +
-    `注意:换结构/换电机/重新设零后,必须重新记录。`);
+async function markRest() {
+  const v4 = motors.filter(x => x.proto !== "V3" && typeof lastAngle[x.id] === "number");
+  if (!v4.length) { showBanner("尚无 V4 电机角度读数,请稍候再试", true); return; }
+  const staleN = v4.filter(x => x.restStale).length;
+  const ok = await showConfirm("记录机械臂上电位置",
+    "把以下电机的当前位置记录为上电位置?\n"
+    + v4.map(x => `· ${x.name}(#${x.id}) → ${(lastAngle[x.id] - e4Of(x)).toFixed(2)}°`).join("\n")
+    + (staleN ? `\n(其中 ${staleN} 台标记「需重标」,一并更新)` : "")
+    + "\n\n用途:每次开电前人工把整臂摆到此姿态,上电后核对角度纠正急停丢圈。\n换结构/换电机/重新设零后必须重新记录。");
   if (!ok) return;
-  m.restDeg = Math.round(raw * 100) / 100;
-  m.restDegDate = new Date().toISOString().slice(0, 10);
-  m.restStale = false;   // 重标清除失效标记
-  if (!(typeof m.turnDeg === "number" && isFinite(m.turnDeg) && m.turnDeg > 0)) {
-    m.turnDeg = (m.proto === "V44") ? 12.78 : 10.0;
-  }
+  const today = new Date().toISOString().slice(0, 10);
+  v4.forEach(x => {
+    x.restDeg = Math.round((lastAngle[x.id] - e4Of(x)) * 100) / 100;
+    x.restDegDate = today;
+    x.restStale = false;
+    if (!(typeof x.turnDeg === "number" && isFinite(x.turnDeg) && x.turnDeg > 0)) {
+      x.turnDeg = (x.proto === "V44") ? 12.78 : 10.0;
+    }
+  });
   saveMotors();
   renderMotorCards(); renderChartGrid();
-  updateMarkRestTip();
-  addLog("sys", `${m.name}:上电位置记录 ${m.restDeg}°(${m.restDegDate})`);
-  showBanner(`✅ ${m.name} 上电位置已记录 ${m.restDeg}°——开电前请把臂摆到此位置`);
+  markRestTip();
+  addLog("sys", "机械臂上电位置已记录:" + v4.map(x => `${x.name} ${x.restDeg}°`).join(" / "));
+  showBanner(`✅ 机械臂上电位置已记录(${v4.length} 台)——开电前请把整臂摆到此姿态`);
 }
 
 /* 设为零点(当前位置 = 机械零点 0°;用户 2026-08-26 反馈:不需要输入框,直接按钮)
@@ -2162,7 +2150,7 @@ async function setZeroNow(id) {
       // ⚠️ 2026-09-06:设零后上电位置档案失效(零点变了,参考位的显示角也变)——提示重标
       if (typeof m.restDeg === "number" && isFinite(m.restDeg)) {
         m.restStale = true;   // 卡片/按钮显示"需重标",重标后清除
-        showBanner(`⚠️ ${m.name} 零点已更新——之前记录的上电位置(${m.restDeg.toFixed(2)}°)已失效:请把臂摆回上电参考位,点「📍 记为上电位置」重新记录`, true);
+        showBanner(`⚠️ ${m.name} 零点已更新——上电位置档案已失效(参考位显示角变了):把整臂摆回上电参考位后,点「📍 记录机械臂上电位置」重新记录`, true);
       }
     }
   } finally {
@@ -2566,12 +2554,8 @@ function init() {
   document.getElementById("btnDisableAll").onclick = btnDisable;
   document.getElementById("btnSetDefault").onclick = btnSetDefaultPos;
   document.getElementById("btnMoveDefault").onclick = btnMoveDefault;
-  document.getElementById("btnMarkRest").onclick = () => {
-    const m = motorById(selectedId);
-    if (!m) { showBanner("请先点选要操作的电机", true); return; }
-    if (m.proto !== "V3") markRest(m.id);
-  };
-  updateMarkRestTip();
+  document.getElementById("btnMarkRest").onclick = () => markRest();
+  markRestTip();
   document.getElementById("btnMethod").addEventListener("mousedown", methodPressStart);
   document.getElementById("btnMethod").addEventListener("mouseup", methodPressCancel);
   document.getElementById("btnMethod").addEventListener("mouseleave", methodPressCancel);
