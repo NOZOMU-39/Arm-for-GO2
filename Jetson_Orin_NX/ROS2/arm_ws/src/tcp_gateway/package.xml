@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>tcp_gateway</name>
+  <version>0.1.0</version>
+  <description>Windows 前端(公用)与 Jetson 的统一 TCP 入口。v1 帧透传(仿 ESP32 v2.1.3 协议, 界面 wifi_can_client 零改动可用); 二期语义化接 arm_controller; 三期外设监控。帧协议编解码在 frames.py(纯 Python 零 ROS 依赖)。</description>
+  <maintainer email="nozomu@example.com">NOZOMU</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
+
+  <exec_depend>python3</exec_depend>
+  <exec_depend>arm_interfaces</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
