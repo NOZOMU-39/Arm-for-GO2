@@ -1,0 +1,17 @@
+[Unit]
+Description=Arm control stack (can_bridge + tcp_gateway, UI-master mode)
+# 依赖网络与 can0 就绪后启动(不阻塞: can0 缺失时 wrapper 内部等待)
+After=network-online.target can0.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nvidia
+# 容错: 先等 can0 出现(最多 60s, 每 2s 检查); USB-CAN 未插时安静等待循环, 不崩不刷屏
+# 起后 = 界面主模式(can_bridge + tcp_gateway); 自主任模式手动: controller:=true
+ExecStart=/bin/bash -lc 'source /opt/ros/humble/setup.bash && source /home/nvidia/ROS2/arm_ws/install/setup.bash; for i in $(seq 1 30); do [ -e /sys/class/net/can0 ] && break; sleep 2; done; exec ros2 launch arm_bringup arm_bringup.launch.py'
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

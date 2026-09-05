@@ -1,0 +1,12 @@
+[Unit]
+Description=Arm network watchdog (notify when no network at all)
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/home/nvidia/.local/bin/arm-net-watch.sh
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

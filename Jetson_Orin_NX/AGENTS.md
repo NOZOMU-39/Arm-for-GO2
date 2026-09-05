@@ -4,6 +4,14 @@
 > 事实层（硬件/协议/结论）以 `AI间交流\情报.md` Jetson 条目为准；本文件只放 AI 干活要用的对接信息。
 > **目录边界（2026-09-05 用户定案）**：本目录只放 Jetson 板上运行的内容（`ROS2\arm_ws\`＝ROS2 源码单一源，与 Jetson 侧 `~/ROS2/arm_ws` 同名镜像）；Windows 操作前端＝顶层 `机械臂操作交互界面\`，与本目录是客户端-服务端关系（tcp_gateway 接入），**不并入本目录**；其协议逻辑第 1 步单一源化时改指向 `ROS2\arm_ws\src\arm_protocol`。
 
+## 系统部署件（2026-09-06 安装，源码归档 `Jetson_Orin_NX\deploy\`，勿忘勿乱改）
+
+- **arm-stack.service**（/etc/systemd/system，开机自启）：界面主模式控制栈（can_bridge+tcp_gateway），等 can0 容错（缺失安静等待不崩）。运维：`systemctl restart arm-stack`、`journalctl -u arm-stack -n 50`；自主任模式先 `systemctl stop arm-stack` 再手动 launch controller:=true
+- **arm-ip**（/usr/local/bin）：查 Jetson 当前 IP+栈状态（野外第一步）；界面连哪个 IP 以它为准（DHCP 会变）
+- **arm-net-watch**（用户自启服务）：网络三档策略哨兵——有线优先（NM 默认）/没线连 NOZOMU 热点（autoconnect）/双无桌面提醒。状态文件 /tmp/claude/net_state
+- 网络策略文档与安装脚本：`deploy\README.md` + `deploy\install.sh`（换机/重刷一键恢复）
+- ⚠️ SSH 地址随网络变：实验室 192.168.31.x（有线 DHCP）或 192.168.137.x（热点）——连不上先 `arm-ip`/扫网段
+
 ## 快速接入
 
 - SSH：`192.168.31.114` / `nvidia` / 密码 `1`（登录界面有提示；sudo 密码同 `1`）；**免密已配（2026-09-05）**：Windows `~/.ssh/id_ed25519_jetson_go2`（无口令，`ssh -i` 直连；旧带口令密钥备份为 `.old-passphrase`）
