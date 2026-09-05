@@ -458,6 +458,7 @@ main { flex: 1; display: flex; min-height: 0; }
               <div class="grp">
                 <button id="btnSetDefault" data-tip="把当前选中电机的当前位置记为默认位置（每个电机独立）">📍 设置当前位置为默认位置</button>
                 <button id="btnMoveDefault" data-tip="所有已设置默认位置的电机移动到各自默认位置（限幅校验通过才发送，需确认）">🏠 移动到默认位置</button>
+                <button id="btnMarkRest" data-tip="上电位置">📍 记为上电位置</button>
               </div>
               <div class="grp">
                 <button class="danger" id="btnEStop" data-tip="紧急停止：全部电机停止保持（停在当前位置，不掉力）。无需确认，一键直达">🛑 紧急停止(保持)</button>
@@ -1334,7 +1335,27 @@ function selectMotor(id) {
   renderMotors();
   renderMotorCards();
   renderChartGrid();
+  updateMarkRestBtn();
   addLog("sys", `选中电机:${motorById(id).name}(#${id})`);
+}
+/* 上电位置按钮状态:V4 可用(V3 无此机制);已记录时 tip 显示当前档案值 */
+function updateMarkRestBtn() {
+  const btn = document.getElementById("btnMarkRest");
+  if (!btn) return;
+  const m = motorById(selectedId);
+  if (!m || m.proto === "V3") {
+    btn.disabled = true;
+    btn.dataset.tip = m ? `${m.name}:V3 无上电位置机制(用零点档案/E0 体系)` : "";
+    return;
+  }
+  btn.disabled = false;
+  const has = typeof m.restDeg === "number" && isFinite(m.restDeg);
+  btn.dataset.tip = (has
+    ? `当前记录 ${m.restDeg.toFixed(2)}°${m.restDegDate ? "(" + m.restDegDate.slice(5) + ")" : ""}，点击更新\n`
+    : "未记录\n")
+    + "开电前必须人工把臂摆到的固定位置（建议低势能安全位，有刻度/凸点辅助更准）。"
+    + "上电后系统以此核对角度、纠正急停丢的圈数。\n"
+    + "换结构/换电机/重新设零后必须重新记录。";
 }
 function uiAddMotor() {
   const id = normId(document.getElementById("addId").value);
@@ -2003,14 +2024,6 @@ function renderMotorCards() {
         <button data-tip="确认：写入角度下限">确认</button>
         <span class="hint">°</span>
       </div>
-      ${m.proto === "V3" ? "" : `
-      <div class="mrow" id="restRow_${m.id}">
-        <label data-tip="开电前必须人工把臂摆到的固定位置（建议低势能安全位，有刻度/凸点辅助更准）。上电后系统以此核对角度、纠正急停丢的圈数（不会让电机自己动，只是记录位置做比对）">上电位置</label>
-        <span class="hint" id="restVal_${m.id}">${typeof m.restDeg === "number" && isFinite(m.restDeg)
-            ? m.restDeg.toFixed(2) + "°" + (m.restDegDate ? "（" + m.restDegDate.slice(5) + "）" : "")
-            : "未记录"}</span>
-        <button id="restBtn_${m.id}" data-tip="把当前位置记为上电位置。仅当：①已人工把臂摆到固定的上电参考位 ②刚设过零点（显示角度 = 真实角度）。注意：换结构/换电机/重新设零后，必须重新记录">📍 记为上电位置</button>
-      </div>`}
       <div class="mtip" data-tip="">单击选中 · 双击进入单电机操控（键盘 ↑↓ 运动 / ←→ 切电机）</div>`;
     card.onclick = () => selectMotor(m.id);
     card.ondblclick = () => openSingleView(m.id);
@@ -2021,9 +2034,6 @@ function renderMotorCards() {
     card.querySelectorAll("button")[0].onclick = (e) => { e.stopPropagation(); setZero(); };
     card.querySelectorAll("button")[1].onclick = (e) => { e.stopPropagation(); setMax(); };
     card.querySelectorAll("button")[2].onclick = (e) => { e.stopPropagation(); setMin(); };
-    // 上电位置按钮(V4 卡片才有;独立 id 绑定,不占 querySelectorAll 索引)
-    const rb = document.getElementById("restBtn_" + m.id);
-    if (rb) rb.onclick = (e) => { e.stopPropagation(); markRest(m.id); };
     card.querySelectorAll("input")[0].onclick = (e) => e.stopPropagation();
     card.querySelectorAll("input")[1].onclick = (e) => e.stopPropagation();
     card.querySelectorAll("input")[0].onmousedown = (e) => e.stopPropagation();
@@ -2540,6 +2550,8 @@ function init() {
   document.getElementById("btnDisableAll").onclick = btnDisable;
   document.getElementById("btnSetDefault").onclick = btnSetDefaultPos;
   document.getElementById("btnMoveDefault").onclick = btnMoveDefault;
+  document.getElementById("btnMarkRest").onclick = () => { const m = motorById(selectedId); if (m) markRest(m.id); };
+  updateMarkRestBtn();
   document.getElementById("btnMethod").addEventListener("mousedown", methodPressStart);
   document.getElementById("btnMethod").addEventListener("mouseup", methodPressCancel);
   document.getElementById("btnMethod").addEventListener("mouseleave", methodPressCancel);
