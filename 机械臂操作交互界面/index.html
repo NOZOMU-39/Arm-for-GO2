@@ -1975,7 +1975,14 @@ async function limitModalMoveDefault() {
   }
   addLog("sys", `限幅恢复完成:${withDef.length} 台回默认位置,${noDef.length} 台停止保持`);
 }
+/* 连接初期自动校正未完成 = 显示角可能含未校正丢圈 → 限幅监控/运动都不可信 */
+function calibPending() {
+  if (autoCalibDone) return false;
+  return motors.some(x => x.proto !== "V3" && !x.restStale
+    && typeof x.restDeg === "number" && isFinite(x.restDeg));
+}
 function monitorLimit(m, ang, spd, iq) {
+  if (calibPending()) return;   // ⚠️ 2026-09-06: 校正前跳监控——曾致小臂未越限却报限幅(丢圈显示角超限误报+误发0x81)
   if (!m) return;
   const d = k => (typeof m[k] === "number" && isFinite(m[k])) ? m[k] : null;
   const lo = d("limMinDeg"), hi = d("limMaxDeg"), limSpd = d("limMaxSpd"), limIq = d("limMaxIq");
@@ -2319,6 +2326,10 @@ async function moveToAngle(m, deg, note, spdDps) {
 }
 /* 发送绝对位置(免 limitBlock——限幅恢复等动作豁免,报警电机处于越限锁定态也能恢复) */
 async function sendToAngle(m, deg, spdDps, note) {
+  if (calibPending()) {   // ⚠️ 2026-09-06: 校正前发送目标不可信(丢圈未折回),短暂拦截(约1-2s)
+    showBanner("正在核对上电位置,请稍候(1~2 秒)…", true);
+    return false;
+  }
   const spd = spdDps || 60;
   if (m.proto === "V3") {
     const t = v3TrackOf(m);
