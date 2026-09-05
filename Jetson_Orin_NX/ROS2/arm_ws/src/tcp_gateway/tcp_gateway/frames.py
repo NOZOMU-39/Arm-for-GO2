@@ -34,13 +34,24 @@ MAX_FRAME = 4096
 # ---------- 解码(收) ----------
 
 def recv_exact(sock, n: int, timeout: float = 1.0) -> bytes | None:
-    """读满 n 字节; 超时/断开返回 None"""
+    """读满 n 字节。
+
+    语义(2026-09-06 修复, 曾致设零断连):
+      - 对端关闭(recv 返回空) / 其他 OSError / 半帧超时(已读部分数据后静默=流损坏) → None(断开)
+      - 纯静默超时(一个字节都没收到) → 抛 TimeoutError(上层继续等待, 不踢客户端)
+    背景: 旧实现把"超时"与"断开"都返回 None → 界面设零节奏(0x64 后停 1s、
+    0x76 后停 10s, 期间暂停轮询不发帧)停发 >1s 即被 gateway 踢下线, 0x76 永远发不出。
+    """
     sock.settimeout(timeout)
     buf = b""
     while len(buf) < n:
         try:
             chunk = sock.recv(n - len(buf))
-        except (TimeoutError, OSError):
+        except TimeoutError:
+            if buf:
+                return None  # 半帧超时: 协议流已损坏, 断开等客户端重连
+            raise            # 纯静默: 客户端只是停顿(设零节奏), 上层 continue
+        except OSError:
             return None
         if not chunk:
             return None

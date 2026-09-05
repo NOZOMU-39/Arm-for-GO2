@@ -25,7 +25,10 @@
   "limMaxDeg": 94,
   "limMinDeg": -40,
   "E4": 0,
-  "defaultPosDeg": 80
+  "defaultPosDeg": 80,
+  "restDeg": 93.69,
+  "turnDeg": 10.0,
+  "restDegDate": "2026-09-06"
  },
  {
   "id": 3,
@@ -38,7 +41,10 @@
   "limMaxDeg": 77,
   "limMinDeg": -171,
   "E4": 0,
-  "defaultPosDeg": -159.99
+  "defaultPosDeg": -159.99,
+  "restDeg": -170.46,
+  "turnDeg": 10.0,
+  "restDegDate": "2026-09-06"
  },
  {
   "id": 4,
@@ -51,7 +57,10 @@
   "limMinDeg": -124,
   "E0": null,
   "E4": 0,
-  "defaultPosDeg": -10
+  "defaultPosDeg": -10,
+  "restDeg": 16.45,
+  "turnDeg": 12.78,
+  "restDegDate": "2026-09-06"
  },
  {
   "id": 5,
@@ -64,6 +73,9 @@
   "limMinDeg": -110,
   "limMaxDeg": 110,
   "E4": 0,
-  "defaultPosDeg": 0
+  "defaultPosDeg": 0,
+  "restDeg": 0.02,
+  "turnDeg": 12.78,
+  "restDegDate": "2026-09-06"
  }
 ]

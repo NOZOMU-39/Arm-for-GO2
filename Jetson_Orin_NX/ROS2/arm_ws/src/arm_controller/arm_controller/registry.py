@@ -6,6 +6,12 @@
   E0 V3 零点档案(固件角,数值或 None) | E0Date str|None | v9cSemantics "pulse"/"angle"|None
   limMinDeg/limMaxDeg 软件限位(°|None=未设) | limMaxSpd/limMaxIq 可选(°|A,None=未设)
   E4 V4 显示偏移(缺省 0) | defaultPosDeg 默认位置(°|None)
+  restDeg V4 低势能自落谷位期望显示角(°|None, 2026-09-06 自落参考校正档案)
+          ⚠️ 结构参数非永久常量: 结构更改/重新设零/换电机后谷位变化 → 必须人工重标
+          (rest_calib.py --mark-rest, 见 arm_controller AGENTS 与情报 09-06 条目)
+  restDegDate 谷位档案标定日期(str|None)
+  turnDeg V4 转子 1 圈对应输出角(°|None, X6-40=10.0(36:1)、X2-7≈12.78(28.17:1);
+          急停甩动丢圈的输出单位 = N×turnDeg; 随减速比固件档案, 换电机需核对)
 规范化失败抛 ValueError(中文); 不存在的键保持原样由调用方承载。
 """
 from __future__ import annotations
@@ -13,7 +19,7 @@ from __future__ import annotations
 PROTOS = ("V3", "V43", "V44")
 
 _FLOAT_FIELDS = ("gear", "dir", "E0", "E4", "limMinDeg", "limMaxDeg",
-                 "limMaxSpd", "limMaxIq", "defaultPosDeg")
+                 "limMaxSpd", "limMaxIq", "defaultPosDeg", "restDeg", "turnDeg")
 
 
 def _opt_num(m: dict, k: str):
@@ -45,6 +51,9 @@ def normalize(raw: dict) -> dict:
         "limMaxIq": None,
         "E4": 0.0,
         "defaultPosDeg": None,
+        "restDeg": None,
+        "restDegDate": None,
+        "turnDeg": None,
     }
     for k, v in raw.items():
         if k in ("id", "name", "proto"):
@@ -57,6 +66,9 @@ def normalize(raw: dict) -> dict:
             continue
         if k == "E0Date":
             out["E0Date"] = str(v) if v else None
+            continue
+        if k == "restDegDate":
+            out["restDegDate"] = str(v) if v else None
             continue
         if k in _FLOAT_FIELDS:
             x = _opt_num(raw, k)

@@ -102,9 +102,12 @@ class GatewayNode(Node):
     def _client_loop(self, conn: socket.socket, addr):
         try:
             while not self._stop.is_set():
-                got = decode_frame(conn)
+                try:
+                    got = decode_frame(conn)
+                except TimeoutError:
+                    continue                  # 客户端静默(设零节奏等) → 继续等, 不踢
                 if got is None:
-                    break                      # 断开/超时
+                    break                     # 断开/帧损坏
                 ftype, payload = got
                 if ftype == FRAME_CAN_SEND:    # CAN 发送帧 → 总线
                     r = decode_can_send(payload)

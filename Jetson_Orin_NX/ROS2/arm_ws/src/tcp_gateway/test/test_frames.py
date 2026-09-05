@@ -81,3 +81,56 @@ def test_socket_roundtrip():
     finally:
         a.close()
         b.close()
+
+
+# ---- 2026-09-06 回归: 客户端静默(设零节奏停发 >1s)不得被踢下线 ----
+# 背景: recv_exact 旧实现把"超时"与"断开"都返回 None → gateway 1s 无数据即断客户端,
+# 界面设零 0x64 后停 1s/0x76 后停 10s 必撞 → 0x76 发送失败(真机 03:16 事故)。
+# 修后语义: 纯静默超时 → TimeoutError(上层 continue); 半帧超时/对端关闭 → None(断开)。
+
+
+class _Sock:
+    """可控 socket 替身: 按序返回数据, 空列表时抛 TimeoutError(静默)"""
+
+    def __init__(self, chunks):
+        self._chunks = list(chunks)
+        self._timeout = None
+
+    def settimeout(self, t):
+        self._timeout = t
+
+    def recv(self, n):
+        if not self._chunks:
+            raise TimeoutError("静默超时")
+        c = self._chunks.pop(0)
+        return c
+
+
+def test_recv_exact_silent_timeout_raises():
+    """纯静默(无任何字节)超时 → 抛 TimeoutError(上层继续等, 不踢)"""
+    from tcp_gateway.frames import recv_exact
+    with pytest.raises(TimeoutError):
+        recv_exact(_Sock([]), 2, timeout=0.01)
+
+
+def test_recv_exact_peer_close_returns_none():
+    """对端关闭(recv 返回空) → None(断开)"""
+    from tcp_gateway.frames import recv_exact
+
+    class _Closed(_Sock):
+        def recv(self, n):
+            return b""
+
+    assert recv_exact(_Closed([]), 2, timeout=0.01) is None
+
+
+def test_recv_exact_half_frame_timeout_returns_none():
+    """半帧超时(已读部分后静默) → None(流损坏, 断开等重连)"""
+    from tcp_gateway.frames import recv_exact
+    assert recv_exact(_Sock([b"\x00"]), 2, timeout=0.01) is None
+
+
+def test_recv_exact_completes_across_chunks():
+    """分片到达仍能读满"""
+    from tcp_gateway.frames import recv_exact
+    assert recv_exact(_Sock([b"\x00", b"\x07"]), 2, timeout=0.01) == b"\x00\x07"
