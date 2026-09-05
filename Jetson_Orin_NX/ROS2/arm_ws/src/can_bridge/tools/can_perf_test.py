@@ -2,8 +2,10 @@
 """can_bridge 连续帧吞吐压测: 轮流发 5 电机 0x9A, 统计 rx 回复率与有效吞吐。
 
 用法(Jetson, tmux 会话内): python3 tools/can_perf_test.py
-2026-09-05 实测结论: 10ms/帧(每电机 50ms)零丢失; 3ms 极限丢 16% 且各电机均匀丢
-=电机固件处理上限, 非桥瓶颈。轮询节奏 >=10ms/帧 安全(已覆盖第一期需求)。
+⚠️ 结论修正(2026-09-05 三路计数实验): 本脚本旧注释"3ms 丢 16%"是 sleep 节拍抖动
+伪影——精确节拍后: 桥全程零丢, 电机固件边界=每电机 >=20ms(50Hz) 100% 可靠,
+<20ms 零星丢(16ms 0.8%/12ms 3.3%), 丢全在电机侧。
+"""
 import time
 import rclpy
 from rclpy.node import Node
