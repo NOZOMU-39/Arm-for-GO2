@@ -15,6 +15,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ArmStatus.msg"
   "msg/JointCmd.msg"
   "msg/RegistryEntry.msg"
+  "msg/CanFrame.msg"
   "srv/Scan.srv"
   "srv/SetZero.srv"
   "srv/SetLimits.srv"

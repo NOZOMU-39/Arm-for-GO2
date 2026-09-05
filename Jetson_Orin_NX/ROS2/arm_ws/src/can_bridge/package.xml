@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>can_bridge</name>
+  <version>0.1.0</version>
+  <description>can0 SocketCAN ↔ ROS2 帧桥：发布 /arm/can/rx（收帧，带到达时间戳），订阅 /arm/can/tx（发帧）。原始帧不解析（解析属 arm_protocol/arm_controller）。标准库 raw socket，无 python-can 依赖。</description>
+  <maintainer email="nozomu@example.com">NOZOMU</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>arm_interfaces</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
