@@ -86,6 +86,13 @@ def test_v3_9c_pulse_vs_angle():
     assert out_a["values"]["ang"] == 4660
 
 
+def test_v3_9c_pulse_zero_iq_no_neg_zero():
+    """真机 2026-09-05 暴露: V3 9C pulse 分支 dir=-1 零电流曾显示 -0.00A（归零漏网点）"""
+    frame = bytes([0x9C, 25, 0, 0, 0, 0, 0xA9, 0xBB])
+    out = parse.parse_reply("V3", 0x241, frame, {"gear": 6, "dir": -1})
+    assert "0.00A" in out["summary"] and "-0.00A" not in out["summary"], out["summary"]
+
+
 def test_decode79_reply():
     """0x79 读回复 D6-D7 是回复 CAN 地址 0x240+编号"""
     d = parse.decode79_reply(bytes([0x79, 0, 1, 0, 0, 0, 0x42, 0x02]))

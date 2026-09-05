@@ -99,9 +99,8 @@ def parse_reply(proto: str, can_id: int, data, motor=None) -> dict | None:
                                   f"速度 {rot2out(out['values']['spd'], rm)}dps · "
                                   f"角度 {rot2out(out['values']['ang'], rm)}°(0x9C)")
             else:
-                q = dir_of(rm)
                 out["summary"] = (f"温度 {out['values']['temp']}℃ · 电流 "
-                                  f"{(out['values']['iq'] * q):.2f}A(输出轴) · "
+                                  f"{amp2rot(out['values']['iq'], rm):.2f}A(输出轴) · "
                                   f"速度 {rot2out(out['values']['spd'], rm):.2f}dps(输出轴) · "
                                   f"编码器 {out['values']['enc']} 脉冲(转子侧原始)")
         elif cmd == 0x9D:
