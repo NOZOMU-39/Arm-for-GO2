@@ -12,7 +12,7 @@ import threading
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSPresetProfile
+from rclpy.qos import HistoryPolicy, QoSProfile
 
 from arm_interfaces.msg import CanFrame
 
@@ -30,13 +30,12 @@ class CanBridgeNode(Node):
         self.declare_parameter("retry_sec", 2.0)
 
         iface = self.get_parameter("iface").value
-        # rx 广播（可能多订阅者：controller/记录），tx 直通（低延迟）
+        # rx 广播（可能多订阅者：controller/记录），tx 直通（低延迟）；depth 100 容轮询突发
+        qos = QoSProfile(depth=100, history=HistoryPolicy.KEEP_LAST)
         self._pub_rx = self.create_publisher(
-            CanFrame, self.get_parameter("rx_topic").value,
-            QoSPresetProfile.SYSTEM_DEFAULT.value)
+            CanFrame, self.get_parameter("rx_topic").value, qos)
         self._sub_tx = self.create_subscription(
-            CanFrame, self.get_parameter("tx_topic").value,
-            self._on_tx, QoSPresetProfile.SYSTEM_DEFAULT.value)
+            CanFrame, self.get_parameter("tx_topic").value, self._on_tx, qos)
 
         self._can = CanSocket(iface)
         self._retry_sec = self.get_parameter("retry_sec").value
@@ -49,6 +48,7 @@ class CanBridgeNode(Node):
         self._tx_count = 0
         self._last_warn = 0.0
         self._open()
+        self._rx_thread.start()
 
     # ---------------- 底层 ----------------
 
@@ -85,6 +85,7 @@ class CanBridgeNode(Node):
             msg.dlc = len(data)
             msg.data = [b for b in data] + [0] * (8 - len(data))
             self._pub_rx.publish(msg)
+            self.get_logger().info(f"RX id=0x{can_id:03X} {data.hex(' ').upper()}")
 
     def _close_and_retry(self):
         self._can.close()
@@ -106,6 +107,7 @@ class CanBridgeNode(Node):
         try:
             self._can.send(msg.can_id, bytes(msg.data[:msg.dlc]))
             self._tx_count += 1
+            self.get_logger().info(f"TX id=0x{msg.can_id:03X} {bytes(msg.data[:msg.dlc]).hex(' ').upper()}")
         except CanError as e:
             self._err_count += 1
             self.get_logger().error(f"发送失败: {e}")
