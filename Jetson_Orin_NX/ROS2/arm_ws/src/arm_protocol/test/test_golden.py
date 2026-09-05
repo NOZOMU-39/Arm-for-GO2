@@ -20,7 +20,8 @@ def test_golden_file_exists():
 
 def test_golden_count_sane():
     doc = json.loads(GOLDEN_PATH.read_text(encoding="utf-8"))
-    assert doc["count"] >= 30, f"黄金向量条数异常少: {doc['count']}"
+    assert doc["frame_count"] >= 30, f"组帧黄金向量条数异常少: {doc['frame_count']}"
+    assert doc["parse_count"] >= 20, f"解析黄金向量条数异常少: {doc['parse_count']}"
 
 
 @pytest.mark.parametrize("case", [

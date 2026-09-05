@@ -9,19 +9,21 @@
   build      组帧（BUILD_V3 与 BUILD_V44，V4.3 复用 V44）
   errors     错误码表与 errText
   angles     方向/减速比/零点换算与设零数学
-  parse      回复解析 parse_reply（移植进行中）
+  parse      回复解析 parse_reply（V3/V4.3/V4.4 三分支）
 """
 
-from . import angles, build, bytes_ops, errors
+from . import angles, build, bytes_ops, errors, parse
 
 __version__ = "0.1.0"
 
 # 对外便捷导出（常用）
 from .angles import amp2rot, dir_of, gear_of, out2rot, rot2out, spd2rot  # noqa: E402
 from .bytes_ops import hx  # noqa: E402
+from .parse import decode79_reply, parse_reply  # noqa: E402
 
 __all__ = [
-    "angles", "build", "bytes_ops", "errors",
+    "angles", "build", "bytes_ops", "errors", "parse",
     "amp2rot", "dir_of", "gear_of", "out2rot", "rot2out", "spd2rot", "hx",
+    "decode79_reply", "parse_reply",
     "__version__",
 ]

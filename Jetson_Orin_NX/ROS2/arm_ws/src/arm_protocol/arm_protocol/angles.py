@@ -26,17 +26,20 @@ def dir_of(m) -> int:
 
 def out2rot(v: float, m) -> float:
     """输出轴(显示角) → 协议侧(转子角): v * gear * dir（发帧用）"""
-    return v * gear_of(m) * dir_of(m)
+    r = v * gear_of(m) * dir_of(m)
+    return r if r != 0 else 0.0  # 归零: 0×dir=-0.0 会致日志显示 "-0.00"(JS toFixed 输出 "0.00")
 
 
 def rot2out(v: float, m) -> float:
     """协议侧(转子角) → 输出轴(显示角): v / gear * dir"""
-    return v / gear_of(m) * dir_of(m)
+    r = v / gear_of(m) * dir_of(m)
+    return r if r != 0 else 0.0
 
 
 def amp2rot(v: float, m) -> float:
     """电流: 乘 dir 映射（V3 电流在协议侧与输出方向同向）"""
-    return v * dir_of(m)
+    r = v * dir_of(m)
+    return r if r != 0 else 0.0
 
 
 def spd2rot(v: float, m) -> float:

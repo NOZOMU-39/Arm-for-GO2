@@ -1,8 +1,9 @@
 {
  "generated_by": "tools/gen_golden.js",
  "source": "e:/Work and Study Project/Program for Work and Study/Arm for GO2/机械臂操作交互界面/index.html",
- "count": 45,
- "note": "黄金向量: JS 版组帧标准答案。pytest 逐字节断言 Python 版 build_frame(proto, op, *args) 输出 hx 与此一致。",
+ "frame_count": 45,
+ "parse_count": 46,
+ "note": "黄金向量: JS 版标准答案。frame_cases 组帧逐字节比对 build_frame; parse_cases 回复解析比对 parse_reply(values/summary)。",
  "cases": [
   {
    "proto": "V3",
@@ -415,6 +416,1602 @@
    "args": [
     0
    ]
+  }
+ ],
+ "parse_cases": [
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    154,
+    35,
+    0,
+    1,
+    120,
+    0,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 154,
+    "summary": "温度 35℃ · 电压 12.0V · 抱闸已释放 · 无错误 ✅",
+    "values": {
+     "temp": 35,
+     "brake": "已释放",
+     "brakeRaw": 1,
+     "volt": 12,
+     "err": 0
+    }
+   },
+   "valuesOnly": false,
+   "note": "9A 抱闸释放"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    154,
+    35,
+    0,
+    2,
+    120,
+    0,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 154,
+    "summary": "温度 35℃ · 电压 12.0V · 抱闸未定义(0x02,无抱闸型号属正常) · 无错误 ✅",
+    "values": {
+     "temp": 35,
+     "brake": "未定义(0x02,无抱闸型号属正常)",
+     "brakeRaw": 2,
+     "volt": 12,
+     "err": 0
+    }
+   },
+   "valuesOnly": false,
+   "note": "9A 抱闸未定义"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    154,
+    35,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 154,
+    "summary": "温度 35℃ · 电压 —(旧固件不回传,正常) · 抱闸已锁定 · 无错误 ✅",
+    "values": {
+     "temp": 35,
+     "brake": "已锁定",
+     "brakeRaw": 0,
+     "volt": 0,
+     "err": 0
+    }
+   },
+   "valuesOnly": false,
+   "note": "9A 电压零=旧固件"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    146,
+    33,
+    103,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 146,
+    "summary": "多圈角度 264.01°(输出轴)",
+    "values": {
+     "pos": 264.01
+    }
+   },
+   "valuesOnly": false,
+   "note": "92 D1-D4 264.01"
+  },
+  {
+   "proto": "V3",
+   "cid": 580,
+   "bytes": [
+    146,
+    152,
+    58,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 4,
+    "name": "v3g6",
+    "proto": "V3",
+    "gear": 6,
+    "dir": -1
+   },
+   "out": {
+    "motorId": 4,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 146,
+    "summary": "多圈角度 -25.00°(输出轴,方向已映射)",
+    "values": {
+     "pos": -25
+    }
+   },
+   "valuesOnly": false,
+   "note": "92 gear6 dir-1 显示角"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    156,
+    30,
+    100,
+    0,
+    244,
+    1,
+    52,
+    18
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 156,
+    "summary": "温度 30℃ · 电流 1.00A(输出轴) · 速度 500.00dps(输出轴) · 编码器 4660 脉冲(转子侧原始)",
+    "values": {
+     "temp": 30,
+     "iq": 1,
+     "spd": 500,
+     "enc": 4660
+    }
+   },
+   "valuesOnly": false,
+   "note": "9C 相位脉冲"
+  },
+  {
+   "proto": "V3",
+   "cid": 581,
+   "bytes": [
+    156,
+    30,
+    100,
+    0,
+    244,
+    1,
+    52,
+    18
+   ],
+   "motor": {
+    "id": 5,
+    "name": "v3ang",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "angle"
+   },
+   "out": {
+    "motorId": 5,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 156,
+    "summary": "温度 30℃ · 电流 1.00A · 速度 500dps · 角度 4660°(0x9C)",
+    "values": {
+     "temp": 30,
+     "iq": 1,
+     "spd": 500,
+     "enc": null,
+     "ang": 4660
+    }
+   },
+   "valuesOnly": true,
+   "note": "9C angle 语义"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    157,
+    10,
+    0,
+    20,
+    0,
+    30,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 157,
+    "summary": "相电流 A 0.1A · B 0.2A · C 0.3A",
+    "values": {
+     "ia": 0.1,
+     "ib": 0.2,
+     "ic": 0.3
+    }
+   },
+   "valuesOnly": false,
+   "note": "9D 相电流"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    48,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 48,
+    "summary": "PID 六参数:电流KP 1 KI 2 · 速度KP 3 KI 4 · 位置KP 5 KI 6",
+    "values": {
+     "pid": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+     ]
+    }
+   },
+   "valuesOnly": false,
+   "note": "30 PID 六参数"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    66,
+    1,
+    0,
+    0,
+    210,
+    4,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 66,
+    "summary": "加速度 位置减速度 = 1234 dps/s",
+    "values": {
+     "idx": 1,
+     "acc": 1234
+    }
+   },
+   "valuesOnly": false,
+   "note": "42 加速度"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    144,
+    0,
+    52,
+    18,
+    0,
+    0,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 144,
+    "summary": "单圈编码器 4660(原始 0,零偏 0)脉冲",
+    "values": {
+     "enc": 4660,
+     "raw": 0,
+     "off": 0
+    }
+   },
+   "valuesOnly": false,
+   "note": "90 单圈编码器"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    148,
+    0,
+    0,
+    0,
+    0,
+    0,
+    16,
+    39
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 148,
+    "summary": "单圈角度 100.00°(输出轴,0~359.99)",
+    "values": {
+     "pos": 100
+    }
+   },
+   "valuesOnly": false,
+   "note": "94 单圈角"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    97,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 97,
+    "summary": "编码器 65536 脉冲(方向已映射;原始 65536)",
+    "values": {
+     "enc": 65536
+    }
+   },
+   "valuesOnly": false,
+   "note": "61 编码器 i32"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    112,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    3
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 112,
+    "summary": "运行模式 位置环",
+    "values": {
+     "mode": 3
+    }
+   },
+   "valuesOnly": false,
+   "note": "70 模式位置环"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    113,
+    0,
+    0,
+    0,
+    0,
+    0,
+    100,
+    0
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 113,
+    "summary": "功率 10.0W",
+    "values": {
+     "power": 10
+    }
+   },
+   "valuesOnly": false,
+   "note": "71 功率"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    121,
+    0,
+    1,
+    0,
+    0,
+    0,
+    66,
+    2
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 121,
+    "summary": "已收到 0x79 只读回复,编号 2",
+    "values": {
+     "mode": "read",
+     "id": 2,
+     "replyCanId": 578,
+     "summary": "已收到 0x79 只读回复,编号 2"
+    }
+   },
+   "valuesOnly": false,
+   "note": "79 读ID 回复0x242"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    121,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    5
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 121,
+    "summary": "收到 0x79 回显,编号 5",
+    "values": {
+     "mode": "writeEcho",
+     "id": 5,
+     "replyCanId": null,
+     "summary": "收到 0x79 回显,编号 5"
+    }
+   },
+   "valuesOnly": false,
+   "note": "79 写回显"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    177,
+    0,
+    0,
+    0,
+    196,
+    9,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 177,
+    "summary": "运行时间 2.5s",
+    "values": {
+     "ms": 2500
+    }
+   },
+   "valuesOnly": false,
+   "note": "B1 运行时间"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    178,
+    0,
+    0,
+    0,
+    0,
+    0,
+    53,
+    1
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 178,
+    "summary": "固件日期 20250624",
+    "values": {
+     "d": 20250624
+    }
+   },
+   "valuesOnly": false,
+   "note": "B2 固件日期"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    179,
+    0,
+    0,
+    0,
+    232,
+    3,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 179,
+    "summary": "通信中断保护 1000ms",
+    "values": {
+     "ms": 1000
+    }
+   },
+   "valuesOnly": false,
+   "note": "B3 中断保护"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    180,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 180,
+    "summary": "波特率索引 1(CAN 1M)",
+    "values": {
+     "idx": 1
+    }
+   },
+   "valuesOnly": false,
+   "note": "B4 波特率1M"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    181,
+    82,
+    77,
+    68,
+    45,
+    88,
+    56,
+    0
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 181,
+    "summary": "型号:RMD-X8\u0000",
+    "values": {
+     "text": "RMD-X8\u0000"
+    }
+   },
+   "valuesOnly": false,
+   "note": "B5 型号"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    32,
+    1,
+    0,
+    0,
+    255,
+    255,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 32,
+    "summary": "功能控制 清除多圈值 = 65535(回显,写入成功)",
+    "values": {
+     "idx": 1,
+     "val": 65535
+    }
+   },
+   "valuesOnly": false,
+   "note": "20 功能回显"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    164,
+    30,
+    100,
+    0,
+    244,
+    1,
+    52,
+    18
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 164,
+    "summary": "回复:温度 30℃ · 电流 1.00A(输出轴) · 速度 500.00dps(输出轴) · 编码器 4660",
+    "values": {
+     "temp": 30,
+     "iq": 1,
+     "spd": 500,
+     "enc": 4660
+    }
+   },
+   "valuesOnly": false,
+   "note": "A4 控制回复"
+  },
+  {
+   "proto": "V3",
+   "cid": 577,
+   "bytes": [
+    129,
+    30,
+    200,
+    0,
+    44,
+    1,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 1,
+    "name": "x8",
+    "proto": "V3",
+    "gear": 1,
+    "dir": 1,
+    "v9cSemantics": "pulse"
+   },
+   "out": {
+    "motorId": 1,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 129,
+    "summary": "回复:温度 30℃ · 电流 2.00A(输出轴) · 速度 300.00dps(输出轴) · 编码器 0",
+    "values": {
+     "temp": 30,
+     "iq": 2,
+     "spd": 300,
+     "enc": 0
+    }
+   },
+   "valuesOnly": false,
+   "note": "81 停止回复"
+  },
+  {
+   "proto": "V3",
+   "cid": 256,
+   "bytes": [
+    154,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "motor": null,
+   "note": "cid 不识别→null",
+   "out": null
+  },
+  {
+   "proto": "V44",
+   "cid": 578,
+   "bytes": [
+    154,
+    35,
+    40,
+    0,
+    120,
+    0,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 2,
+    "name": "x6",
+    "proto": "V43",
+    "gear": 1,
+    "dir": 1
+   },
+   "out": {
+    "motorId": 2,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 154,
+    "summary": "温度 35℃(MOS 40℃) · 电压 12.0V · 抱闸已锁定 · 无错误 ✅",
+    "values": {
+     "temp": 35,
+     "mosTemp": 40,
+     "brake": "已锁定",
+     "volt": 12,
+     "err": 0
+    }
+   },
+   "valuesOnly": false,
+   "note": "V4 9A"
+  },
+  {
+   "proto": "V44",
+   "cid": 578,
+   "bytes": [
+    146,
+    0,
+    0,
+    0,
+    130,
+    218,
+    255,
+    255
+   ],
+   "motor": {
+    "id": 2,
+    "name": "x6",
+    "proto": "V43",
+    "gear": 1,
+    "dir": 1
+   },
+   "out": {
+    "motorId": 2,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 146,
+    "summary": "多圈角度 -95.98°(输出轴)",
+    "values": {
+     "pos": -95.98
+    }
+   },
+   "valuesOnly": false,
+   "note": "V4 92 D4-D7 负值"
+  },
+  {
+   "proto": "V43",
+   "cid": 578,
+   "bytes": [
+    148,
+    0,
+    0,
+    0,
+    0,
+    0,
+    16,
+    39
+   ],
+   "motor": {
+    "id": 2,
+    "name": "x6",
+    "proto": "V43",
+    "gear": 1,
+    "dir": 1
+   },
+   "out": {
+    "motorId": 2,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 148,
+    "summary": "单圈角度 100.00°(输出轴,0~359.99)",
+    "values": {
+     "pos": 100
+    }
+   },
+   "valuesOnly": false,
+   "note": "V43 94 两字节"
+  },
+  {
+   "proto": "V44",
+   "cid": 579,
+   "bytes": [
+    148,
+    0,
+    0,
+    0,
+    16,
+    39,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 3,
+    "name": "x2",
+    "proto": "V44",
+    "gear": 6,
+    "dir": -1
+   },
+   "out": {
+    "motorId": 3,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 148,
+    "summary": "单圈角度 -100.00°(输出轴,方向已映射,±180°)",
+    "values": {
+     "pos": -100
+    }
+   },
+   "valuesOnly": false,
+   "note": "V44 94 int32"
+  },
+  {
+   "proto": "V44",
+   "cid": 579,
+   "bytes": [
+    156,
+    30,
+    100,
+    0,
+    244,
+    1,
+    52,
+    18
+   ],
+   "motor": {
+    "id": 3,
+    "name": "x2",
+    "proto": "V44",
+    "gear": 6,
+    "dir": -1
+   },
+   "out": {
+    "motorId": 3,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 156,
+    "summary": "温度 30℃ · 电流 -1.00A · 速度 -83.33dps · 角度 -776.67°(输出轴,方向已映射)",
+    "values": {
+     "temp": 30,
+     "iq": 1,
+     "spd": 500,
+     "ang": 4660
+    }
+   },
+   "valuesOnly": false,
+   "note": "V44 9C"
+  },
+  {
+   "proto": "V44",
+   "cid": 579,
+   "bytes": [
+    99,
+    0,
+    0,
+    0,
+    0,
+    128,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 3,
+    "name": "x2",
+    "proto": "V44",
+    "gear": 6,
+    "dir": -1
+   },
+   "out": {
+    "motorId": 3,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 99,
+    "summary": "零偏写入回显: 32768 脉冲",
+    "values": {
+     "encoderOffset": 32768
+    }
+   },
+   "valuesOnly": false,
+   "note": "V44 63 零偏回显"
+  },
+  {
+   "proto": "V44",
+   "cid": 579,
+   "bytes": [
+    96,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0
+   ],
+   "motor": {
+    "id": 3,
+    "name": "x2",
+    "proto": "V44",
+    "gear": 6,
+    "dir": -1
+   },
+   "out": {
+    "motorId": 3,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 96,
+    "summary": "多圈位置: -65536 脉冲(原始 65536)",
+    "values": {
+     "enc": 65536
+    }
+   },
+   "valuesOnly": false,
+   "note": "V44 60 多圈位置"
+  },
+  {
+   "proto": "V44",
+   "cid": 578,
+   "bytes": [
+    98,
+    0,
+    0,
+    0,
+    0,
+    64,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 2,
+    "name": "x6",
+    "proto": "V43",
+    "gear": 1,
+    "dir": 1
+   },
+   "out": {
+    "motorId": 2,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 98,
+    "summary": "多圈零偏: 16384 脉冲(原始 16384)",
+    "values": {
+     "enc": 16384,
+     "encoderOffset": 16384
+    }
+   },
+   "valuesOnly": false,
+   "note": "V44 62 零偏"
+  },
+  {
+   "proto": "V44",
+   "cid": 578,
+   "bytes": [
+    49,
+    1,
+    0,
+    0,
+    0,
+    0,
+    192,
+    63
+   ],
+   "motor": {
+    "id": 2,
+    "name": "x6",
+    "proto": "V43",
+    "gear": 1,
+    "dir": 1
+   },
+   "out": {
+    "motorId": 2,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 49,
+    "summary": "PID 索引 电流环KP = 1.50000",
+    "values": {
+     "idx": 1,
+     "val": 1.5
+    }
+   },
+   "valuesOnly": false,
+   "note": "V44 31 PID f32=1.5"
+  },
+  {
+   "proto": "V44",
+   "cid": 578,
+   "bytes": [
+    66,
+    0,
+    0,
+    0,
+    136,
+    19,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 2,
+    "name": "x6",
+    "proto": "V43",
+    "gear": 1,
+    "dir": 1
+   },
+   "out": {
+    "motorId": 2,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 66,
+    "summary": "加速度 位置加速度 = 5000 dps/s",
+    "values": {
+     "idx": 0,
+     "acc": 5000
+    }
+   },
+   "valuesOnly": false,
+   "note": "V44 42 加速度"
+  },
+  {
+   "proto": "V44",
+   "cid": 578,
+   "bytes": [
+    112,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    2
+   ],
+   "motor": {
+    "id": 2,
+    "name": "x6",
+    "proto": "V43",
+    "gear": 1,
+    "dir": 1
+   },
+   "out": {
+    "motorId": 2,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 112,
+    "summary": "运行模式 位置环模式",
+    "values": {
+     "mode": 2
+    }
+   },
+   "valuesOnly": false,
+   "note": "V44 70 位置环模式"
+  },
+  {
+   "proto": "V44",
+   "cid": 578,
+   "bytes": [
+    177,
+    0,
+    0,
+    0,
+    196,
+    9,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 2,
+    "name": "x6",
+    "proto": "V43",
+    "gear": 1,
+    "dir": 1
+   },
+   "out": {
+    "motorId": 2,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 177,
+    "summary": "运行时间 2.5s",
+    "values": {
+     "ms": 2500
+    }
+   },
+   "valuesOnly": false,
+   "note": "V44 B1"
+  },
+  {
+   "proto": "V44",
+   "cid": 578,
+   "bytes": [
+    180,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 2,
+    "name": "x6",
+    "proto": "V43",
+    "gear": 1,
+    "dir": 1
+   },
+   "out": {
+    "motorId": 2,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 180,
+    "summary": "波特率索引 0(1M)",
+    "values": {
+     "idx": 0
+    }
+   },
+   "valuesOnly": false,
+   "note": "V44 B4 索引0=1M"
+  },
+  {
+   "proto": "V44",
+   "cid": 578,
+   "bytes": [
+    181,
+    1,
+    88,
+    54,
+    45,
+    52,
+    48,
+    0
+   ],
+   "motor": {
+    "id": 2,
+    "name": "x6",
+    "proto": "V43",
+    "gear": 1,
+    "dir": 1
+   },
+   "out": {
+    "motorId": 2,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 181,
+    "summary": "型号片段 1:X6-40",
+    "values": {
+     "part": 1,
+     "text": "X6-40"
+    }
+   },
+   "valuesOnly": false,
+   "note": "V44 B5 型号"
+  },
+  {
+   "proto": "V44",
+   "cid": 578,
+   "bytes": [
+    182,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1
+   ],
+   "motor": {
+    "id": 2,
+    "name": "x6",
+    "proto": "V43",
+    "gear": 1,
+    "dir": 1
+   },
+   "out": {
+    "motorId": 2,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 182,
+    "summary": "主动回复:已开启",
+    "values": {
+     "on": 1
+    }
+   },
+   "valuesOnly": false,
+   "note": "V44 B6 开"
+  },
+  {
+   "proto": "V44",
+   "cid": 578,
+   "bytes": [
+    121,
+    0,
+    1,
+    0,
+    0,
+    0,
+    67,
+    2
+   ],
+   "motor": {
+    "id": 2,
+    "name": "x6",
+    "proto": "V43",
+    "gear": 1,
+    "dir": 1
+   },
+   "out": {
+    "motorId": 2,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 121,
+    "summary": "已收到 0x79 只读回复,编号 3",
+    "values": {
+     "mode": "read",
+     "id": 3,
+     "replyCanId": 579,
+     "summary": "已收到 0x79 只读回复,编号 3"
+    }
+   },
+   "valuesOnly": false,
+   "note": "V44 79 读ID"
+  },
+  {
+   "proto": "V44",
+   "cid": 579,
+   "bytes": [
+    32,
+    6,
+    0,
+    0,
+    48,
+    117,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 3,
+    "name": "x2",
+    "proto": "V44",
+    "gear": 6,
+    "dir": -1
+   },
+   "out": {
+    "motorId": 3,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 32,
+    "summary": "功能控制 正向最大角度 = 30000(回显,写入成功);输出轴 5000°",
+    "values": {
+     "idx": 6,
+     "val": 30000
+    }
+   },
+   "valuesOnly": false,
+   "note": "V44 20 正向最大角 5000"
+  },
+  {
+   "proto": "V44",
+   "cid": 579,
+   "bytes": [
+    128,
+    30,
+    200,
+    0,
+    44,
+    1,
+    0,
+    0
+   ],
+   "motor": {
+    "id": 3,
+    "name": "x2",
+    "proto": "V44",
+    "gear": 6,
+    "dir": -1
+   },
+   "out": {
+    "motorId": 3,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 128,
+    "summary": "系统回复:温度 30℃ · 电流 -2.00A · 速度 -50.00dps · 角度 0.00°",
+    "values": {
+     "temp": 30,
+     "iq": 2,
+     "spd": 300,
+     "ang": 0
+    }
+   },
+   "valuesOnly": false,
+   "note": "V44 80 系统回复"
+  },
+  {
+   "proto": "V44",
+   "cid": 579,
+   "bytes": [
+    164,
+    30,
+    100,
+    0,
+    244,
+    1,
+    52,
+    18
+   ],
+   "motor": {
+    "id": 3,
+    "name": "x2",
+    "proto": "V44",
+    "gear": 6,
+    "dir": -1
+   },
+   "out": {
+    "motorId": 3,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 164,
+    "summary": "控制回复:温度 30℃ · 电流 -1.00A · 速度 -83.33dps · 角度 -776.67°",
+    "values": {
+     "temp": 30,
+     "iq": 1,
+     "spd": 500,
+     "ang": 4660
+    }
+   },
+   "valuesOnly": false,
+   "note": "V44 A4 控制回复"
+  },
+  {
+   "proto": "V44",
+   "cid": 579,
+   "bytes": [
+    114,
+    30,
+    100,
+    0,
+    244,
+    1,
+    52,
+    18
+   ],
+   "motor": {
+    "id": 3,
+    "name": "x2",
+    "proto": "V44",
+    "gear": 6,
+    "dir": -1
+   },
+   "out": {
+    "motorId": 3,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 114,
+    "summary": "控制回复:温度 30℃ · 电流 -1.00A · 速度 -83.33dps · 角度 -776.67°",
+    "values": {
+     "temp": 30,
+     "iq": 1,
+     "spd": 500,
+     "ang": 4660
+    }
+   },
+   "valuesOnly": false,
+   "note": "V44 72 前馈"
   }
  ]
 }

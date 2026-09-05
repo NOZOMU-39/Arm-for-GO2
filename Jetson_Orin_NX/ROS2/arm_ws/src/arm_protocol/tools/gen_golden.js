@@ -116,18 +116,84 @@ C("V44","FUNC", hx(BUILD_V44.FUNC(6, 360)), 6, 360);
 C("V44","B3", hx(BUILD_V44.B3(0)), 0);
 C("V44","B4", hx(BUILD_V44.B4(1)), 1);
 C("V44","B6", hx(BUILD_V44.B6(0)), 0);
-globalThis.__GOLDEN = JSON.stringify(__c);
+/* ============ 回复解析对拍用例（真实回复帧样例） ============ */
+/* 注册测试电机（parseReply 按回复 can_id 从 motors 找配置; cid=0x240+id） */
+motors.length = 0;
+motors.push({id:1,name:"x8",proto:"V3",gear:1,dir:1,v9cSemantics:"pulse"});
+motors.push({id:2,name:"x6",proto:"V43",gear:1,dir:1});
+motors.push({id:3,name:"x2",proto:"V44",gear:6,dir:-1});
+motors.push({id:4,name:"v3g6",proto:"V3",gear:6,dir:-1});
+motors.push({id:5,name:"v3ang",proto:"V3",gear:1,dir:1,v9cSemantics:"angle"});
+try { selectedId = 3; } catch (e) {}   // 对齐界面选中态(0x20 idx6/7 摘要的 gearOf(selMotor))
+const __p = [];
+function P(proto, cid, bytes, note, valuesOnly) {
+  const out = parseReply(proto, cid, bytes);
+  if (!out) { __p.push({ proto, cid, bytes, motor: null, note, out: null }); return; }
+  const motor = motorById(out.motorId) || null;
+  __p.push({ proto, cid, bytes, motor: JSON.parse(JSON.stringify(motor)), out, valuesOnly: !!valuesOnly, note });
+}
+/* V3 帧（id1/4/5 回复地址 0x241/0x244/0x245） */
+P("V3", 0x241, [0x9A,35,0,1,120,0,0,0], "9A 抱闸释放");
+P("V3", 0x241, [0x9A,35,0,2,120,0,0,0], "9A 抱闸未定义");
+P("V3", 0x241, [0x9A,35,0,0,0,0,0,0], "9A 电压零=旧固件");
+P("V3", 0x241, [0x92,0x21,0x67,0,0,0,0,0], "92 D1-D4 264.01");
+P("V3", 0x244, [0x92,0x98,0x3A,0,0,0,0,0], "92 gear6 dir-1 显示角");
+P("V3", 0x241, [0x9C,30,0x64,0,0xF4,0x01,0x34,0x12], "9C 相位脉冲");
+P("V3", 0x245, [0x9C,30,0x64,0,0xF4,0x01,0x34,0x12], "9C angle 语义", true);
+P("V3", 0x241, [0x9D,10,0,20,0,30,0,0], "9D 相电流");
+P("V3", 0x241, [0x30,0,1,2,3,4,5,6], "30 PID 六参数");
+P("V3", 0x241, [0x42,1,0,0,0xD2,0x04,0,0], "42 加速度");
+P("V3", 0x241, [0x90,0,0x34,0x12,0,0,0,0], "90 单圈编码器");
+P("V3", 0x241, [0x94,0,0,0,0,0,0x10,0x27], "94 单圈角");
+P("V3", 0x241, [0x61,0,0,0,0,0,1,0], "61 编码器 i32");
+P("V3", 0x241, [0x70,0,0,0,0,0,0,3], "70 模式位置环");
+P("V3", 0x241, [0x71,0,0,0,0,0,0x64,0], "71 功率");
+P("V3", 0x241, [0x79,0,1,0,0,0,0x42,0x02], "79 读ID 回复0x242");
+P("V3", 0x241, [0x79,0,0,0,0,0,0,5], "79 写回显");
+P("V3", 0x241, [0xB1,0,0,0,0xC4,0x09,0,0], "B1 运行时间");
+P("V3", 0x241, [0xB2,0,0,0,0,0,0x35,0x01], "B2 固件日期");
+P("V3", 0x241, [0xB3,0,0,0,0xE8,0x03,0,0], "B3 中断保护");
+P("V3", 0x241, [0xB4,0,0,0,0,0,0,1], "B4 波特率1M");
+P("V3", 0x241, [0xB5,0x52,0x4D,0x44,0x2D,0x58,0x38,0], "B5 型号");
+P("V3", 0x241, [0x20,1,0,0,0xFF,0xFF,0,0], "20 功能回显");
+P("V3", 0x241, [0xA4,30,0x64,0,0xF4,0x01,0x34,0x12], "A4 控制回复");
+P("V3", 0x241, [0x81,30,0xC8,0,0x2C,0x01,0x00,0x00], "81 停止回复");
+P("V3", 0x100, [0x9A,0,0,0,0,0,0,0], "cid 不识别→null");
+/* V4.3/V4.4 帧（id2/3 回复 0x242/0x243） */
+P("V44", 0x242, [0x9A,35,40,0,120,0,0,0], "V4 9A");
+P("V44", 0x242, [0x92,0,0,0,0x82,0xDA,0xFF,0xFF], "V4 92 D4-D7 负值");
+P("V43", 0x242, [0x94,0,0,0,0,0,0x10,0x27], "V43 94 两字节");
+P("V44", 0x243, [0x94,0,0,0,0x10,0x27,0,0], "V44 94 int32");
+P("V44", 0x243, [0x9C,30,0x64,0,0xF4,0x01,0x34,0x12], "V44 9C");
+P("V44", 0x243, [0x63,0,0,0,0,0x80,0,0], "V44 63 零偏回显");
+P("V44", 0x243, [0x60,0,0,0,0,0,1,0], "V44 60 多圈位置");
+P("V44", 0x242, [0x62,0,0,0,0x00,0x40,0,0], "V44 62 零偏");
+P("V44", 0x242, [0x31,1,0,0,0,0,0xC0,0x3F], "V44 31 PID f32=1.5");
+P("V44", 0x242, [0x42,0,0,0,0x88,0x13,0,0], "V44 42 加速度");
+P("V44", 0x242, [0x70,0,0,0,0,0,0,2], "V44 70 位置环模式");
+P("V44", 0x242, [0xB1,0,0,0,0xC4,0x09,0,0], "V44 B1");
+P("V44", 0x242, [0xB4,0,0,0,0,0,0,0], "V44 B4 索引0=1M");
+P("V44", 0x242, [0xB5,1,0x58,0x36,0x2D,0x34,0x30,0], "V44 B5 型号");
+P("V44", 0x242, [0xB6,0,0,0,0,0,0,1], "V44 B6 开");
+P("V44", 0x242, [0x79,0,1,0,0,0,0x43,0x02], "V44 79 读ID");
+P("V44", 0x243, [0x20,6,0,0,0x30,0x75,0,0], "V44 20 正向最大角 5000");
+P("V44", 0x243, [0x80,30,0xC8,0,0x2C,0x01,0x00,0x00], "V44 80 系统回复");
+P("V44", 0x243, [0xA4,30,0x64,0,0xF4,0x01,0x34,0x12], "V44 A4 控制回复");
+P("V44", 0x243, [0x72,30,0x64,0,0xF4,0x01,0x34,0x12], "V44 72 前馈");
+globalThis.__GOLDEN = JSON.stringify({ cases: __c, parse_cases: __p });
 `;
 vm.runInContext(js + collect, ctx);
 
 const golden = JSON.parse(ctx.__GOLDEN);
-golden.sort((a, b) => (a.proto + a.op + a.hex).localeCompare(b.proto + b.op + b.hex));
+golden.cases.sort((a, b) => (a.proto + a.op + a.hex).localeCompare(b.proto + b.op + b.hex));
 const doc = {
   generated_by: 'tools/gen_golden.js',
   source: htmlPath,
-  count: golden.length,
-  note: '黄金向量: JS 版组帧标准答案。pytest 逐字节断言 Python 版 build_frame(proto, op, *args) 输出 hx 与此一致。',
-  cases: golden,
+  frame_count: golden.cases.length,
+  parse_count: golden.parse_cases.length,
+  note: '黄金向量: JS 版标准答案。frame_cases 组帧逐字节比对 build_frame; parse_cases 回复解析比对 parse_reply(values/summary)。',
+  cases: golden.cases,
+  parse_cases: golden.parse_cases,
 };
 fs.writeFileSync(outPath, JSON.stringify(doc, null, 1), 'utf8');
-console.log(`OK: ${golden.length} 条黄金向量已写入 ${outPath}`);
+console.log(`OK: 组帧 ${golden.cases.length} 条 + 解析 ${golden.parse_cases.length} 条黄金向量已写入 ${outPath}`);
