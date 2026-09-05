@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>arm_controller</name>
+  <version>0.1.0</version>
+  <description>机械臂主控（臂脉塔电机域总包，一名到底）：电机档案/轮询调度/相位跟踪/V3 角度真相/限幅安全链/设零与回位流程；二期控制算法模块（后坐抑制等）挂入 control/。纯逻辑模块零 ROS 依赖（registry/track/limit），节点层在 controller_node。</description>
+  <maintainer email="nozomu@example.com">NOZOMU</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>python3</exec_depend>
+  <exec_depend>arm_protocol</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
