@@ -174,6 +174,26 @@ class WiFiCANClient:
     # ====== 网络发现 ======
 
     @staticmethod
+    def scan_gateways(timeout: float = 0.15, max_workers: int = 64) -> List[str]:
+        """扫描全部本机网段的 8888 端口, 返回所有发现的无线网关 IP 列表。
+
+        (2026-09-06 新增) Jetson 控制栈 tcp_gateway 与 ESP32 中继都听 8888 且协议兼容,
+        本函数 = 连接页「发现设备」按钮后端: 一次扫完所有本地子网, 全收不取首个。
+        每子网 ≈ 254×timeout/max_workers 秒; 多子网依数量线性增加。
+        """
+        found: List[str] = []
+        for subnet in WiFiCANClient._get_all_local_subnets():
+            ips = [f"{subnet}.{i}" for i in range(1, 255)]
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [executor.submit(WiFiCANClient._tcp_probe, ip, 8888, timeout)
+                           for ip in ips]
+                for fut in futures:
+                    ip, ok = fut.result()
+                    if ok and ip not in found:
+                        found.append(ip)
+        return found
+
+    @staticmethod
     def _get_all_local_subnets() -> List[str]:
         """检测本机所有网卡的子网前缀"""
         subnets = []

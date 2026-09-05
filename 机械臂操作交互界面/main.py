@@ -912,6 +912,18 @@ class Device:
         self.add_log("info", f"已打开 {name},通道 {ch},波特率 {baud_kbps} kbps,{mode} 模式")
         return {"ok": True, "msg": f"已打开 {name}({mode} 模式)"}
 
+    def discover_wifi(self):
+        """扫描本机网段 8888 端口 → 发现的无线网关 IP 列表(Jetson 控制栈 / ESP32 通用)。
+        连接页「发现设备」按钮后端(2026-09-06);耗时约 3-5 秒/网段。"""
+        try:
+            from wifi_can_client import WiFiCANClient
+            found = WiFiCANClient.scan_gateways()
+            self.add_log("info", f"无线网关扫描完成: 发现 {len(found)} 个 {found}")
+            return {"ok": True, "devices": found}
+        except Exception as e:
+            self.add_log("err", f"无线网关扫描失败:{e}")
+            return {"ok": False, "msg": f"扫描失败:{e}"}
+
     def open_wifi(self, host, baud_kbps):
         """无线连接:WiFiCANBridge 构造即连接(TCP+协商批帧+UDP 订阅)+ 起接收线程。
         host 为空串 → 库内四级自动发现(AP 直连/本机网段/热点网段/串口)。"""
@@ -935,8 +947,9 @@ class Device:
             self._running = True
             self._rx_thread = threading.Thread(target=self._rx_loop, daemon=True)
             self._rx_thread.start()
-            self.add_log("info", f"已连接无线 CAN 中继(ESP32 {bridge.host},波特率 {baud_kbps} kbps)")
-            return {"ok": True, "msg": f"已连接无线 CAN(ESP32 {bridge.host})"}
+            self.add_log("info", f"已连接无线 CAN 网关({bridge.host},波特率 {baud_kbps} kbps)")
+            # host = 实际连接 IP(自动搜索也算) → JS 记忆回填用(2026-09-06)
+            return {"ok": True, "msg": f"已连接无线 CAN({bridge.host})", "host": bridge.host}
 
     def close_device(self):
         with self._lock:

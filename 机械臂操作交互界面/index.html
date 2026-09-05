@@ -320,11 +320,19 @@ main { flex: 1; display: flex; min-height: 0; }
     <div class="connectCard">
       <h2>📡 无线连接</h2>
       <div class="row">
-        <label data-tip="ESP32 无线 CAN 中继的地址。AP 模式固定 192.168.4.1；连了电脑热点时填 ESP32 的 STA IP（热点后台可查）。留空 = 自动搜索（AP 直连 → 本机网段 → 热点网段 → 串口，需要几秒）">设备地址</label>
-        <input type="text" id="wifiHost" placeholder="192.168.4.1（留空自动搜索）" data-tip="ESP32 的 IP 地址。AP 模式固定 192.168.4.1（需先连接 WiFi：ESP32-WiFi-CAN，密码 12345678）；STA 模式填热点分配的 IP。留空自动搜索">
+        <label data-tip="扫描本机网段 8888 端口，列出发现的无线 CAN 网关（Jetson 控制栈 / ESP32 通用），点选即填入地址">🔍 发现设备</label>
+        <button id="btnWifiScan" data-tip="扫描本机网段（约 3-5 秒），发现 Jetson 控制栈 / ESP32 无线中继">搜 索</button>
+      </div>
+      <div class="row" id="wifiFoundRow" style="display:none">
+        <select id="wifiFound" style="flex:1"></select>
+        <button id="btnUseFound" data-tip="把选中的设备地址填入输入框并记住">选用</button>
       </div>
       <div class="row">
-        <label data-tip="CAN 总线波特率，默认 1000 kbps。改动会通过命令下发给 ESP32 并永久保存（NVS），影响总线上全部设备，必须与电机一致">波特率</label>
+        <label data-tip="无线 CAN 网关地址：点「搜索」发现后自动填入；也可手动输入（上次连接地址自动记住回填）">设备地址</label>
+        <input type="text" id="wifiHost" placeholder="点「搜索」发现，或手动输入" data-tip="扫描发现后点选自动填入；上次连接地址自动记忆回填（连接成功后保存实际 IP）">
+      </div>
+      <div class="row">
+        <label data-tip="CAN 总线波特率，默认 1000 kbps。改动会通过命令下发给网关并永久保存，影响总线上全部设备，必须与电机一致">波特率</label>
         <select id="wifiBaud">
           <option value="1000" selected>1000 kbps</option>
           <option value="500">500 kbps</option>
@@ -335,8 +343,8 @@ main { flex: 1; display: flex; min-height: 0; }
         </select>
         <span class="hint">kbps</span>
       </div>
-      <div class="row"><span class="hint">留空地址自动搜索：逐网段扫描，最多约 1 分钟</span></div>
-      <button class="btnConnect" id="btnWifiConnect" data-tip="通过 ESP32 无线连接 CAN 总线（ESP32 已上电、WiFi 已连上）">连 接</button>
+      <div class="row"><span class="hint">点「搜索」自动发现本网段的无线网关（Jetson / ESP32 通用）</span></div>
+      <button class="btnConnect" id="btnWifiConnect" data-tip="连接当前地址的无线 CAN 网关（已上电、网络已通）">连 接</button>
     </div>
   </div>
   <div class="sub" data-tip="">开发版可用 --mock 启动模拟模式（无硬件）；打包版 exe 直连真机</div>
@@ -1005,7 +1013,8 @@ function createMockBridge() {
     _push(ev) { this.events.push(ev); if (this.events.length > 2000) this.events.splice(0, 1000); },
     list_devices() { return { ok: true, data: [{ type: 41, name: "模拟 USBCANFD-200U" }, { type: 4, name: "模拟 USBCAN2" }] }; },
     open_usb(t, i, c, b) { this.opened = true; this._log("已打开 模拟设备(USB),波特率 " + b + " kbps"); return { ok: true, msg: "已打开 模拟设备" }; },
-    open_wifi(h, b) { this.opened = true; this._log("已连接 模拟无线(ESP32 " + (h || "自动发现") + ")"); return { ok: true, msg: "已连接 模拟无线" }; },
+    discover_wifi() { return { ok: true, devices: ["192.168.31.114", "192.168.4.1"] }; },
+    open_wifi(h, b) { this.opened = true; this._log("已连接 模拟无线(" + (h || "自动发现") + ")"); return { ok: true, msg: "已连接 模拟无线", host: h || "192.168.31.114" }; },
     close_device() { this.opened = false; this._log("设备已关闭"); return { ok: true, msg: "设备已关闭" }; },
     _log(m, lv) { this.logs.push({ ts: Date.now(), level: lv || "info", msg: m, kind: "log" }); },
     send_frame(id, extd, hexstr, note) {
@@ -1274,6 +1283,12 @@ async function doConnect(kind) {
   btn.textContent = "连 接";
   if (r && r.ok) {
     addLog("sys", "✅ " + r.msg);
+    // ⚠️ 2026-09-06 记忆实际连接 IP(自动搜索找到的也算)→ 下次打开自动回填免重找
+    if (kind === "wifi" && r.host) {
+      try { localStorage.setItem("wifi_host", r.host); } catch (e) {}
+      const wh = document.getElementById("wifiHost");
+      if (wh) wh.value = r.host;
+    }
     showMainView();
   } else {
     showBanner("连接失败：" + (r && r.msg || "未知错误"), true);
@@ -2536,6 +2551,41 @@ function init() {
   document.getElementById("btnUsbRefresh").onclick = refreshUsbDevices;
   document.getElementById("btnUsbConnect").onclick = () => doConnect("usb");
   document.getElementById("btnWifiConnect").onclick = () => doConnect("wifi");
+  /* 无线设备发现(2026-09-06): 扫本机网段 8888 → 下拉列表 → 选用填入 */
+  document.getElementById("btnWifiScan").onclick = async () => {
+    const btn = document.getElementById("btnWifiScan");
+    btn.disabled = true; btn.textContent = "搜索中…";
+    addLog("sys", "扫描本机网段 8888 端口,寻找无线网关…");
+    try {
+      const r = await bridge.discover_wifi();
+      const sel = document.getElementById("wifiFound");
+      sel.innerHTML = "";
+      const devs = (r && r.ok && Array.isArray(r.devices)) ? r.devices : [];
+      if (!devs.length) {
+        addLog("warn", "未发现无线网关——检查 Jetson 已连同一网络(或 ESP32 已上电)");
+        showBanner("未发现设备：确认 Jetson/ESP32 与本机在同一网络后重试", true);
+      } else {
+        devs.forEach(ip => {
+          const o = document.createElement("option");
+          o.value = ip; o.textContent = ip;
+          sel.appendChild(o);
+        });
+        document.getElementById("wifiFoundRow").style.display = "";
+        addLog("sys", `发现 ${devs.length} 个无线网关,点「选用」填入`);
+      }
+    } catch (e) {
+      addLog("err", "扫描异常:" + e);
+    }
+    btn.disabled = false; btn.textContent = "搜 索";
+  };
+  document.getElementById("btnUseFound").onclick = () => {
+    const ip = document.getElementById("wifiFound").value;
+    if (!ip) return;
+    document.getElementById("wifiHost").value = ip;
+    try { localStorage.setItem("wifi_host", ip); } catch (e) {}
+    document.getElementById("wifiFoundRow").style.display = "none";
+    addLog("sys", `已选用 ${ip},点「连接」`);
+  };
   document.getElementById("btnDisconnect").onclick = async () => {
     if (!dev.opened) return;
     kbStopAll();

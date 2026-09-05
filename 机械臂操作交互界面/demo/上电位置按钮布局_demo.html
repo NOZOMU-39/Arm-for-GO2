@@ -42,15 +42,24 @@
     <div class="connectCard">
       <h2>📡 无线连接</h2>
       <div class="row">
-        <label data-tip="ESP32 无线 CAN 中继的地址。AP 模式固定 192.168.4.1；连了电脑热点时填 ESP32 的 STA IP（热点后台可查）。留空 = 自动搜索（AP 直连 → 本机网段 → 热点网段 → 串口，需要几秒）">设备地址</label>
-        <input type="text" id="wifiHost" placeholder="192.168.4.1（留空自动搜索）" data-tip="ESP32 的 IP 地址。AP 模式固定 192.168.4.1（需先连接 WiFi：ESP32-WiFi-CAN，密码 12345678）；STA 模式填热点分配的 IP。留空自动搜索">
+        <label data-tip="扫描本机网段,列出发现的无线 CAN 网关(Jetson 控制栈 / ESP32),点选即填入">🔍 发现设备</label>
+        <button id="demoWifiScan">搜 索</button>
+      </div>
+      <div class="row" id="wifiFoundRow" style="display:none">
+        <select id="wifiFound" style="flex:1"></select>
+        <button id="demoUseFound">选用</button>
+      </div>
+      <div class="row" style="display:none"></div>
+      <div class="row">
+        <label data-tip="也可手动填地址（上次连接地址已自动记住）">设备地址</label>
+        <input type="text" id="wifiHost" placeholder="留空搜索后点选，或手动输入" data-tip="扫描发现后点选自动填入；也可手动输入地址；上次连接地址自动记忆回填">
       </div>
       <div class="row">
         <label>波特率</label>
         <select id="wifiBaud"><option value="1000" selected>1000 kbps</option><option value="500">500 kbps</option></select>
         <span class="hint">kbps</span>
       </div>
-      <div class="row"><span class="hint">留空地址自动搜索：逐网段扫描，最多约 1 分钟</span></div>
+      <div class="row"><span class="hint">点「搜索」自动发现本网段的无线网关（Jetson / ESP32 通用，约 3-5 秒）</span></div>
       <button class="btnConnect" id="demoWifiConn">连 接</button>
     </div>
   </div>
@@ -257,11 +266,27 @@ document.addEventListener("mouseover", e => {
 document.addEventListener("mouseout", e => { if (e.target.closest("[data-tip]")) tipEl.style.display = "none"; });
 
 /* ---------- 两态切换:连接页 ↔ 主界面(mock) ---------- */
-function enterMain() {
+/* 连接记忆演示: 模拟"记住实际 IP, 下次打开自动回填"(真界面 2026-09-06 增强同款) */
+function mockConnect(kind) {
+  let realIp = null;
+  if (kind === "wifi") {
+    const typed = document.getElementById("wifiHost").value.trim();
+    realIp = typed || "192.168.31.114";   // 留空 = 自动搜索找到(演示值)
+    try { localStorage.setItem("demo_wifi_host", realIp); } catch (e) {}
+    addLog("sys", `无线连接成功(实际地址 ${realIp})——已记住,下次打开自动填入`);
+  } else {
+    addLog("sys", "USB 直连(ZLG 800U 通道0)");
+  }
+  document.getElementById("wifiHost").value = realIp || document.getElementById("wifiHost").value;
+  enterMain(realIp);
+}
+function enterMain(ip) {
   document.getElementById("connectView").style.display = "none";
   document.getElementById("mainView").style.display = "flex";
   document.body.style.overflow = "hidden";
-  addLog("sys", "连接成功(无线 192.168.137.247, 1000kbps)——开始状态刷新");
+  const badge = document.querySelector("#mainView header .badge");
+  if (badge && ip) badge.textContent = `🟢 无线 ${ip}`;
+  addLog("sys", `连接成功(无线 ${ip || "—"}, 1000kbps)——开始状态刷新`);
 }
 function backToConnect() {
   document.getElementById("mainView").style.display = "none";
@@ -269,9 +294,44 @@ function backToConnect() {
   document.body.style.overflow = "";
   addLog("sys", "已断开连接,返回连接页");
 }
-document.getElementById("demoUsbConn").onclick = () => { addLog("sys", "USB 直连(ZLG 800U 通道0)"); enterMain(); };
-document.getElementById("demoWifiConn").onclick = () => { addLog("sys", "无线连接发起"); enterMain(); };
+/* 页面加载: 读记忆预填(演示: 刷新页面 = 模拟下次打开) */
+(function () {
+  const saved = (() => { try { return localStorage.getItem("demo_wifi_host") || ""; } catch (e) { return ""; } })();
+  if (saved) {
+    document.getElementById("wifiHost").value = saved;
+    addLog("sys", `已自动填入上次连接地址:${saved}(点连接秒连; 想换设备清空后重搜)`);
+  }
+})();
+document.getElementById("demoUsbConn").onclick = () => mockConnect("usb");
+document.getElementById("demoWifiConn").onclick = () => mockConnect("wifi");
 document.querySelector("#mainView header button").onclick = backToConnect;
+
+/* ---------- 设备发现(mock): 点搜索 → 列表 → 选用 ---------- */
+document.getElementById("demoWifiScan").onclick = async () => {
+  const btn = document.getElementById("demoWifiScan");
+  btn.disabled = true; btn.textContent = "搜索中…";
+  addLog("sys", "扫描本机网段 8888 端口…");
+  await new Promise(r => setTimeout(r, 1200));   // mock 扫描耗时
+  const sel = document.getElementById("wifiFound");
+  sel.innerHTML = "";
+  [["192.168.31.114", "Jetson 控制栈网关"], ["192.168.4.1", "ESP32 无线中继"]].forEach(([ip, tag]) => {
+    const o = document.createElement("option");
+    o.value = ip; o.textContent = `${ip}（${tag}）`;
+    sel.appendChild(o);
+  });
+  document.getElementById("wifiFoundRow").style.display = "";
+  btn.disabled = false; btn.textContent = "搜 索";
+  addLog("sys", "发现 2 个设备,点选后「选用」");
+};
+document.getElementById("demoUseFound").onclick = () => {
+  const sel = document.getElementById("wifiFound");
+  const ip = sel.value;
+  if (!ip) return;
+  document.getElementById("wifiHost").value = ip;
+  try { localStorage.setItem("demo_wifi_host", ip); } catch (e) {}
+  addLog("sys", `已选用 ${ip} 并记住——点「连接」`);
+  document.getElementById("wifiFoundRow").style.display = "none";
+};
 
 /* ---------- mock 电机(虚构数据) ---------- */
 const motors = [
