@@ -1,7 +1,8 @@
 """arm_controller 主节点（第 2 步: 档案加载 + 只读轮询 + 状态发布, 监督型不运动）
 
 职责(一期逐步扩展, 此步为骨架):
-  - 电机档案: 包 share/config/registry.json(交互界面注册表同构) → registry.load_list
+  - 电机档案: ~/ROS2/arm_ws/config/registry.json(部署权威副本, 服务变更落盘于此;
+    源码 src/arm_controller/config/registry.json 仅种子, 部署时 scp 到部署路径)
   - 轮询: 独立线程, 逐台 9A/9C/92, 帧间隔由周期推导(见 _frame_interval, 不用无线时代固定 60ms)
   - 状态: rx 回复帧 → parse → state.update_from_parse(越限首触发此步只记日志, 发 0x81 归安全链步骤)
   - 发布: /arm/motor_states(10Hz 全表单条流) + /arm/status(1Hz 总线级)
