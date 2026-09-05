@@ -912,18 +912,6 @@ class Device:
         self.add_log("info", f"已打开 {name},通道 {ch},波特率 {baud_kbps} kbps,{mode} 模式")
         return {"ok": True, "msg": f"已打开 {name}({mode} 模式)"}
 
-    def discover_wifi(self):
-        """扫描本机网段 8888 端口 → 发现的无线网关 IP 列表(Jetson 控制栈 / ESP32 通用)。
-        连接页「发现设备」按钮后端(2026-09-06);耗时约 3-5 秒/网段。"""
-        try:
-            from wifi_can_client import WiFiCANClient
-            found = WiFiCANClient.scan_gateways()
-            self.add_log("info", f"无线网关扫描完成: 发现 {len(found)} 个 {found}")
-            return {"ok": True, "devices": found}
-        except Exception as e:
-            self.add_log("err", f"无线网关扫描失败:{e}")
-            return {"ok": False, "msg": f"扫描失败:{e}"}
-
     def open_wifi(self, host, baud_kbps):
         """无线连接:WiFiCANBridge 构造即连接(TCP+协商批帧+UDP 订阅)+ 起接收线程。
         host 为空串 → 库内四级自动发现(AP 直连/本机网段/热点网段/串口)。"""
@@ -1122,6 +1110,20 @@ class Api:
             self.device.add_log("err", f"open_usb 参数非法:{dev_type!r}/{dev_index!r}/{ch!r}/{baud_kbps!r}")
             return {"ok": False, "msg": "连接参数非法:请先在 USB 卡片「刷新」选择设备型号"}
         return self.device.open_device(dev_type, dev_index, ch, baud_kbps)
+
+    def discover_wifi(self):
+        """扫描本机网段 8888 端口 → 发现的无线网关 IP 列表(Jetson 控制栈 / ESP32 通用)。
+        连接页「发现设备」按钮后端(2026-09-06);耗时约 3-5 秒/网段。⚠️ 必须放 Api 类
+        (js_api 暴露 Api,放 Device 上 JS 拿不到——已踩过,勿再犯)。"""
+        self._trace("discover_wifi")
+        try:
+            from wifi_can_client import WiFiCANClient
+            found = WiFiCANClient.scan_gateways()
+            self.device.add_log("info", f"无线网关扫描完成: 发现 {len(found)} 个 {found}")
+            return {"ok": True, "devices": found}
+        except Exception as e:
+            self.device.add_log("err", f"无线网关扫描失败:{e}")
+            return {"ok": False, "msg": f"扫描失败:{e}"}
 
     def open_wifi(self, host, baud_kbps):
         self._trace("open_wifi")
