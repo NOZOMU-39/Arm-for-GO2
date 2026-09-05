@@ -182,14 +182,26 @@ class WiFiCANClient:
         每子网 ≈ 254×timeout/max_workers 秒; 多子网依数量线性增加。
         """
         found: List[str] = []
-        for subnet in WiFiCANClient._get_all_local_subnets():
+        subnets = WiFiCANClient._get_all_local_subnets()
+
+        def scan_one(subnet: str):
             ips = [f"{subnet}.{i}" for i in range(1, 255)]
+            hits = []
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = [executor.submit(WiFiCANClient._tcp_probe, ip, 8888, timeout)
                            for ip in ips]
                 for fut in futures:
                     ip, ok = fut.result()
-                    if ok and ip not in found:
+                    if ok:
+                        hits.append(ip)
+            return hits
+
+        # ⚠️ 网段并行(2026-09-06): 多网段(热点/有线/虚拟网卡)曾顺序扫 → 首次连接 ~30s;
+        # 并行后总耗时 = 最慢单网段(254×timeout/max_workers ≈ 0.6~1s 级)
+        with ThreadPoolExecutor(max_workers=len(subnets) or 1) as ex:
+            for hits in ex.map(scan_one, subnets):
+                for ip in hits:
+                    if ip not in found:
                         found.append(ip)
         return found
 

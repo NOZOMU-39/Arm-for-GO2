@@ -1271,8 +1271,13 @@ async function doConnect(kind) {
       const ch = parseInt(document.getElementById("usbCh").value || "0", 10);
       r = await bridge.open_usb(devType, idx, ch, baud);
     } else {
-      const host = document.getElementById("wifiHost").value.trim();
+      let host = document.getElementById("wifiHost").value.trim();
       // ⚠️ 2026-08-27 记住无线地址(下次打开自动回填,免重输/免等自动发现 26 秒)
+      // ⚠️ 2026-09-06 记忆优先: 地址为空时先试上次成功 IP(秒连),失败才走全自动发现(30s 级)
+      if (!host) {
+        const mem = (() => { try { return localStorage.getItem("wifi_host") || ""; } catch (e) { return ""; } })();
+        if (mem) { host = mem; addLog("sys", `地址为空,优先尝试上次连接地址 ${mem}`); }
+      }
       try { localStorage.setItem("wifi_host", host); } catch (e) {}
       r = await bridge.open_wifi(host, baud);
     }
