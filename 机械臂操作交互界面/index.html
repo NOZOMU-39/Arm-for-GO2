@@ -1472,8 +1472,8 @@ function pollToggle(on) {
   pollOn = on;
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   if (on) {
-    // ⚠️ 忙/暂停则跳过:避免 pollAll 未完成时下一轮又启动(帧间隔加入后一轮约 360ms,
-    // 轮询周期手动调小(如 200ms)时并发会让命令更密集,触发总线损坏)
+    // ⚠️ 忙/暂停则跳过:避免 pollAll 未完成时下一轮又启动(帧间隔由周期推导后,
+    // 5 台×3 帧一轮 = 0.8×周期, 天然不会超周期——busy 跳过仅防异常慢轮)
     const iv = () => {
       if (dev.opened && motors.length && !polling && !pollPaused) {
         polling = true;
@@ -1485,20 +1485,29 @@ function pollToggle(on) {
     pollTimer = setInterval(iv, Math.max(200, Math.min(2000, isNaN(ms) ? 500 : ms)));
   }
 }
+/* 轮询帧间隔(ms) = 周期 × 0.8 ÷ 每轮帧数, 下限 5ms。
+   2026-09-05 用户实测暴露: 原固定 60ms 是无线时代防 ESP32 突发遗产——5 台×3 帧×60ms
+   = 900ms 轮长, 刷新被锁死 ~1s, 刷新周期设置永远被 busy 跳过(怎么调都 ~1s)。
+   本地链路(USB 直连 / Jetson gateway)实测电机 5ms 命令间隔全通(通信档案留 4 倍余量);
+   无线(ESP32)链路如遇丢帧, 把刷新周期调大即自动放大帧间隔(保守不单独设档)。 */
+function pollFrameInterval() {
+  const ms = parseInt(document.getElementById("pollInt").value, 10);
+  const period = Math.max(200, Math.min(2000, isNaN(ms) ? 500 : ms));
+  const frames = Math.max(1, motors.length) * 3;   // 每台 9A/9C/92
+  return Math.max(period * 0.8 / frames, 5);
+}
 async function pollAll() {
   if (!dev.opened) return;
+  const iv = pollFrameInterval();   // 每轮按当前周期与电机数推导一次
   for (const m of motors) {
     if (!dev.opened) break;
     const id = 0x140 + m.id;
     await sendMotorSilent(m, pad8([0x9A]), "轮询 0x9A");
-    // ⚠️ 2026-08-27 帧间隔 60ms(实测):173e22b 后发送直接 sendall 无锁,命令背靠背
-    // 快速连发 → 总线瞬时突发 → 9A/9C 回复在总线上损坏被 ESP32 CRC 拒收(丢 60-87%);
-    // 拉开帧间隔后 X6 9A/9C 恢复 93%(X8 9C 仍有 ~47% 批次性丢失,疑似 X8 侧硬件)
-    await sleep(60);
+    await sleep(iv);
     await sendMotorSilent(m, pad8([0x9C]), "轮询 0x9C");
-    await sleep(60);
+    await sleep(iv);
     await sendMotorSilent(m, pad8([0x92]), "轮询 0x92");
-    await sleep(60);
+    await sleep(iv);
   }
 }
 /* 轮询帧间延迟(测试 vm 中 setTimeout 同步执行,不阻塞) */
