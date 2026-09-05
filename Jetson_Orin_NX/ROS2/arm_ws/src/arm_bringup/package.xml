@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>arm_bringup</name>
+  <version>0.1.0</version>
+  <description>Jetson 控制栈一键启动: 界面主模式(can_bridge+tcp_gateway, v1 默认) / 自主任模式(controller:=true 起 arm_controller 停网关防双主)。六包收官。</description>
+  <maintainer email="nozomu@example.com">NOZOMU</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>ros2launch</exec_depend>
+  <exec_depend>can_bridge</exec_depend>
+  <exec_depend>tcp_gateway</exec_depend>
+  <exec_depend>arm_controller</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
