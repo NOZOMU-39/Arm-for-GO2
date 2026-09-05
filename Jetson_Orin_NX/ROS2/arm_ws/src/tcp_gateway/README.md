@@ -22,3 +22,4 @@ tcp_gateway                        # Jetson: 起网关(需 can_bridge 已跑)
 
 - **总线单主 = 界面**：v1 界面自己轮询+安全链；controller 不要起（或 `poll_enable:=false` 只旁听）
 - 帧协议细节（封装/批帧/命令码）以 `wifi_can_client.py` 为兼容基准，改动须与它互测
+- **读超时 ≠ 断开（2026-09-06 修复）**：客户端静默 >1s 曾被踢下线（界面设零节奏 0x64 后停 1s → 0x76 永远发不出，真机 03:16 事故）——现纯静默超时抛 TimeoutError 上层 continue，仅半帧超时/对端关闭才断开；回归测试 4 条在 `test/test_frames.py`

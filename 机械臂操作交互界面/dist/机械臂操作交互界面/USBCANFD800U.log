@@ -1,0 +1,3 @@
+[2026-09-06 05:58:52.195] ================= Logging =================
+[2026-09-06 05:58:52.195] [ERR] USBDeviceMgr::OpenDev nDevIndex:0 Device Path Empty
+[2026-09-06 05:58:52.195] [ERR] Device::OpenDevice USBDeviceMgr Open device[0] failed!

@@ -66,6 +66,19 @@
   can_bridge            # 在 tmux 会话里跑，方便 Ctrl+C 停
   ```
 
+## 掉电丢圈与上电位置校正（2026-09-06 起，日常必读）
+
+机械臂无抱闸，急停/掉电后若臂转动过（垂落/手动摆臂），转子整圈发生在无电期间 → 重新上电后角度可能差整圈（X6 每圈 10°、X2 每圈约 12.8°）。**V4 四台的多圈掉电保存（索引 4）已持久开启**——静止掉电零丢失；丢圈只发生在"掉电后转动过"的场景。
+
+- **正常流程（用 Windows 界面的用户）**：急停后把臂摆回固定姿态再上电，连界面**自动检测修正**（弹提示"检测到掉电丢圈，已自动修正"）——什么都不用做；首次使用先在界面点一次「📍 记录机械臂上电位置」；
+- **不用界面（纯 Jetson 侧）**：摆好臂上电后跑一次校正工具（在 tmux 会话里）：
+  ```bash
+  cd ~/ROS2/arm_ws/src/arm_controller && source /opt/ros/humble/setup.bash && source ~/ROS2/arm_ws/install/setup.bash
+  python3 tools/rest_calib.py         # 先 dry-run 看判定（丢圈 N / 一致）
+  python3 tools/rest_calib.py --apply # 确认后落盘（自动备份 registry.json）
+  ```
+  ⚠️ 校正前断开 Windows 界面连接（总线独占）；换结构/换电机/重新设零后需重新记录上电位置（界面按钮或 `--mark-rest`）。
+
 ## 常用命令速查
 ```bash
 # 系统状态
@@ -94,17 +107,19 @@ sudo stty -F /dev/ttyUSB0 921600 raw -echo && sudo timeout 2 cat /dev/ttyUSB0 | 
 
 # 🔍 深度参考（需要时再看）
 
-## ROS2 控制栈（进度 2026-09-05）
+## ROS2 控制栈（进度 2026-09-06：六包全部完成）
 
 | 软件包 | 干什么 | 状态 |
 |---|---|---|
 | arm_interfaces | 消息/服务定义（控制软件间的"通信格式"） | ✅ 完成 |
-| arm_protocol | 电机协议库（把指令编成电机帧、把回复译成人话） | ✅ 完成（5212 项自动测试 + 真机只读验证过） |
+| arm_protocol | 电机协议库（把指令编成电机帧、把回复译成人话） | ✅ 完成（5228 项自动测试 + 真机覆盖过） |
 | can_bridge | CAN 帧桥（软件与 can0 总线之间的"翻译通道"） | ✅ 完成（真机双向验证过） |
-| arm_controller | 控制核心（轮询/安全限幅/设零） | ⏳ 开发中 |
-| tcp_gateway / arm_bringup | 界面接入 / 一键启动 | ⏳ 待做 |
+| arm_controller | 控制核心（档案/轮询/安全限幅/设零服务/上电位置校正） | ✅ 完成（97 项单测 + 真机全路径） |
+| tcp_gateway | 界面 TCP 接入（仿 ESP32 协议，界面零改动） | ✅ 完成（真机键盘点动实测过） |
+| arm_bringup | 一键启动（界面主模式默认 / controller:=true 自主任） | ✅ 完成 |
 
 - 源码在 Windows 仓库 `Jetson_Orin_NX\ROS2\arm_ws\`（开发在 Windows 侧），本机 `~/ROS2/arm_ws` 是同步构建副本
+- 上电位置校正工具：`~/ROS2/arm_ws/src/arm_controller/tools/rest_calib.py`（用法见上文「掉电丢圈」节）
 - 架构决策与开发细节：见 `AI间交流\情报.md` Jetson 条目（AI 协作文档）
 
 ## 资料索引

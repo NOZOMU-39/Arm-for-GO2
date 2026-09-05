@@ -81,7 +81,12 @@
     - 按钮:工具栏「📍 记为上电位置」(选中电机,最左);V3 禁用(tip 说明);卡片每台统一一行(全含 V3:"—(V3 无此机制)")
     - **设零联动**:V4 设零完成(0x76 复位后)→ 若已标定过 → `m.restStale = true` + 横幅提示重标(卡片显示 ⚠️需重标);重标(记录)后清除
     - 动态提示 `updateMarkRestTip()`:选中变化/记录/设零后刷新 btnMarkRest tip(档案值/失效态/说明)
-    - 字段透传:normMotors 扩展符保留全部字段;Jetson registry 权威副本与界面 registry 的 E4/restDeg 同步靠外部工具(见 §10)
+    - 字段透传:normMotors 扩展符保留全部字段;Jetson registry 权威副本与界面 registry 的 E4/restDeg 同步靠 sync_jetson_registry.py(见 §10)
+11. **掉电自动校正 `autoCalibRest()`(2026-09-06 用户定稿,显式方向)**——急停/掉电后按规范摆到上电位置再上电,界面**自动**检测整圈差并 E4 直设修正(零 ROM 纯显示层):
+    - 触发:①每次连接(showMainView 重置 autoCalibDone)②**电机重启恢复检测**(用户反馈"为何要断连重连"→ pollAll 尾监控:全离线→恢复 = 掉电重启 → 2.5s 后重置 autoCalibDone 自动重校)——界面挂着也能自动修正;
+    - 判定:显示差 = restDeg − lastAngle ≈ N×turnDeg(残差≤2°)→ E4 = restDeg − raw 直设(勿叠加);非整圈 → 提示摆位/重标不误校;restStale(设零后)台跳过(等重标,防设零场景误报);
+    - 显式:修正/警告都弹横幅 + 日志(丢圈 N 圈/非整圈提示),不静默
+12. **无线设备发现(2026-09-06)**:连接页「🔍 搜索」→ `bridge.discover_wifi()`(Api 类!js_api 暴露 Api 非 Device——加错类 JS 拿不到,已踩) → `WiFiCANClient.scan_gateways()`(扫本机全部子网 8888 全收,**网段并行** ~1-2s)→ 下拉点选填入;连接成功记忆**实际 IP**(r.host,自动搜索也算)localStorage `wifi_host`,空地址连接优先试记忆(秒连)
 
 ## 5. 限幅安全链(完整继承 + 两处适配)
 

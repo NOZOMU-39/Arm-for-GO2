@@ -6,13 +6,15 @@
 
 | 文件 | 干什么 |
 |---|---|
-| `arm_controller/registry.py` | 电机档案：字段规范化/校验 + RegistryStore 运行时容器（CRUD/版本号/落盘） |
+| `arm_controller/registry.py` | 电机档案：字段规范化/校验 + RegistryStore 运行时容器（CRUD/版本号/落盘）；restDeg/restDegDate/turnDeg = 上电位置档案（显示语义，2026-09-06） |
+| `arm_controller/rest.py` | 上电参考位丢圈判定纯函数（显示差 ≈ N×turnDeg → N；E4 直设语义见 docstring） |
 | `arm_controller/track.py` | V3 相位跟踪（0x9C 编码器积分 + 0x92 校准，E0 显示角换算） |
 | `arm_controller/limit.py` | 限幅判定纯函数（发送前拦截 / 运行中监控，越限锁只放反向） |
 | `arm_controller/state.py` | 单台电机运行时状态（回复帧 → 角度/速度/在线更新，只 9C/92 驱动角度） |
 | `arm_controller/supervisor.py` | 臂级状态机（全失联 2s → 整臂锁；SafetyReset 校验） |
 | `arm_controller/controller_node.py` | ROS2 主节点（轮询线程/7 个服务/状态发布，接线都在这里） |
 | `config/registry.json` | 档案种子（部署时 scp 到 ~/ROS2/arm_ws/config/registry.json 为权威副本） |
+| `tools/rest_calib.py` | 上电位置校正工具（Jetson 直跑：dry-run 判圈 / `--apply` E4 直设落盘 / `--mark-rest` 显式重标；自动备份） |
 | `test/` | pytest 全套（纯逻辑模块零 ROS 依赖，源码树直跑） |
 
 ## 常用入口
