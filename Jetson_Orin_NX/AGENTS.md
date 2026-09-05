@@ -52,6 +52,7 @@
 - **协议改动联动纪律**：改交互界面 index.html（JS 源）→ 界面 Node 回归 → arm_protocol 重跑 `tools/gen_golden.js` + `gen_rand_vectors.js` → pytest 全绿 → 同步 Jetson
 - **tcp_gateway 演进备忘（不许止步 v1）**：v1 帧透传(ESP32 TCP 兼容，界面零改动) → 二期界面语义化+安全链下沉 arm_controller → 三期多前端接入（详见情报）
 - V3 相位跟踪/限幅判定（v3TrackOf/v3PosDual/limitBlock）归 arm_controller 轮移植（见界面测试文件）；电机闭环运动验证按 SOP 待 controller 阶段
+- **⚠️ 待办（2026-09-05，0x9D 教训派生）**：arm_protocol 未真机验证解析分支**逐分支盘点**（黄金向量只保证"两实现一致"，不保证"实现正确"——对拍过的每个分支都要对照 V3.9/V4.4 手册原文 + 真机帧库复核；盘点结果落情报）
 
 ## 日志与验证
 
