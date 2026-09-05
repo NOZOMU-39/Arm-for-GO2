@@ -9,8 +9,13 @@
 
   <buildtool_depend>ament_python</buildtool_depend>
 
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
+  <depend>ament_index_python</depend>
+
   <exec_depend>python3</exec_depend>
   <exec_depend>arm_protocol</exec_depend>
+  <exec_depend>arm_interfaces</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>
