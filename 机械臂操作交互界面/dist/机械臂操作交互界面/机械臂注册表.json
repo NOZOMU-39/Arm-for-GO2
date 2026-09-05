@@ -22,7 +22,7 @@
     "dir": 1,
     "E0": null,
     "v9cSemantics": "pulse",
-    "limMaxDeg": 94.5,
+    "limMaxDeg": 94,
     "limMinDeg": -40,
     "E4": 0,
     "defaultPosDeg": 80
@@ -35,8 +35,8 @@
     "gear": 1,
     "dir": 1,
     "E0": null,
-    "limMaxDeg": 80,
-    "limMinDeg": -170,
+    "limMaxDeg": 77,
+    "limMinDeg": -171,
     "E4": 0,
     "defaultPosDeg": -159.99
   },
@@ -61,8 +61,8 @@
     "gear": 1,
     "dir": 1,
     "E0": null,
-    "limMinDeg": -120,
-    "limMaxDeg": 120,
+    "limMinDeg": -110,
+    "limMaxDeg": 110,
     "E4": 0,
     "defaultPosDeg": 0
   }
