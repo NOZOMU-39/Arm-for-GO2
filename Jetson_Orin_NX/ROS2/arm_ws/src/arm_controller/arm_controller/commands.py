@@ -37,6 +37,10 @@ def plan_command(m: dict, alarm: dict | None, kind: int, deg: float, spd_dps: fl
         return True, "停止保持", bytes([0x81, 0, 0, 0, 0, 0, 0, 0])
     if kind == 4:                                   # DISABLE 失能(安全指令豁免)
         return True, "失能", bytes([0x80, 0, 0, 0, 0, 0, 0, 0])
+    # ⚠️ 运动防呆(2026-09-05 事故教训: 曾因 SetLimits 全量替换被误清限幅致 200° 命令放行):
+    # 运动类指令要求该台至少设了一侧角度软限——双侧全无 = 无软限保护, 拒绝运动。
+    if kind in (1, 2, 5) and m.get("limMinDeg") is None and m.get("limMaxDeg") is None:
+        return False, "该台未设角度软限(limMinDeg/limMaxDeg), 拒绝运动——请先设置限幅", None
     if kind == 5:                                   # HOME 回默认位置
         home = m.get("defaultPosDeg")
         if not isinstance(home, (int, float)):

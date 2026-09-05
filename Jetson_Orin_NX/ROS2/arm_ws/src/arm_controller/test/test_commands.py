@@ -113,3 +113,27 @@ def test_locked_reverse_allowed():
 def test_unknown_kind_rejected():
     ok, why, _ = plan_command(V4, None, 99, 0, 60)
     assert not ok and "未知指令类型" in why
+
+
+# ---------- 无软限防呆(2026-09-05 事故教训) ----------
+
+def test_motion_rejected_when_no_angle_limits():
+    """双侧无角度软限 → 运动类拒绝(曾被误清限幅致 200° 放行的事故防呆)"""
+    m = dict(V4, limMinDeg=None, limMaxDeg=None)
+    for kind in (1, 2, 5):
+        ok, why, _ = plan_command(m, None, kind, 0, 60, cur_angle=0)
+        assert not ok and "软限" in why, (kind, why)
+
+
+def test_stop_disable_still_allowed_without_limits():
+    """无软限时安全指令(停/失能)仍放行"""
+    m = dict(V4, limMinDeg=None, limMaxDeg=None)
+    assert plan_command(m, None, 3, 0, 0)[0] is True
+    assert plan_command(m, None, 4, 0, 0)[0] is True
+
+
+def test_single_side_limit_allows_motion():
+    """只有单侧软限也允许运动(另一侧由机械/其他约束)"""
+    m = dict(V4, limMinDeg=None, limMaxDeg=10.0)
+    ok, why, frame = plan_command(m, None, 1, 0, 60, cur_angle=0)
+    assert ok, why

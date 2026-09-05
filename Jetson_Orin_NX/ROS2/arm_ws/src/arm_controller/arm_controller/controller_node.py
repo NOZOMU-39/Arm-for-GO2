@@ -77,6 +77,10 @@ class ArmControllerNode(Node):
 
         self.views = {m["id"]: MotorView(m["id"]) for m in self.motors}
         self.tracks = V3Tracks()
+        for m in self.motors:
+            if m.get("limMinDeg") is None and m.get("limMaxDeg") is None:
+                self.get_logger().warn(
+                    f"档案警告: #{m['name']} 无角度软限(limMinDeg/limMaxDeg)——运动指令将被拒绝, 请先设限")
         self._tx_count = 0
         self._rx_count = 0
         self._last_alarm = ""
