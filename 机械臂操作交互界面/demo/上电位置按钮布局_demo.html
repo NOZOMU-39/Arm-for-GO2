@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>完整 UI Demo — 上电位置按钮</title>
+<link rel="stylesheet" href="界面样式_demo.css">
+<style>
+/* demo 附加:mock 卡片的迷你曲线占位 */
+.miniChart { height: 70px; border: 1px dashed #234; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  color: #345; font-size: 11px; background: #0a1626; }
+.demobadge { position: fixed; right: 10px; bottom: 8px; color: #fbbf24;
+  font-size: 11px; background: #0008; padding: 2px 8px; border-radius: 4px; z-index: 99; }
+.mockList { color: var(--dim); }
+</style>
+</head>
+<body>
+<div id="globalTip"></div>
+<div class="demobadge">🎨 纯前端 UI demo — 无真机/无通信;右上连接信息为 mock</div>
+
+<!-- ============ 主界面(mock 已连接状态) ============ -->
+<div id="mainView" style="display:flex">
+  <header>
+    <button class="ghost">⏻ 断开</button>
+    <span class="title">机械臂操作交互界面</span>
+    <span class="sep"></span>
+    <span class="badge ok">🟢 无线 192.168.137.247</span>
+    <span class="badge ok">总线:ERROR-ACTIVE</span>
+    <span class="badge">界面主</span>
+  </header>
+  <div class="banner" style="display:none"></div>
+  <main>
+    <!-- 左侧设备面板 -->
+    <aside id="sidePanel">
+      <div class="sideCard" id="cardCan">
+        <h3>🛰️ CAN 通信</h3>
+        <div class="row"><label>连接方式</label><span id="canKindTxt">无线 TCP</span></div>
+        <div class="row"><label>地址/设备</label><span id="canAddrTxt">192.168.137.247</span></div>
+        <div class="row"><label>波特率</label><span id="canBaudTxt">1000 kbps</span></div>
+      </div>
+      <div class="sideCard">
+        <h3>🤖 电机 <span class="sep"></span><button>扫描</button></h3>
+        <div class="row">
+          <input type="number" placeholder="ID 1~32" style="width:64px">
+          <input type="text" placeholder="名称" style="width:70px">
+          <select style="width:76px"><option>V3</option><option>V4.3</option><option>V4.4</option></select>
+        </div>
+        <div class="row"><input type="number" placeholder="减速比" style="width:70px">
+          <select style="width:84px"><option>正转</option><option>反转</option></select>
+          <button>➕ 添加</button></div>
+        <div class="row"><input type="text" placeholder="备注（可选）" style="width:100%"></div>
+        <ul id="motorList">
+          <li class="mockList">🟢 基座云台Yaw #1（V3）</li>
+          <li class="mockList">🟢 大臂Pitch #2（V4.3）</li>
+          <li class="mockList">🟢 小臂Pitch #3（V4.3）</li>
+          <li class="mockList">🟢 手腕Pitch #4（V4.4）</li>
+          <li class="mockList">🟢 末端Yaw #5（V4.4）</li>
+        </ul>
+      </div>
+      <div class="sideCard"><h3>🧭 IMU（预留）</h3><div class="hint">V2.0 接入 · HI12S2-MI1</div></div>
+      <div class="sideCard"><h3>📷 摄像头（预留）</h3><div class="hint">V2.0 接入 · OpenMV RT1062</div></div>
+      <div class="sideCard"><h3>🎮 手柄（预留）</h3><div class="hint">V2.0 接入</div></div>
+    </aside>
+
+    <!-- 右侧交互区 -->
+    <section id="interactArea">
+      <div id="deviceTabs">
+        <button class="tab active">⚙️ 电机交互</button>
+        <button class="tab" disabled>🧭 IMU</button>
+        <button class="tab" disabled>📷 摄像头</button>
+        <button class="tab" disabled>🎮 手柄</button>
+        <span class="sep"></span>
+        <span class="pollRow">刷新周期 <input type="number" value="500" style="width:60px">ms</span>
+      </div>
+      <div id="deviceContent">
+        <div id="motorView">
+          <!-- 上 60%:曲线区(mock 占位) -->
+          <div id="chartArea">
+            <div id="chartToolbar">
+              <span class="lbl">显示参数</span>
+              <label><input type="checkbox" checked> 角度</label>
+              <label><input type="checkbox" checked> 速度</label>
+              <label><input type="checkbox" checked> 电流</label>
+              <span class="sep" style="flex:1"></span>
+              <button>👁 显示全部</button><button>🙈 隐藏全部</button>
+            </div>
+            <div id="chartGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
+              <div class="miniChart">📈 基座Yaw 曲线占位</div>
+              <div class="miniChart">📈 大臂Pitch 曲线占位</div>
+              <div class="miniChart">📈 小臂Pitch 曲线占位</div>
+              <div class="miniChart">📈 手腕Pitch 曲线占位</div>
+              <div class="miniChart">📈 末端Yaw 曲线占位</div>
+            </div>
+          </div>
+          <!-- 下 40%:电机操作 -->
+          <div id="opArea">
+            <div id="opToolbar">
+              <div class="grp">
+                <span><button class="ok">🎯 位置控制</button></span>
+              </div>
+              <div class="grp">
+                <button id="btnSetDefault" data-tip="把当前选中电机的当前位置记为默认位置（每个电机独立）">📍 设置当前位置为默认位置</button>
+                <button id="btnMoveDefault" data-tip="所有已设置默认位置的电机移动到各自默认位置（限幅校验通过才发送，需确认）">🏠 移动到默认位置</button>
+                <button id="btnMarkRest" data-tip="上电位置">📍 记为上电位置</button>
+              </div>
+              <div class="grp">
+                <button class="danger" id="btnEStop" data-tip="紧急停止：全部电机停止保持（停在当前位置，不掉力）。无需确认，一键直达">🛑 紧急停止(保持)</button>
+                <button class="warn" id="btnDisableAll" data-tip="停止(失能)：全部电机掉力，关节可能因重力下落！需确认">⏹ 停止(失能)</button>
+              </div>
+              <span class="sep" style="flex:1"></span>
+              <span class="hint">单击卡片选中 · 双击进入单电机操控(键盘 ↑↓)</span>
+            </div>
+            <div id="motorCards" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+/* ---------- 全局 tooltip(同真界面) ---------- */
+const tipEl = document.getElementById("globalTip");
+document.addEventListener("mouseover", e => {
+  const t = e.target.closest("[data-tip]");
+  if (!t || !t.dataset.tip) return;
+  tipEl.textContent = t.dataset.tip;
+  tipEl.style.display = "block";
+  const r = t.getBoundingClientRect();
+  tipEl.style.left = Math.min(r.left, innerWidth - tipEl.offsetWidth - 8) + "px";
+  tipEl.style.top = (r.top - tipEl.offsetHeight - 8 < 0 ? r.bottom + 8 : r.top - tipEl.offsetHeight - 8) + "px";
+});
+document.addEventListener("mouseout", e => { if (e.target.closest("[data-tip]")) tipEl.style.display = "none"; });
+
+/* ---------- mock 电机与卡片(静态渲染,仅选中/上电位置交互) ---------- */
+const motors = [
+  { id: 1, name: "基座云台Yaw", proto: "V3", ang: "15.81" },
+  { id: 2, name: "大臂Pitch",   proto: "V43", ang: "93.56", restDeg: 93.69, restDegDate: "2026-09-06" },
+  { id: 3, name: "小臂Pitch",   proto: "V43", ang: "-170.40", restDeg: -170.46, restDegDate: "2026-09-06" },
+  { id: 4, name: "手腕Pitch",   proto: "V44", ang: "16.47", restDeg: 16.45, restDegDate: "2026-09-06" },
+  { id: 5, name: "末端Yaw",     proto: "V44", ang: "0.15", restDeg: null, restDegDate: null },
+];
+let selectedId = 2;
+const wrap = document.getElementById("motorCards");
+const btnMarkRest = document.getElementById("btnMarkRest");
+
+function renderCards() {
+  wrap.innerHTML = "";
+  motors.forEach(m => {
+    const card = document.createElement("div");
+    card.className = "mcard" + (m.id === selectedId ? " sel" : "");
+    const restTxt = m.proto !== "V3" && typeof m.restDeg === "number"
+      ? `上电位置 ${m.restDeg.toFixed(2)}°` : "";
+    card.innerHTML = `
+      <div class="mHead"><span class="dot on"></span>
+        <span class="mname">${m.name}<span class="hint"> #${m.id}</span></span>
+        <span class="mang">${m.ang}°</span></div>
+      <div class="mrow"><label>设为零点</label><button>📍 设为零点</button></div>
+      <div class="mrow"><label>设最大角</label><input type="number" style="width:56px"><button>确认</button><span class="hint">°</span></div>
+      <div class="mrow"><label>设最小角</label><input type="number" style="width:56px"><button>确认</button><span class="hint">°</span></div>
+      ${m.proto === "V3" ? "" : `<div class="mrow"><label>上电位置</label><span class="hint">${restTxt || "未记录"}</span></div>`}
+      <div class="mtip">单击选中 · 双击进入单电机操控</div>`;
+    card.onclick = () => { selectedId = m.id; renderCards(); updateBtn(); };
+    wrap.appendChild(card);
+  });
+}
+function updateBtn() {
+  const m = motors.find(x => x.id === selectedId);
+  if (m.proto === "V3") {
+    btnMarkRest.disabled = true;
+    btnMarkRest.dataset.tip = `${m.name}:V3 无上电位置机制(用零点档案/E0 体系)`;
+    return;
+  }
+  btnMarkRest.disabled = false;
+  const has = typeof m.restDeg === "number";
+  btnMarkRest.dataset.tip = (has
+    ? `当前记录 ${m.restDeg.toFixed(2)}°(${m.restDegDate.slice(5)}),点击更新\n`
+    : "未记录\n")
+    + "开电前必须人工把臂摆到的固定位置（建议低势能安全位，有刻度/凸点辅助更准）。"
+    + "上电后系统以此核对角度、纠正急停丢的圈数。\n"
+    + "换结构/换电机/重新设零后必须重新记录。";
+}
+btnMarkRest.onclick = () => {
+  const m = motors.find(x => x.id === selectedId);
+  const has = typeof m.restDeg === "number";
+  if (!confirm(`把 ${m.name}(#${m.id}) 当前位置记为上电位置?\n\n`
+    + (has ? `当前记录:${m.restDeg}°(${m.restDegDate})\n` : "当前未记录\n")
+    + "\n用途:每次开电前人工把臂摆到此位置,上电后核对角度纠正急停丢圈。\n换结构/换电机/重新设零后必须重新记录。`)) return;
+  m.restDeg = parseFloat(m.ang); m.restDegDate = "2026-09-06";
+  renderCards(); updateBtn();
+};
+renderCards();
+updateBtn();
+</script>
+</body>
+</html>
