@@ -51,14 +51,22 @@
 - **领域边界**：IMU 域工作归 IMU 会话（`Database\IMU`），跨域只讨论不定案不落盘；情报写入须用户明确同意
 - 禁更新包列表（hold）：nvidia-l4t-display-kernel / nvidia-l4t-kernel / -dtbs / -headers / -oot-headers / -oot-modules
 
-## ROS2 控制栈（开发进度 2026-09-05）
+## V4 零点漂移机制（2026-09-06 确诊，勿再走弯路）
+
+- **V4 电机 0x20 索引 4（多圈掉电保存）= 0 未开 → 恶性掉电（急停/亏电/卡死重启）→ 多圈计数丢失 → 上电重建 → 显示角离散偏差（整圈折算，5°/10° 倍数，每次掉电不同）**。大臂 -10°/小臂 +30° 实例；X8(V3) 不受影响（界面 0x92 校准兜底）
+- 排查"V4 全不动/V3 正常"先看 9A 电压与 err 位（~19.4V 时 V4 报 0x0004 低压锁存拒运动——电源亏电乌龙教训）
+- **⚠️ 0x76 复位 = 重启 = 丢圈**（索引 4 未持久时）——复位操作前先确认索引 4 状态，勿拿 0x76 反复测试（曾把大臂显示角复位到 -266°）
+- 状态：ID3/ID5 索引 4 已持久开启(1)；ID2/ID4 未持久（写 RAM 成 ROM 不成，正确时序待查 V4.4 手册 0x20 索引 4 节——疑似需断电硬重启）；显示角已乱，最终靠重新设零校正（必须在低势能/支撑下，用户零点原在高势能点，严禁擅自失能）
+- 卡死事件（2026-09-06 未定论）：WiFi 热点模式下界面连接后约 1 分钟系统冷死三次（手动/systemd 都卡过，有线全天正常）——复现时抓 journalctl -k + tegrastats，有线/热点对照
+
+## ROS2 控制栈（开发进度 2026-09-06：六包全完成）
 
 - **包地图与边界规则（2026-09-05 架构决议，勿破）**：
   - **命名规律**：`arm_` 前缀 = 臂脉塔电机域专属（interfaces/protocol/can_bridge/controller）；**外设（IMU/摄像头/手柄）独立 driver 包、用自己的名**（如 hi12s2_imu），不并入臂域；ROS 惯例=协议随设备走，**arm_protocol 只装脉塔电机协议**，其余设备协议归各自 driver，不得并入（边界声明在包 README）
   - **arm_controller = 臂主控总包，一名到底**（命名决议：曾议拆 supervisor+controller，撤销——中小型项目一包演进更常用）：一期=档案/轮询/安全链/流程服务；**二期控制算法模块（后坐抑制等）挂入本包 control/ 或作扩展节点**，届时安全语义=controller 持总闸与授权包络、算法在包络内自主（生成 vs 执行判据写架构文档）
   - **tcp_gateway = Windows 前端（公用）↔ Jetson 统一入口**（非 arm 专属，故不叫 arm_gateway）：一期 v1 帧透传（臂域）→ 二期语义化接 controller → 三期接入外设监控（IMU 曲线/手柄回显/摄像头状态）；**边界：视频走独立流不进帧网关；实验高频数据不出 Jetson（1kHz 采样本地 rosbag），前端只看降频**
   - **单主纪律**：任何时刻总线只有一个轮询/命令主（Windows 界面或 Jetson 栈，二选一，v1 透传期=界面主、controller 只旁听不轮询）
-- **第一期六包已完三**：arm_interfaces（5 msg/7 srv）→ arm_protocol（协议库全移植，pytest 5212）→ can_bridge（真机双向打通）——详见情报「Jetson 控制栈开发进度」条目；剩 arm_controller → tcp_gateway → arm_bringup
+- **六包全部完成（2026-09-06）**：arm_interfaces → arm_protocol(pytest 5228) → can_bridge → arm_controller(88 单测+真机全路径) → tcp_gateway(v1 帧透传界面零改动实测过) → arm_bringup(launch 双模式)；系统部署件 arm-stack.service/arm-ip/arm-net-watch 已装但**因卡死事件当前禁用**（源码与安装见 deploy\README.md，接手方排查完重新 enable）——详见交接「交接_Jetson控制栈_ROS2六包与部署_20260906」
 - **同步机制（已实践）**：Windows 改源码 → `scp -i ~/.ssh/id_ed25519_jetson_go2 -r ROS2/arm_ws/src/<包> nvidia@…:~/ROS2/arm_ws/src/` → tmux ops 内 `cd ~/ROS2/arm_ws && source /opt/ros/humble/setup.bash && colcon build --packages-select <包>` → `source install/setup.bash`
 - **⚠️ 新终端环境**：bashrc 未配 ROS——每个新 tmux 会话必须显式 `source /opt/ros/humble/setup.bash && source ~/ROS2/arm_ws/install/setup.bash`（否则 ros2 命令找不到）
 - **⚠️ Humble 兼容（2026-09-05 真机踩坑）**：无 `QoSPresetProfile`（用 `QoSProfile(depth=100, history=HistoryPolicy.KEEP_LAST)`）；CLI `topic pub/echo` 默认 BEST_EFFORT 与节点 RELIABLE 不匹配——CLI 测试要加 `--qos-reliability reliable`；接口包构建需 rosidl_default_generators（已装）
