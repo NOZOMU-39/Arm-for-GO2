@@ -170,7 +170,11 @@ def parse_reply(proto: str, can_id: int, data, motor=None) -> dict | None:
             out["values"] = {"idx": fidx, "val": fval}
             name = V3_FUNC_NAME.get(fidx) or ("索引" + str(fidx))
             out["summary"] = f"功能控制 {name} = {fval}(回显,写入成功)"
-        elif cmd in (0xA1, 0xA2, 0xA4, 0xA6, 0xA8, 0x80, 0x81, 0x77, 0x78):
+        elif cmd in (0x80, 0x81):
+            # 全零回显帧(2026-09-05 真机实测+手册): 回复=与发送相同(80/81 00...),非状态帧——勿读 temp/iq/spd/enc
+            out["values"] = {}
+            out["summary"] = ("关闭命令已回显(电机已失能)" if cmd == 0x80 else "停止命令已回显(全零帧)")
+        elif cmd in (0xA1, 0xA2, 0xA4, 0xA6, 0xA8, 0x77, 0x78):
             out["values"] = {"temp": data[1], "iq": i16(data, 2) / 100,
                              "spd": i16(data, 4), "enc": u16(data, 6)}
             v = out["values"]
@@ -264,10 +268,13 @@ def parse_reply(proto: str, can_id: int, data, motor=None) -> dict | None:
                 out["values"] = {"text": text}
                 out["summary"] = f"型号:{text}"
             else:
-                part = data[1]
-                text = "".join(chr(b) for b in data[2:7])
-                out["values"] = {"part": part, "text": text}
-                out["summary"] = f"型号片段 {part}:{text}"
+                # V44/X2-7 带参分段(2026-09-05 真机三段实测拼出 RMD-X2-P28-7; 手册 V4.4 版 2.34):
+                # 读取需发 B5 01 索引(1~3), 回复 = D1=0x01 固定标记 + D2=索引回显 + D3-7=5 字符 ASCII;
+                # 无参发送回全 0(曾致"V44 B5 空文本"遗留)
+                idx = data[2]
+                text = "".join(chr(b) for b in data[3:8])
+                out["values"] = {"idx": idx, "text": text}
+                out["summary"] = f"型号片段{idx}:{text}"
         elif cmd == 0xB6:
             out["values"] = {"on": data[7]}
             out["summary"] = f"主动回复:{'已开启' if out['values']['on'] else '已关闭'}"
@@ -287,7 +294,11 @@ def parse_reply(proto: str, can_id: int, data, motor=None) -> dict | None:
                 else:
                     s += f";输出轴 {(fval / g):.0f}°"
             out["summary"] = s
-        elif cmd in (0x80, 0x81, 0x77, 0x78):
+        elif cmd in (0x80, 0x81):
+            # 全零回显帧(2026-09-05 真机实测+手册): 回复=与发送相同(80/81 00...),非状态帧——勿读 temp/iq/spd/ang
+            out["values"] = {}
+            out["summary"] = ("关闭命令已回显(电机已失能)" if cmd == 0x80 else "停止命令已回显(全零帧)")
+        elif cmd in (0x77, 0x78):
             out["values"] = {"temp": data[1], "iq": i16(data, 2) / 100,
                              "spd": i16(data, 4), "ang": i16(data, 6)}
             v = out["values"]

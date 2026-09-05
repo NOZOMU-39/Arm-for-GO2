@@ -600,7 +600,8 @@ const ERR_V44 = [
 ];
 const ERR_V3 = [
   [0x0002, "电机堵转"], [0x0004, "低压保护"], [0x0008, "过压保护"], [0x0010, "过流保护"],
-  [0x0040, "功率超限"], [0x0100, "超速"], [0x1000, "电机过温"], [0x2000, "编码器校准错误"],
+  [0x0040, "功率超限"], [0x0080, "标定参数写入错误"], [0x0100, "超速"], [0x1000, "电机过温"],
+  [0x2000, "编码器校准错误"],
 ];
 const V44_MODE = { 0x01: "电流环模式", 0x02: "位置环模式", 0x03: "速度环模式" };
 const V44_PID_NAME = { 0x01: "电流环KP", 0x02: "电流环KI", 0x04: "速度环KP", 0x05: "速度环KI",
@@ -769,7 +770,13 @@ function parseReply(proto, cid, bytes) {
         out.summary = `功能控制 ${V3_FUNC_NAME[fidx] || ("索引" + fidx)} = ${fval}(回显,写入成功)`;
         break;
       }
-      case 0xA1: case 0xA2: case 0xA4: case 0xA6: case 0xA8: case 0x80: case 0x81: case 0x77: case 0x78:
+      case 0x80: case 0x81:
+        /* 全零回显帧(2026-09-05 真机实测+两版手册): 0x80/0x81 回复=与发送相同(80/81 00...),
+           非状态帧——勿按 temp/iq/spd/enc 解析(否则显示假 0 读数, 真机电机 28℃ 会显示 0℃) */
+        out.values = {};
+        out.summary = cmd === 0x80 ? "关闭命令已回显(电机已失能)" : "停止命令已回显(全零帧)";
+        break;
+      case 0xA1: case 0xA2: case 0xA4: case 0xA6: case 0xA8: case 0x77: case 0x78:
         out.values = { temp: bytes[1], iq: i16(bytes, 2) / 100, spd: i16(bytes, 4), enc: u16(bytes, 6) };
         out.summary = `回复:温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A(输出轴) · 速度 ${rot2out(out.values.spd, rm).toFixed(2)}dps(输出轴) · 编码器 ${out.values.enc}`;
         break;
@@ -846,14 +853,17 @@ function parseReply(proto, cid, bytes) {
         break;
       case 0xB5:
         /* 真机 2026-09-05（Jetson 侧全只读探测）: V43/X6 的 0xB5 回复 D1 起即型号文本
-           （"X6-P36" 分布在 D1~D6，与 V3 同布局）→ V43 分叉走文本；V44/X2 保持分段 */
+           （"X6-P36" 分布在 D1~D6，与 V3 同布局）→ V43 分叉走文本；V44/X2 走带参分段 */
         if (proto === "V43") {
           out.values = { text: String.fromCharCode(...bytes.slice(1, 8)) };
           out.summary = `型号:${out.values.text}`;
           break;
         }
-        out.values = { part: bytes[1], text: String.fromCharCode(...bytes.slice(2, 7)) };
-        out.summary = `型号片段 ${out.values.part}:${out.values.text}`;
+        /* V44/X2-7 带参分段(2026-09-05 真机三段实测拼出 RMD-X2-P28-7; 手册 V4.4 版 2.34):
+           读取需发 B5 01 索引(1~3), 回复 = D1=0x01 固定标记 + D2=索引回显 + D3-7=5 字符 ASCII,
+           型号≤15 字符需三段拼接; 无参发送回全 0(曾致"V44 B5 空文本"遗留) */
+        out.values = { idx: bytes[2], text: String.fromCharCode(...bytes.slice(3, 8)) };
+        out.summary = `型号片段${bytes[2]}:${out.values.text}`;
         break;
       case 0xB6:
         out.values = { on: bytes[7] };
@@ -877,7 +887,13 @@ function parseReply(proto, cid, bytes) {
         out.summary = s;
         break;
       }
-      case 0x80: case 0x81: case 0x77: case 0x78:
+      case 0x80: case 0x81:
+        /* 全零回显帧(2026-09-05 真机实测+两版手册): 0x80/0x81 回复=与发送相同(80/81 00...),
+           非状态帧——勿按 temp/iq/spd/ang 解析(否则显示假 0 读数) */
+        out.values = {};
+        out.summary = cmd === 0x80 ? "关闭命令已回显(电机已失能)" : "停止命令已回显(全零帧)";
+        break;
+      case 0x77: case 0x78:
         out.values = { temp: bytes[1], iq: i16(bytes, 2) / 100, spd: i16(bytes, 4), ang: i16(bytes, 6) };
         out.summary = `系统回复:温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A · 速度 ${rot2out(out.values.spd, rm).toFixed(2)}dps · 角度 ${angForLog(rm, rot2out(out.values.ang, rm))}°`;
         break;
