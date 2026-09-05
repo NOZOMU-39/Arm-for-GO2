@@ -2,7 +2,7 @@
 
 > 机械臂主控设备（图为 TWOWIN T801 定制载板 + NVIDIA 原装 Orin NX 16GB 模组）
 > AI 协作细节见项目 `AI间交流\情报.md`（Jetson 条目）
-> 目录边界（2026-09-05 用户定案）：本目录只放 **Jetson 板上运行**的内容（`control\` ROS2 源码等）；Windows 操作前端 `机械臂操作交互界面\` 保持顶层独立、经 TCP 接入（客户端-服务端）
+> 目录边界（2026-09-05 用户定案）：本目录只放 **Jetson 板上运行**的内容（`ROS2\arm_ws\` 控制软件源码等）；Windows 操作前端 `机械臂操作交互界面\` 保持顶层独立、经 TCP 接入（客户端-服务端）
 
 ---
 
@@ -51,6 +51,15 @@
 - IMU 实测波特率：921600 → 1000Hz 输出
 - ⚠️ 插拔顺序变化会导致 ttyUSB0/1 互换——程序按实际设备名适配
 
+## 机械臂控制软件（ROS2，可选使用）
+- Jetson 正逐步搭载一套 ROS2 机械臂控制软件（源码与进度见文末「深度参考」）
+- 看总线原始帧：`candump can0`（Ctrl+C 退出）
+- 跑 CAN 帧桥节点（当前唯一可跑的软件节点）：
+  ```bash
+  source /opt/ros/humble/setup.bash && source ~/ROS2/arm_ws/install/setup.bash
+  can_bridge            # 在 tmux 会话里跑，方便 Ctrl+C 停
+  ```
+
 ## 常用命令速查
 ```bash
 # 系统状态
@@ -66,23 +75,22 @@ sudo stty -F /dev/ttyUSB0 921600 raw -echo && sudo timeout 2 cat /dev/ttyUSB0 | 
 
 ---
 
-# 🤖 ROS2 控制栈（开发进度 2026-09-05）
-
-> 机械臂控制核心按 ROS2 布局（见 `AI间交流\情报.md` 架构条目）；源码在仓库 `Jetson_Orin_NX\ROS2\arm_ws\`（Windows 开发），本机 `~/ROS2/arm_ws` 是同步构建副本。
-
-| 包 | 状态 |
-|---|---|
-| arm_interfaces（消息契约） | ✅ 完成（5 消息/7 服务，真机构建验证过） |
-| arm_protocol（电机协议库） | ✅ 完成（黄金向量+随机对拍 5212 项测试，真机只读验证通过） |
-| can_bridge（can0 帧桥） | ✅ 完成（真机双向验证：tx 话题→电机→rx 话题） |
-| arm_controller（控制核心） | ⏳ 下一个 |
-| tcp_gateway / arm_bringup | ⏳ 待做 |
-
-看状态/收发：`candump can0`（总线直看）；跑节点：`source /opt/ros/humble/setup.bash && source ~/ROS2/arm_ws/install/setup.bash && can_bridge`（在 tmux 会话里跑，方便 Ctrl+C）。
-
----
-
 # 🔍 深度参考（需要时再看）
+
+## ROS2 控制栈（进度 2026-09-05）
+
+| 软件包 | 干什么 | 状态 |
+|---|---|---|
+| arm_interfaces | 消息/服务定义（控制软件间的"通信格式"） | ✅ 完成 |
+| arm_protocol | 电机协议库（把指令编成电机帧、把回复译成人话） | ✅ 完成（5212 项自动测试 + 真机只读验证过） |
+| can_bridge | CAN 帧桥（软件与 can0 总线之间的"翻译通道"） | ✅ 完成（真机双向验证过） |
+| arm_controller | 控制核心（轮询/安全限幅/设零） | ⏳ 开发中 |
+| tcp_gateway / arm_bringup | 界面接入 / 一键启动 | ⏳ 待做 |
+
+- 源码在 Windows 仓库 `Jetson_Orin_NX\ROS2\arm_ws\`（开发在 Windows 侧），本机 `~/ROS2/arm_ws` 是同步构建副本
+- 架构决策与开发细节：见 `AI间交流\情报.md` Jetson 条目（AI 协作文档）
+
+## 资料索引
 
 | 想看什么 | 去哪 |
 |---|---|
