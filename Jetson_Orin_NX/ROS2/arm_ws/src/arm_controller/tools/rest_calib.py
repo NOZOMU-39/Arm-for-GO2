@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """低势能自落位参考校正工具(V4 甩动丢圈软件折回) —— 2026-09-06
 
-用途: 急停/掉电甩动丢圈后, 臂自落低势能谷 → 读 0x92 vs 档案 restDeg →
+用途: 急停/掉电甩动丢圈后, 上电前人工把臂摆到上电参考位 → 读 0x92 vs 档案 restDeg →
      差 ≈ N×turnDeg → E4 += N×turnDeg(纯软件折回, 零 ROM 写入)。
 用法(Jetson, tmux ops):
     source ~/ROS2/arm_ws/install/setup.bash && python3 rest_calib.py        # dry-run
     python3 rest_calib.py --apply                                           # 落盘 registry.json(自动备份)
-前置: registry.json 每台 V4 已标 restDeg/turnDeg(谷位期望/一圈输出角);
-      arm 在低势能谷位(自落到位); 总线仅本工具活动(勿与界面 TCP 并发轮询)。
+前置: registry.json 每台 V4 已标 restDeg/turnDeg(上电参考位期望角/一圈输出角);
+      人已把臂摆到上电参考位(规范要求, 见界面「记为上电位置」); 总线仅本工具活动。
 安全: 全只读+档案写, 不碰电机 ROM/运动。
 """
 import argparse
@@ -66,8 +66,8 @@ def main():
         import datetime
         today = datetime.date.today().isoformat()
         print("== 标定谷位档案(--mark-rest) ==")
-        print("⚠️ 前提: 臂已无电自落低势能谷位, 且刚完成设零(显示角=机械真实角)")
-        print("   本操作把『当前读角』写为 restDeg——结构更改/重新设零后必须重跑本命令")
+        print("⚠️ 前提: 人已把臂人工摆到上电参考位(建议低势能+刻度/凸点), 且刚完成设零(显示=真实角)")
+        print("   本操作把『当前读角』写为 restDeg(=界面的「上电位置」档案)——结构更改/重新设零后必须重标")
         n_ok = 0
         for m in motors:
             mid = m.get("id")
@@ -107,7 +107,7 @@ def main():
         n = lost_turns(read, rest, turn, tol_deg=args.tol)
         if n is None:
             print(f"ID{mid}: 读 {read:.2f}° vs 谷位 {rest}°(标定 {date}) → 非整圈偏差, 不校, 交人工")
-            print(f"       可能: ①臂不在谷位(手动移回或等自落) ②谷位档案过期(结构更改/重设零后没重标 → 跑 --mark-rest)")
+            print(f"       可能: ①臂不在上电参考位(人工摆正后再跑) ②档案过期(结构更改/重设零后没重标 → 界面或 --mark-rest 重记)")
             continue
         if n == 0:
             print(f"ID{mid}: 读 {read:.2f}° 与谷位一致(差 {read-rest:+.2f}°, 档案 {date}), 无需校正 ✅")

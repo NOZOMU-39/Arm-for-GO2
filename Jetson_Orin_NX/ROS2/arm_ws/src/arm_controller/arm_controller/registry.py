@@ -6,9 +6,9 @@
   E0 V3 零点档案(固件角,数值或 None) | E0Date str|None | v9cSemantics "pulse"/"angle"|None
   limMinDeg/limMaxDeg 软件限位(°|None=未设) | limMaxSpd/limMaxIq 可选(°|A,None=未设)
   E4 V4 显示偏移(缺省 0) | defaultPosDeg 默认位置(°|None)
-  restDeg V4 低势能自落谷位期望显示角(°|None, 2026-09-06 自落参考校正档案)
-          ⚠️ 结构参数非永久常量: 结构更改/重新设零/换电机后谷位变化 → 必须人工重标
-          (rest_calib.py --mark-rest, 见 arm_controller AGENTS 与情报 09-06 条目)
+  restDeg V4 上电参考位期望显示角(°|None; 界面文案"上电位置", 2026-09-06 校正档案)
+          ⚠️ 结构参数非永久常量: 结构更改/重新设零/换电机后参考位显示角变化 → 必须重标
+          (界面「记为上电位置」按钮 或 rest_calib.py --mark-rest; 规范=上电前人工摆位)
   restDegDate 谷位档案标定日期(str|None)
   turnDeg V4 转子 1 圈对应输出角(°|None, X6-40=10.0(36:1)、X2-7≈12.78(28.17:1);
           急停甩动丢圈的输出单位 = N×turnDeg; 随减速比固件档案, 换电机需核对)
