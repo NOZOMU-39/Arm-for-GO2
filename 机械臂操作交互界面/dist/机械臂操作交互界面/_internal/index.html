@@ -2050,12 +2050,16 @@ function updateMarkRestTip() {
   const btn = document.getElementById("btnMarkRest");
   if (!btn) return;
   const m = motorById(selectedId);
-  if (!m || m.proto === "V3") {
+  if (m && m.proto === "V3") {
     btn.disabled = true;
-    btn.dataset.tip = m ? `${m.name}:V3 无上电位置机制(用零点档案/E0 体系)` : "";
+    btn.dataset.tip = `${m.name}:V3 无上电位置机制(用零点档案/E0 体系)`;
     return;
   }
   btn.disabled = false;
+  if (!m) {
+    btn.dataset.tip = "未选中电机——先点选一台 V4 电机(如大臂/小臂/腕/末端)";
+    return;
+  }
   const has = typeof m.restDeg === "number" && isFinite(m.restDeg);
   btn.dataset.tip = (has
     ? (m.restStale ? "⚠️ 设零后已失效!请重标\n" : `当前记录 ${m.restDeg.toFixed(2)}°(${m.restDegDate ? m.restDegDate.slice(5) : "?"}),点击更新\n`)
@@ -2562,7 +2566,11 @@ function init() {
   document.getElementById("btnDisableAll").onclick = btnDisable;
   document.getElementById("btnSetDefault").onclick = btnSetDefaultPos;
   document.getElementById("btnMoveDefault").onclick = btnMoveDefault;
-  document.getElementById("btnMarkRest").onclick = () => { const m = motorById(selectedId); if (m) markRest(m.id); };
+  document.getElementById("btnMarkRest").onclick = () => {
+    const m = motorById(selectedId);
+    if (!m) { showBanner("请先点选要操作的电机", true); return; }
+    if (m.proto !== "V3") markRest(m.id);
+  };
   updateMarkRestTip();
   document.getElementById("btnMethod").addEventListener("mousedown", methodPressStart);
   document.getElementById("btnMethod").addEventListener("mouseup", methodPressCancel);
