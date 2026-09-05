@@ -16,10 +16,49 @@
 </head>
 <body>
 <div id="globalTip"></div>
-<div class="demobadge">🎨 纯前端 UI demo — 无真机/无通信;右上连接信息为 mock</div>
+<div class="demobadge">🎨 纯前端 UI demo — 无真机/无通信;数据为 mock</div>
+
+<!-- ============ 连接页(未连接状态) ============ -->
+<div id="connectView">
+  <h1>机械臂操作交互界面</h1>
+  <div class="sub">GO2 武器臂 · 5 关节 · 无线/有线双通道</div>
+  <div class="connectCards">
+    <div class="connectCard">
+      <h2>🔌 USB 直连</h2>
+      <div class="row">
+        <label data-tip="电脑上已插入的 USBCAN 模块（自动探测，带 ✓ 的为实际探测成功）；列表为空时点「刷新」重试，若仍为空请检查驱动或改用无线连接">设备型号</label>
+        <select id="usbDev"><option>USBCANFD-800U ✓</option></select>
+        <button data-tip="重新扫描 USB 上的 CAN 模块">刷新</button>
+      </div>
+      <div class="row"><label>设备索引</label><input type="number" value="0" min="0" max="15"></div>
+      <div class="row"><label>通道</label><input type="number" value="0" min="0" max="1"></div>
+      <div class="row">
+        <label>波特率</label>
+        <select><option value="1000" selected>1000 kbps</option><option value="500">500 kbps</option></select>
+        <span class="hint">kbps</span>
+      </div>
+      <button class="btnConnect" id="demoUsbConn">连 接</button>
+    </div>
+    <div class="connectCard">
+      <h2>📡 无线连接</h2>
+      <div class="row">
+        <label data-tip="ESP32 无线 CAN 中继的地址。AP 模式固定 192.168.4.1；连了电脑热点时填 ESP32 的 STA IP（热点后台可查）。留空 = 自动搜索（AP 直连 → 本机网段 → 热点网段 → 串口，需要几秒）">设备地址</label>
+        <input type="text" id="wifiHost" placeholder="192.168.4.1（留空自动搜索）" data-tip="ESP32 的 IP 地址。AP 模式固定 192.168.4.1（需先连接 WiFi：ESP32-WiFi-CAN，密码 12345678）；STA 模式填热点分配的 IP。留空自动搜索">
+      </div>
+      <div class="row">
+        <label>波特率</label>
+        <select id="wifiBaud"><option value="1000" selected>1000 kbps</option><option value="500">500 kbps</option></select>
+        <span class="hint">kbps</span>
+      </div>
+      <div class="row"><span class="hint">留空地址自动搜索：逐网段扫描，最多约 1 分钟</span></div>
+      <button class="btnConnect" id="demoWifiConn">连 接</button>
+    </div>
+  </div>
+  <div class="sub" data-tip="">🎨 demo：点上方「连接」按钮模拟进入主界面（无真实通信）</div>
+</div>
 
 <!-- ============ 主界面(mock 已连接状态) ============ -->
-<div id="mainView" style="display:flex">
+<div id="mainView" style="display:none">
   <header>
     <button class="ghost">⏻ 断开</button>
     <span class="title">机械臂操作交互界面</span>
@@ -99,18 +138,49 @@
                 <span><button class="ok">🎯 位置控制</button></span>
               </div>
               <div class="grp">
+                <button id="btnMarkRest" data-tip="上电位置">📍 记为上电位置</button>
                 <button id="btnSetDefault" data-tip="把当前选中电机的当前位置记为默认位置（每个电机独立）">📍 设置当前位置为默认位置</button>
                 <button id="btnMoveDefault" data-tip="所有已设置默认位置的电机移动到各自默认位置（限幅校验通过才发送，需确认）">🏠 移动到默认位置</button>
-                <button id="btnMarkRest" data-tip="上电位置">📍 记为上电位置</button>
               </div>
               <div class="grp">
-                <button class="danger" id="btnEStop" data-tip="紧急停止：全部电机停止保持（停在当前位置，不掉力）。无需确认，一键直达">🛑 紧急停止(保持)</button>
-                <button class="warn" id="btnDisableAll" data-tip="停止(失能)：全部电机掉力，关节可能因重力下落！需确认">⏹ 停止(失能)</button>
+                <button class="warn" id="btnEStop" data-tip="紧急停止：全部电机停止保持（停在当前位置，不掉力）。无需确认，一键直达">⚠️ 紧急停止(保持)</button>
+                <button class="danger" id="btnDisableAll" data-tip="停止(失能)：全部电机掉力，关节可能因重力下落！需确认">🛑 停止(失能)</button>
               </div>
               <span class="sep" style="flex:1"></span>
               <span class="hint">单击卡片选中 · 双击进入单电机操控(键盘 ↑↓)</span>
             </div>
             <div id="motorCards" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px"></div>
+            <!-- 单电机操控视图(真界面同款:默认隐藏,.show 显示;motorCards 保留) -->
+            <div id="singleView">
+              <div class="sHead">
+                <button id="btnSingleBack" data-tip="返回多电机操作界面">← 返回</button>
+                <span class="sName" id="singleName">—</span>
+                <span class="curAng" id="svAng">—</span>
+                <span class="hint" id="svLim"></span>
+                <span class="sep" style="flex:1"></span>
+              </div>
+              <div class="row">
+                <label data-tip="键盘 ↑/↓ 运动速度（°/s）">运动速度</label>
+                <input type="number" id="kbSpeedIn" value="20" min="0" style="width:70px">
+                <span class="hint">°/s</span>
+                <span class="kbHint">键盘:按住 ↑ 逆时针(+) / ↓ 顺时针(−) 运动,松手即停;← / → 切换电机(轮转)</span>
+              </div>
+              <div class="row">
+                <label data-tip="目标角度（相对零点，超限只提示不动作）">绝对位置</label>
+                <input type="number" id="svAbsIn" style="width:80px"><span class="hint">°</span>
+                <button id="btnSvAbs">执行</button>
+              </div>
+              <div class="row">
+                <label data-tip="增量角度（正=逆时针，负=顺时针）">相对位置</label>
+                <input type="number" id="svRelIn" style="width:80px"><span class="hint">°</span>
+                <button id="btnSvRel">执行</button>
+              </div>
+            </div>
+            <!-- 界面日志(辅助排查,mock) -->
+            <div id="logArea">
+              <div class="logHead" id="logHead">📋 界面日志 <span class="hint">(点击展开/收起)</span></div>
+              <div id="logboxWrap" style="display:none"><div id="logbox" style="max-height:110px;overflow:auto"></div></div>
+            </div>
           </div>
         </div>
       </div>
@@ -118,7 +188,61 @@
   </main>
 </div>
 
+<!-- ============ 危险操作确认弹窗 ============ -->
+<div id="modalMask" style="display:none">
+  <div class="modal">
+    <h3 id="modalTitle">确认</h3>
+    <div class="msg" id="modalMsg"></div>
+    <div class="btns">
+      <button id="modalCancel">取 消</button>
+      <button class="danger" id="modalOk">确 认</button>
+    </div>
+  </div>
+</div>
+<div class="banner warn" id="demoBanner" style="display:none;position:fixed;top:44px;left:0;right:0;z-index:200"></div>
+
 <script>
+/* ---------- mock 全局(同真界面语义):showConfirm/showBanner/addLog ---------- */
+function showConfirm(title, msg) {
+  return new Promise(res => {
+    document.getElementById("modalTitle").textContent = title;
+    document.getElementById("modalMsg").textContent = msg;
+    const mask = document.getElementById("modalMask");
+    mask.style.display = "flex";
+    modalResolve = res;
+  });
+}
+let modalResolve = null;
+document.getElementById("modalOk").onclick = () => {
+  document.getElementById("modalMask").style.display = "none";
+  if (modalResolve) { modalResolve(true); modalResolve = null; }
+};
+document.getElementById("modalCancel").onclick = () => {
+  document.getElementById("modalMask").style.display = "none";
+  if (modalResolve) { modalResolve(false); modalResolve = null; }
+};
+let bannerTimer = null;
+function showBanner(msg, isErr) {
+  const b = document.getElementById("demoBanner");
+  b.textContent = msg;
+  b.className = "banner " + (isErr ? "err" : "warn") + " demoBannerShow";
+  b.style.display = "block";
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => b.style.display = "none", 6000);
+}
+function addLog(tag, msg) {
+  const box = document.getElementById("logbox");
+  const line = document.createElement("div");
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${tag} ${msg}`;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+  if (box.children.length > 120) box.removeChild(box.firstChild);
+}
+document.getElementById("logHead").onclick = () => {
+  const w = document.getElementById("logboxWrap");
+  w.style.display = w.style.display === "none" ? "" : "none";
+};
+
 /* ---------- 全局 tooltip(同真界面) ---------- */
 const tipEl = document.getElementById("globalTip");
 document.addEventListener("mouseover", e => {
@@ -132,63 +256,230 @@ document.addEventListener("mouseover", e => {
 });
 document.addEventListener("mouseout", e => { if (e.target.closest("[data-tip]")) tipEl.style.display = "none"; });
 
-/* ---------- mock 电机与卡片(静态渲染,仅选中/上电位置交互) ---------- */
+/* ---------- 两态切换:连接页 ↔ 主界面(mock) ---------- */
+function enterMain() {
+  document.getElementById("connectView").style.display = "none";
+  document.getElementById("mainView").style.display = "flex";
+  document.body.style.overflow = "hidden";
+  addLog("sys", "连接成功(无线 192.168.137.247, 1000kbps)——开始状态刷新");
+}
+function backToConnect() {
+  document.getElementById("mainView").style.display = "none";
+  document.getElementById("connectView").style.display = "";
+  document.body.style.overflow = "";
+  addLog("sys", "已断开连接,返回连接页");
+}
+document.getElementById("demoUsbConn").onclick = () => { addLog("sys", "USB 直连(ZLG 800U 通道0)"); enterMain(); };
+document.getElementById("demoWifiConn").onclick = () => { addLog("sys", "无线连接发起"); enterMain(); };
+document.querySelector("#mainView header button").onclick = backToConnect;
+
+/* ---------- mock 电机(虚构数据) ---------- */
 const motors = [
-  { id: 1, name: "基座云台Yaw", proto: "V3", ang: "15.81" },
-  { id: 2, name: "大臂Pitch",   proto: "V43", ang: "93.56", restDeg: 93.69, restDegDate: "2026-09-06" },
-  { id: 3, name: "小臂Pitch",   proto: "V43", ang: "-170.40", restDeg: -170.46, restDegDate: "2026-09-06" },
-  { id: 4, name: "手腕Pitch",   proto: "V44", ang: "16.47", restDeg: 16.45, restDegDate: "2026-09-06" },
-  { id: 5, name: "末端Yaw",     proto: "V44", ang: "0.15", restDeg: null, restDegDate: null },
+  { id: 1, name: "基座云台Yaw", proto: "V3",  ang: 15.81, zeroing: false, restDeg: null, restDegDate: null, restStale: false },
+  { id: 2, name: "大臂Pitch",   proto: "V43", ang: 93.56, zeroing: false, restDeg: 93.69, restDegDate: "2026-09-06", restStale: false },
+  { id: 3, name: "小臂Pitch",   proto: "V43", ang: -170.40, zeroing: false, restDeg: -170.46, restDegDate: "2026-09-06", restStale: false },
+  { id: 4, name: "手腕Pitch",   proto: "V44", ang: 16.47, zeroing: false, restDeg: 16.45, restDegDate: "2026-09-06", restStale: false },
+  { id: 5, name: "末端Yaw",     proto: "V44", ang: 0.15, zeroing: false, restDeg: null, restDegDate: null, restStale: false },
 ];
 let selectedId = 2;
+let singleId = null;   // 非 null = 单电机操控视图激活
 const wrap = document.getElementById("motorCards");
 const btnMarkRest = document.getElementById("btnMarkRest");
+const mById = id => motors.find(x => x.id === id);
 
+/* ---------- 卡片渲染 ---------- */
 function renderCards() {
   wrap.innerHTML = "";
   motors.forEach(m => {
     const card = document.createElement("div");
     card.className = "mcard" + (m.id === selectedId ? " sel" : "");
+    const angTxt = m.zeroing ? "设零中…" : m.ang.toFixed(2) + "°";
     const restTxt = m.proto !== "V3" && typeof m.restDeg === "number"
-      ? `上电位置 ${m.restDeg.toFixed(2)}°` : "";
+      ? (m.restStale ? "⚠️ " : "") + m.restDeg.toFixed(2) + "°" + (m.restStale ? "(需重标)" : "")
+      : "未记录";
     card.innerHTML = `
-      <div class="mHead"><span class="dot on"></span>
+      <div class="mHead"><span class="dot ${m.zeroing ? "" : "on"}"></span>
         <span class="mname">${m.name}<span class="hint"> #${m.id}</span></span>
-        <span class="mang">${m.ang}°</span></div>
-      <div class="mrow"><label>设为零点</label><button>📍 设为零点</button></div>
-      <div class="mrow"><label>设最大角</label><input type="number" style="width:56px"><button>确认</button><span class="hint">°</span></div>
-      <div class="mrow"><label>设最小角</label><input type="number" style="width:56px"><button>确认</button><span class="hint">°</span></div>
-      ${m.proto === "V3" ? "" : `<div class="mrow"><label>上电位置</label><span class="hint">${restTxt || "未记录"}</span></div>`}
+        <span class="mang">${angTxt}</span></div>
+      <div class="mrow"><label>设为零点</label><button class="zkBtn">📍 设为零点</button></div>
+      <div class="mrow"><label>设最大角</label><input type="number" class="limIn" style="width:52px"><button class="limBtn" data-k="max">确认</button></div>
+      <div class="mrow"><label>设最小角</label><input type="number" class="limIn" style="width:52px"><button class="limBtn" data-k="min">确认</button></div>
+      <div class="mrow"><label>上电位置</label><span class="hint">${m.proto === "V3" ? "—（V3 无此机制）" : restTxt}</span></div>
       <div class="mtip">单击选中 · 双击进入单电机操控</div>`;
-    card.onclick = () => { selectedId = m.id; renderCards(); updateBtn(); };
+    card.onclick = () => { if (!m.zeroing) { selectedId = m.id; renderCards(); updateBtn(); } };
+    card.ondblclick = () => { if (!m.zeroing) openSingle(m.id); };
+    card.querySelector(".zkBtn").onclick = e => { e.stopPropagation(); setZeroMock(m.id); };
+    card.querySelectorAll(".limBtn").forEach(b => b.onclick = e => {
+      e.stopPropagation();
+      const v = parseFloat(b.parentElement.querySelector(".limIn").value);
+      if (isNaN(v)) { showBanner("请输入角度数值", true); return; }
+      addLog("warn", `${m.name}:${b.dataset.k === "max" ? "最大角" : "最小角"}设为 ${v}°(mock)`);
+      showBanner(`✅ ${m.name} ${b.dataset.k === "max" ? "最大角" : "最小角"}已设为 ${v}°`);
+    });
     wrap.appendChild(card);
   });
 }
+
+/* ---------- 上电位置按钮状态(选中电机联动) ---------- */
 function updateBtn() {
-  const m = motors.find(x => x.id === selectedId);
-  if (m.proto === "V3") {
+  const m = mById(selectedId);
+  if (!m || m.proto === "V3") {
     btnMarkRest.disabled = true;
-    btnMarkRest.dataset.tip = `${m.name}:V3 无上电位置机制(用零点档案/E0 体系)`;
+    btnMarkRest.dataset.tip = m ? `${m.name}:V3 无上电位置机制(用零点档案/E0 体系)` : "";
     return;
   }
   btnMarkRest.disabled = false;
   const has = typeof m.restDeg === "number";
   btnMarkRest.dataset.tip = (has
-    ? `当前记录 ${m.restDeg.toFixed(2)}°(${m.restDegDate.slice(5)}),点击更新\n`
+    ? (m.restStale ? "⚠️ 设零后已失效!\n" : `当前记录 ${m.restDeg.toFixed(2)}°(${m.restDegDate.slice(5)}),点击更新\n`)
     : "未记录\n")
     + "开电前必须人工把臂摆到的固定位置（建议低势能安全位，有刻度/凸点辅助更准）。"
     + "上电后系统以此核对角度、纠正急停丢的圈数。\n"
     + "换结构/换电机/重新设零后必须重新记录。";
 }
-btnMarkRest.onclick = () => {
-  const m = motors.find(x => x.id === selectedId);
+btnMarkRest.onclick = async () => {
+  const m = mById(selectedId);
+  if (!m || m.proto === "V3") return;
   const has = typeof m.restDeg === "number";
-  if (!confirm(`把 ${m.name}(#${m.id}) 当前位置记为上电位置?\n\n`
+  const ok = await showConfirm("记录上电位置",
+    `把 ${m.name}(#${m.id}) 当前位置 ${m.ang.toFixed(2)}° 记为上电位置?\n\n`
     + (has ? `当前记录:${m.restDeg}°(${m.restDegDate})\n` : "当前未记录\n")
-    + "\n用途:每次开电前人工把臂摆到此位置,上电后核对角度纠正急停丢圈。\n换结构/换电机/重新设零后必须重新记录。`)) return;
-  m.restDeg = parseFloat(m.ang); m.restDegDate = "2026-09-06";
+    + "\n用途:每次开电前人工把臂摆到此位置,上电后核对角度纠正急停丢圈。\n换结构/换电机/重新设零后必须重新记录。");
+  if (!ok) return;
+  m.restDeg = Math.round(m.ang * 100) / 100; m.restDegDate = "2026-09-06"; m.restStale = false;
+  addLog("sys", `${m.name}:上电位置记录 ${m.restDeg}°(${m.restDegDate})`);
+  renderCards(); updateBtn();
+  showBanner(`✅ ${m.name} 上电位置已记录 ${m.restDeg}°——开电前请把臂摆到此位置`);
+};
+
+/* ---------- 设零流程(mock:V4 三步 + 上电位置失效联动提示 = 本次新增逻辑展示) ---------- */
+async function setZeroMock(id) {
+  const m = mById(id);
+  if (m.zeroing) return;
+  const ok = await showConfirm("设为零点",
+    `确认:${m.name}(#${id}) 当前位置 = 零点(0°)?\n\n`
+    + (m.proto === "V3" ? "V3:记录零点档案(需 0x92 到位)"
+        : "V4:三步含失能(电机掉力!先做好机械防护)——\n0x80 失能 → 0x64 写 ROM → 0x76 复位(约 10s)"));
+  if (!ok) return;
+  m.zeroing = true; renderCards(); addLog("sys", `📍 设零开始:${m.name}(#${id})`);
+  if (m.proto === "V3") {
+    await new Promise(r => setTimeout(r, 600));
+    m.zeroing = false; m.ang = 0;
+    addLog("sys", `✅ ${m.name} 零点已标定:当前位置 = 0°(V3 档案已记录)`);
+  } else {
+    addLog("sys", `${m.name}:1/3 失能 0x80 已发送`);
+    await new Promise(r => setTimeout(r, 400));
+    addLog("sys", `${m.name}:2/3 写零点 0x64 已发送——等待 ROM 写入`);
+    await new Promise(r => setTimeout(r, 600));
+    addLog("sys", `${m.name}:3/3 复位 0x76 已发送——电机复位中约 10s 不响应属正常`);
+    await new Promise(r => setTimeout(r, 1200));
+    m.zeroing = false; m.ang = 0;
+    // ⚠️ 新联动:设零完成 → 上电位置档案失效提示
+    addLog("sys", `✅ ${m.name} 零点已写入固件:当前位置 = 0°(V4 三步)`);
+    if (typeof m.restDeg === "number") {
+      m.restStale = true;
+      showBanner(`⚠️ ${m.name} 零点已更新——之前记录的上电位置(${m.restDeg.toFixed(2)}°)已失效:请把臂摆回上电参考位,点「📍 记为上电位置」重新记录`, true);
+      addLog("warn", `${m.name}:上电位置档案失效,需重标`);
+    }
+  }
+  renderCards(); updateBtn();
+}
+
+/* ---------- 单电机操控视图(真界面同款:singleView.show,motorCards 保留) ---------- */
+function openSingle(id) {
+  singleId = id;
+  document.getElementById("singleView").classList.add("show");
+  const m = mById(id);
+  document.getElementById("singleName").textContent = `${m.name} #${m.id}(${m.proto})`;
+  document.getElementById("svLim").textContent = "限位:— ~ —";
+  document.getElementById("svAng").textContent = m.ang.toFixed(2) + "°";
+  addLog("sys", `进入单电机操控:${m.name}`);
+}
+document.getElementById("btnSingleBack").onclick = () => {
+  singleId = null;
+  document.getElementById("singleView").classList.remove("show");
   renderCards(); updateBtn();
 };
+/* 键盘 ↑↓ 假运动(单机视图激活时,按住连续) */
+const kbState = {};
+document.addEventListener("keydown", e => {
+  if (singleId === null || mById(singleId).zeroing) return;
+  const spd = parseFloat(document.getElementById("kbSpeedIn").value) || 20;
+  if (e.key === "ArrowUp") { kbState.up = true; moveTick(singleId, spd); }
+  else if (e.key === "ArrowDown") { kbState.down = true; moveTick(singleId, -spd); }
+  else if (e.key === "ArrowLeft") { selectSingle(-1); }
+  else if (e.key === "ArrowRight") { selectSingle(1); }
+});
+document.addEventListener("keyup", e => { kbState.up = false; kbState.down = false; });
+setInterval(() => {
+  if (singleId === null) return;
+  const spd = parseFloat(document.getElementById("kbSpeedIn").value) || 20;
+  if (kbState.up) moveTick(singleId, spd);
+  else if (kbState.down) moveTick(singleId, -spd);
+}, 100);
+function moveTick(id, dDeg) {
+  const m = mById(id);
+  m.ang = Math.round((m.ang + dDeg * 0.1) * 100) / 100;
+  document.getElementById("svAng").textContent = m.ang.toFixed(2) + "°";
+}
+function selectSingle(delta) {
+  const idx = motors.findIndex(x => x.id === singleId);
+  const nxt = motors[(idx + delta + motors.length) % motors.length];
+  openSingle(nxt.id);
+}
+/* 绝对/相对位置执行(mock) */
+document.getElementById("btnSvAbs").onclick = async () => {
+  const m = mById(singleId); if (!m) return;
+  const v = parseFloat(document.getElementById("svAbsIn").value);
+  if (isNaN(v)) { showBanner("请输入目标角度", true); return; }
+  const ok = await showConfirm("绝对位置", `${m.name} → ${v}°(限幅校验通过,模拟执行)`);
+  if (!ok) return;
+  m.ang = v; document.getElementById("svAng").textContent = m.ang.toFixed(2) + "°";
+  addLog("sys", `${m.name}:绝对位置执行 ${v}°(mock)`);
+};
+document.getElementById("btnSvRel").onclick = async () => {
+  const m = mById(singleId); if (!m) return;
+  const v = parseFloat(document.getElementById("svRelIn").value);
+  if (isNaN(v)) { showBanner("请输入增量角度", true); return; }
+  m.ang = Math.round((m.ang + v) * 100) / 100;
+  document.getElementById("svAng").textContent = m.ang.toFixed(2) + "°";
+  addLog("sys", `${m.name}:相对位置 +${v}° → ${m.ang}°(mock)`);
+};
+
+/* ---------- 工具栏其余按钮(确认链 mock) ---------- */
+document.getElementById("btnSetDefault").onclick = async () => {
+  const m = mById(selectedId); if (!m) return;
+  const ok = await showConfirm("设置当前位置为默认位置",
+    `把 ${m.name}(#${m.id}) 当前位置 ${m.ang.toFixed(2)}° 记为默认位置?`);
+  if (!ok) return;
+  m.defaultPosDeg = Math.round(m.ang * 100) / 100;
+  addLog("sys", `${m.name}:默认位置记录 ${m.defaultPosDeg}°(mock)`);
+  showBanner(`✅ ${m.name} 默认位置已记录 ${m.defaultPosDeg}°`);
+};
+document.getElementById("btnMoveDefault").onclick = async () => {
+  const withDef = motors.filter(x => typeof x.defaultPosDeg === "number");
+  const msg = withDef.length
+    ? `将按「末端→基座」顺序移动 ${withDef.length} 台回默认位置:\n`
+      + withDef.map(x => `· ${x.name}(#${x.id}) → ${x.defaultPosDeg}°`).join("\n")
+    : "尚未设置任何默认位置——全部电机改为停止保持。";
+  const ok = await showConfirm("🏠 全电机回默认位置", msg);
+  if (!ok) return;
+  withDef.forEach(x => { x.ang = x.defaultPosDeg; });
+  if (singleId) document.getElementById("svAng").textContent = mById(singleId).ang.toFixed(2) + "°";
+  renderCards();
+  addLog("sys", `限幅恢复完成:${withDef.length} 台回默认位置(mock)`);
+};
+document.getElementById("btnEStop").onclick = () => {
+  addLog("warn", "🛑 紧急停止:全部电机停止保持(无需确认,mock)");
+  showBanner("🛑 已紧急停止:全部电机停在当前位置");
+};
+document.getElementById("btnDisableAll").onclick = async () => {
+  const ok = await showConfirm("⏹ 停止(失能)", "全部电机掉力,关节可能因重力下落!确认失能?");
+  if (!ok) return;
+  addLog("warn", "⏹ 全部电机已失能(mock)——掉电自落场景可演示「摆回上电位置→校正」");
+  showBanner("⏹ 全部电机已失能(mock)");
+};
+
 renderCards();
 updateBtn();
 </script>

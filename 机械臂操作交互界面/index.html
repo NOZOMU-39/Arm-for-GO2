@@ -456,13 +456,13 @@ main { flex: 1; display: flex; min-height: 0; }
                 </span>
               </div>
               <div class="grp">
+                <button id="btnMarkRest" data-tip="上电位置">📍 记为上电位置</button>
                 <button id="btnSetDefault" data-tip="把当前选中电机的当前位置记为默认位置（每个电机独立）">📍 设置当前位置为默认位置</button>
                 <button id="btnMoveDefault" data-tip="所有已设置默认位置的电机移动到各自默认位置（限幅校验通过才发送，需确认）">🏠 移动到默认位置</button>
-                <button id="btnMarkRest" data-tip="上电位置">📍 记为上电位置</button>
               </div>
               <div class="grp">
-                <button class="danger" id="btnEStop" data-tip="紧急停止：全部电机停止保持（停在当前位置，不掉力）。无需确认，一键直达">🛑 紧急停止(保持)</button>
-                <button class="warn" id="btnDisableAll" data-tip="停止(失能)：全部电机掉力，关节可能因重力下落！需确认">⏹ 停止(失能)</button>
+                <button class="warn" id="btnEStop" data-tip="紧急停止：全部电机停止保持（停在当前位置，不掉力）。无需确认，一键直达">⚠️ 紧急停止(保持)</button>
+                <button class="danger" id="btnDisableAll" data-tip="停止(失能)：全部电机掉力，关节可能因重力下落！需确认">🛑 停止(失能)</button>
               </div>
               <span class="sep" style="flex:1"></span>
               <span class="hint" data-tip="">单击卡片选中 · 双击进入单电机操控(键盘 ↑↓)</span>
@@ -1335,27 +1335,8 @@ function selectMotor(id) {
   renderMotors();
   renderMotorCards();
   renderChartGrid();
-  updateMarkRestBtn();
+  updateMarkRestTip();
   addLog("sys", `选中电机:${motorById(id).name}(#${id})`);
-}
-/* 上电位置按钮状态:V4 可用(V3 无此机制);已记录时 tip 显示当前档案值 */
-function updateMarkRestBtn() {
-  const btn = document.getElementById("btnMarkRest");
-  if (!btn) return;
-  const m = motorById(selectedId);
-  if (!m || m.proto === "V3") {
-    btn.disabled = true;
-    btn.dataset.tip = m ? `${m.name}:V3 无上电位置机制(用零点档案/E0 体系)` : "";
-    return;
-  }
-  btn.disabled = false;
-  const has = typeof m.restDeg === "number" && isFinite(m.restDeg);
-  btn.dataset.tip = (has
-    ? `当前记录 ${m.restDeg.toFixed(2)}°${m.restDegDate ? "(" + m.restDegDate.slice(5) + ")" : ""}，点击更新\n`
-    : "未记录\n")
-    + "开电前必须人工把臂摆到的固定位置（建议低势能安全位，有刻度/凸点辅助更准）。"
-    + "上电后系统以此核对角度、纠正急停丢的圈数。\n"
-    + "换结构/换电机/重新设零后必须重新记录。";
 }
 function uiAddMotor() {
   const id = normId(document.getElementById("addId").value);
@@ -2024,6 +2005,14 @@ function renderMotorCards() {
         <button data-tip="确认：写入角度下限">确认</button>
         <span class="hint">°</span>
       </div>
+      <div class="mrow">
+        <label data-tip="开电前必须人工把臂摆到的固定位置（建议低势能安全位，有刻度/凸点辅助更准）。上电后系统以此核对角度、纠正急停丢的圈数">上电位置</label>
+        <span class="hint">${m.proto === "V3"
+            ? "—（V3 无此机制）"
+            : (typeof m.restDeg === "number" && isFinite(m.restDeg)
+                ? (m.restStale ? "⚠️ " : "") + m.restDeg.toFixed(2) + "°" + (m.restStale ? "(需重标)" : "")
+                : "未记录")}</span>
+      </div>
       <div class="mtip" data-tip="">单击选中 · 双击进入单电机操控（键盘 ↑↓ 运动 / ←→ 切电机）</div>`;
     card.onclick = () => selectMotor(m.id);
     card.ondblclick = () => openSingleView(m.id);
@@ -2056,6 +2045,26 @@ function updateCardAngle(id) {
   if (el && typeof lastAngle[id] === "number") el.textContent = lastAngle[id].toFixed(2) + "°";
 }
 
+/* 上电位置按钮动态提示:选中电机(V4)显示档案值/失效态;V3 禁用提示(2026-09-06 demo 定稿) */
+function updateMarkRestTip() {
+  const btn = document.getElementById("btnMarkRest");
+  if (!btn) return;
+  const m = motorById(selectedId);
+  if (!m || m.proto === "V3") {
+    btn.disabled = true;
+    btn.dataset.tip = m ? `${m.name}:V3 无上电位置机制(用零点档案/E0 体系)` : "";
+    return;
+  }
+  btn.disabled = false;
+  const has = typeof m.restDeg === "number" && isFinite(m.restDeg);
+  btn.dataset.tip = (has
+    ? (m.restStale ? "⚠️ 设零后已失效!请重标\n" : `当前记录 ${m.restDeg.toFixed(2)}°(${m.restDegDate ? m.restDegDate.slice(5) : "?"}),点击更新\n`)
+    : "未记录\n")
+    + "开电前必须人工把臂摆到的固定位置（建议低势能安全位，有刻度/凸点辅助更准）。"
+    + "上电后系统以此核对角度、纠正急停丢的圈数。\n"
+    + "换结构/换电机/重新设零后必须重新记录。";
+}
+
 /* 记为上电位置(2026-09-06 用户定名;内部字段 restDeg = 掉电自落谷位的协议角档案)。
    用途:掉电/急停甩动丢圈后,臂自落回此位置,校正工具(rest_calib, Jetson 侧)以此核对圈数。
    ⚠️ 取值基准 = 协议角(显示角 − E4),与 Jetson rest_calib 读角(raw 0x92)同基准;
@@ -2075,11 +2084,13 @@ async function markRest(id) {
   if (!ok) return;
   m.restDeg = Math.round(raw * 100) / 100;
   m.restDegDate = new Date().toISOString().slice(0, 10);
+  m.restStale = false;   // 重标清除失效标记
   if (!(typeof m.turnDeg === "number" && isFinite(m.turnDeg) && m.turnDeg > 0)) {
     m.turnDeg = (m.proto === "V44") ? 12.78 : 10.0;
   }
   saveMotors();
   renderMotorCards(); renderChartGrid();
+  updateMarkRestTip();
   addLog("sys", `${m.name}:上电位置记录 ${m.restDeg}°(${m.restDegDate})`);
   showBanner(`✅ ${m.name} 上电位置已记录 ${m.restDeg}°——开电前请把臂摆到此位置`);
 }
@@ -2146,6 +2157,7 @@ async function setZeroNow(id) {
       addLog("sys", `✅ ${m.name} 零点已写入固件:当前位置 = 0°(V4 三步)。复位完成,观察角度显示——归零并保持 = 写入成功;回到原值 = 写入失败,请重试`);
       // ⚠️ 2026-09-06:设零后上电位置档案失效(零点变了,参考位的显示角也变)——提示重标
       if (typeof m.restDeg === "number" && isFinite(m.restDeg)) {
+        m.restStale = true;   // 卡片/按钮显示"需重标",重标后清除
         showBanner(`⚠️ ${m.name} 零点已更新——之前记录的上电位置(${m.restDeg.toFixed(2)}°)已失效:请把臂摆回上电参考位,点「📍 记为上电位置」重新记录`, true);
       }
     }
@@ -2551,7 +2563,7 @@ function init() {
   document.getElementById("btnSetDefault").onclick = btnSetDefaultPos;
   document.getElementById("btnMoveDefault").onclick = btnMoveDefault;
   document.getElementById("btnMarkRest").onclick = () => { const m = motorById(selectedId); if (m) markRest(m.id); };
-  updateMarkRestBtn();
+  updateMarkRestTip();
   document.getElementById("btnMethod").addEventListener("mousedown", methodPressStart);
   document.getElementById("btnMethod").addEventListener("mouseup", methodPressCancel);
   document.getElementById("btnMethod").addEventListener("mouseleave", methodPressCancel);
