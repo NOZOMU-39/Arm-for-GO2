@@ -318,7 +318,7 @@ main { flex: 1; display: flex; min-height: 0; }
       <button class="btnConnect" id="btnUsbConnect" data-tip="通过 USB 连接 CAN 总线（电机 24V 需已上电）">连 接</button>
     </div>
     <div class="connectCard">
-      <h2>📡 无线连接（ESP32）</h2>
+      <h2>📡 无线连接</h2>
       <div class="row">
         <label data-tip="ESP32 无线 CAN 中继的地址。AP 模式固定 192.168.4.1；连了电脑热点时填 ESP32 的 STA IP（热点后台可查）。留空 = 自动搜索（AP 直连 → 本机网段 → 热点网段 → 串口，需要几秒）">设备地址</label>
         <input type="text" id="wifiHost" placeholder="192.168.4.1（留空自动搜索）" data-tip="ESP32 的 IP 地址。AP 模式固定 192.168.4.1（需先连接 WiFi：ESP32-WiFi-CAN，密码 12345678）；STA 模式填热点分配的 IP。留空自动搜索">
