@@ -2,7 +2,7 @@
  "generated_by": "tools/gen_golden.js",
  "source": "e:/Work and Study Project/Program for Work and Study/Arm for GO2/机械臂操作交互界面/index.html",
  "frame_count": 45,
- "parse_count": 47,
+ "parse_count": 48,
  "note": "黄金向量: JS 版标准答案。frame_cases 组帧逐字节比对 build_frame; parse_cases 回复解析比对 parse_reply(values/summary)。",
  "cases": [
   {
@@ -701,11 +701,12 @@
     "broadcast": false,
     "sys300": false,
     "cmd": 157,
-    "summary": "相电流 A 0.1A · B 0.2A · C 0.3A",
+    "summary": "温度 10℃ · 相电流 A 51.2A · B 76.8A · C 0.0A",
     "values": {
-     "ia": 0.1,
-     "ib": 0.2,
-     "ic": 0.3
+     "temp": 10,
+     "ia": 51.2,
+     "ib": 76.8,
+     "ic": 0
     }
    },
    "valuesOnly": false,
@@ -1464,6 +1465,42 @@
    },
    "valuesOnly": false,
    "note": "V43 B5 型号文本 X6-P36"
+  },
+  {
+   "proto": "V44",
+   "cid": 578,
+   "bytes": [
+    157,
+    25,
+    254,
+    255,
+    251,
+    255,
+    252,
+    255
+   ],
+   "motor": {
+    "id": 2,
+    "name": "x6",
+    "proto": "V43",
+    "gear": 1,
+    "dir": 1
+   },
+   "out": {
+    "motorId": 2,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 157,
+    "summary": "温度 25℃ · 相电流 A -0.02A · B -0.05A · C -0.04A",
+    "values": {
+     "temp": 25,
+     "ia": -0.02,
+     "ib": -0.05,
+     "ic": -0.04
+    }
+   },
+   "valuesOnly": false,
+   "note": "V44 9D 真机帧 D1=温度25 相电流归位"
   },
   {
    "proto": "V44",

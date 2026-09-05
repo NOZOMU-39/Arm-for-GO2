@@ -699,8 +699,9 @@ function parseReply(proto, cid, bytes) {
         break;
       }
       case 0x9D:
-        out.values = { ia: i16(bytes, 1) / 100, ib: i16(bytes, 3) / 100, ic: i16(bytes, 5) / 100 };
-        out.summary = `相电流 A ${out.values.ia.toFixed(1)}A · B ${out.values.ib.toFixed(1)}A · C ${out.values.ic.toFixed(1)}A`;
+        /* 布局修正(2026-09-05 真机+手册实证): D1=温度(uint8), A/B/C 相电流在 D2-3/D4-5/D6-7 */
+        out.values = { temp: bytes[1], ia: i16(bytes, 2) / 100, ib: i16(bytes, 4) / 100, ic: i16(bytes, 6) / 100 };
+        out.summary = `温度 ${out.values.temp}℃ · 相电流 A ${out.values.ia.toFixed(1)}A · B ${out.values.ib.toFixed(1)}A · C ${out.values.ic.toFixed(1)}A`;
         break;
       case 0x30: case 0x31: case 0x32: {
         const pid = [bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7]];
@@ -787,8 +788,9 @@ function parseReply(proto, cid, bytes) {
         out.summary = `温度 ${out.values.temp}℃ · 电流 ${(out.values.iq * dirOf(rm)).toFixed(2)}A · 速度 ${rot2out(out.values.spd, rm).toFixed(2)}dps · 角度 ${angForLog(rm, rot2out(out.values.ang, rm))}°(输出轴${dirOf(rm) === -1 ? ",方向已映射" : ""})`;
         break;
       case 0x9D:
-        out.values = { ia: i16(bytes, 1) / 100, ib: i16(bytes, 3) / 100, ic: i16(bytes, 5) / 100 };
-        out.summary = `相电流 A ${out.values.ia.toFixed(2)}A · B ${out.values.ib.toFixed(2)}A · C ${out.values.ic.toFixed(2)}A`;
+        /* 布局修正(2026-09-05 真机+手册实证): D1=温度(uint8), A/B/C 相电流在 D2-3/D4-5/D6-7 */
+        out.values = { temp: bytes[1], ia: i16(bytes, 2) / 100, ib: i16(bytes, 4) / 100, ic: i16(bytes, 6) / 100 };
+        out.summary = `温度 ${out.values.temp}℃ · 相电流 A ${out.values.ia.toFixed(2)}A · B ${out.values.ib.toFixed(2)}A · C ${out.values.ic.toFixed(2)}A`;
         break;
       case 0x92:
         /* ⚠️ V4 的 0x92 int32 在 D4-D7(与 V3 的 D1-D4 不同) */

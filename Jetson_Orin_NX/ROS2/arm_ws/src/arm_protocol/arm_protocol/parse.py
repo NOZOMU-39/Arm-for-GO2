@@ -104,9 +104,11 @@ def parse_reply(proto: str, can_id: int, data, motor=None) -> dict | None:
                                   f"速度 {rot2out(out['values']['spd'], rm):.2f}dps(输出轴) · "
                                   f"编码器 {out['values']['enc']} 脉冲(转子侧原始)")
         elif cmd == 0x9D:
-            out["values"] = {"ia": i16(data, 1) / 100, "ib": i16(data, 3) / 100, "ic": i16(data, 5) / 100}
+            # 布局修正(2026-09-05 真机+手册实证): D1=温度(uint8), A/B/C 相电流在 D2-3/D4-5/D6-7
+            out["values"] = {"temp": data[1], "ia": i16(data, 2) / 100,
+                             "ib": i16(data, 4) / 100, "ic": i16(data, 6) / 100}
             v = out["values"]
-            out["summary"] = (f"相电流 A {v['ia']:.1f}A · B {v['ib']:.1f}A · C {v['ic']:.1f}A")
+            out["summary"] = (f"温度 {v['temp']}℃ · 相电流 A {v['ia']:.1f}A · B {v['ib']:.1f}A · C {v['ic']:.1f}A")
         elif cmd in (0x30, 0x31, 0x32):
             pid = [data[2], data[3], data[4], data[5], data[6], data[7]]
             out["values"] = {"pid": pid}
@@ -194,9 +196,11 @@ def parse_reply(proto: str, can_id: int, data, motor=None) -> dict | None:
                               f"速度 {rot2out(v['spd'], rm):.2f}dps · "
                               f"角度 {rot2out(v['ang'], rm):.2f}°(输出轴{mapped})")
         elif cmd == 0x9D:
-            out["values"] = {"ia": i16(data, 1) / 100, "ib": i16(data, 3) / 100, "ic": i16(data, 5) / 100}
+            # 布局修正(2026-09-05 真机+手册实证): D1=温度(uint8), A/B/C 相电流在 D2-3/D4-5/D6-7
+            out["values"] = {"temp": data[1], "ia": i16(data, 2) / 100,
+                             "ib": i16(data, 4) / 100, "ic": i16(data, 6) / 100}
             v = out["values"]
-            out["summary"] = f"相电流 A {v['ia']:.2f}A · B {v['ib']:.2f}A · C {v['ic']:.2f}A"
+            out["summary"] = f"温度 {v['temp']}℃ · 相电流 A {v['ia']:.2f}A · B {v['ib']:.2f}A · C {v['ic']:.2f}A"
         elif cmd == 0x92:
             # ⚠️ V4 的 0x92 int32 在 D4-D7（与 V3 的 D1-D4 不同）
             _pos = i32(data, 4) / 100 * dir_of(rm)

@@ -1,0 +1,189 @@
+============================================================
+[2026-08-26 09:37:35] 机械臂操作交互界面启动(真机模式)
+[09:37:37.121] [info] [桥接] 界面已成功调用 get_registry()——桥接正常
+[09:37:37.122] [info] [桥接] 界面已成功调用 list_devices()——桥接正常
+[09:37:37.121] 机械臂操作交互界面已就绪
+[09:37:37.122] [info] JS 摘要落盘链路已打通(log_line 首次调用)
+[09:37:37.203] [info] [桥接] 界面已成功调用 get_pending()——桥接正常
+[09:37:37.209] [桥接] 界面已成功调用 get_registry()——桥接正常
+[09:37:37.209] [桥接] 界面已成功调用 list_devices()——桥接正常
+[09:37:37.209] JS 摘要落盘链路已打通(log_line 首次调用)
+[09:37:37.209] [桥接] 界面已成功调用 get_pending()——桥接正常
+[09:37:40.374] [info] [桥接] 界面已成功调用 open_wifi()——桥接正常
+[09:37:40.424] [桥接] 界面已成功调用 open_wifi()——桥接正常
+[09:37:40.678] [info] 已连接无线 CAN 中继(ESP32 192.168.137.138,波特率 1000 kbps)
+[09:37:40.680] ✅ 已连接无线 CAN(ESP32 192.168.137.138)
+[09:37:40.680] 已进入主界面,开始状态刷新
+[09:37:40.736] 已连接无线 CAN 中继(ESP32 192.168.137.138,波特率 1000 kbps)
+[09:37:41.181] [info] [桥接] 界面已成功调用 send_frame()——桥接正常
+[09:37:41.224] [桥接] 界面已成功调用 send_frame()——桥接正常
+[09:37:41.304] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:41.304] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:41.304] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:37:41.924] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:41.924] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:41.924] ← 收 0x242  92 00 00 00 61 DE FF FF
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1973
+[09:37:42.228] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:42.228] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:42.228] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:37:42.841] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:42.841] ← 收 0x141  9C 1D 00 00 00 00 68 BD
+[09:37:42.841] ← 收 0x242  92 00 00 00 61 DE FF FF
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1973
+[09:37:43.457] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:43.457] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:43.457] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:37:43.765] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:43.765] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:43.765] ← 收 0x242  92 00 00 00 61 DE FF FF
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1973
+[09:37:44.380] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:44.380] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:44.380] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:37:44.991] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:44.991] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:44.991] ← 收 0x242  92 00 00 00 61 DE FF FF
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1973
+[09:37:45.299] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:45.299] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:45.299] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:37:45.914] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:45.914] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:45.914] ← 收 0x242  92 00 00 00 61 DE FF FF
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1973
+[09:37:46.220] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:46.220] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:46.220] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:37:46.841] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:46.841] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:46.841] ← 收 0x242  92 00 00 00 61 DE FF FF
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1973
+[09:37:47.298] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:47.298] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:47.298] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:37:47.758] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:47.758] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:47.758] ← 收 0x242  92 00 00 00 61 DE FF FF
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1973
+[09:37:48.377] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:48.377] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:48.377] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:37:48.984] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:48.984] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:48.984] ← 收 0x242  9A 1B 00 00 EB 00 00 00
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1973
+[09:37:49.210] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:49.210] ← 收 0x141  9C 1D 00 00 00 00 68 BD
+[09:37:49.210] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:49.210] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:37:49.707] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:49.707] ← 收 0x141  9C 1D 00 00 00 00 68 BD
+[09:37:49.724] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:49.724] ← 收 0x242  92 00 00 00 61 DE FF FF
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1973
+[09:37:50.263] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:50.263] ← 收 0x141  9C 1D 00 00 00 00 68 BD
+[09:37:50.263] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:37:50.490] 扫描不一致警告:#2 X6:注册但总线上未响应
+[09:37:50.830] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:50.830] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:50.830] ← 收 0x242  92 00 00 00 61 DE FF FF
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1973
+[09:37:51.440] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:51.440] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:51.440] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:37:51.750] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:51.750] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:51.750] ← 收 0x242  92 00 00 00 61 DE FF FF
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1973
+[09:37:52.365] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:52.365] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:52.365] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:37:52.699] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:52.711] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:52.711] ← 收 0x242  92 00 00 00 61 DE FF FF
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1973
+[09:37:53.286] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:53.286] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:53.286] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:37:53.900] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:53.900] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:53.900] ← 收 0x242  92 00 00 00 61 DE FF FF
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1973
+[09:37:54.516] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:54.525] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:54.525] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:37:54.822] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:54.822] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:54.822] ← 收 0x242  92 00 00 00 61 DE FF FF
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1973
+[09:37:55.438] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:55.438] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:55.438] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:37:55.743] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:55.743] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:55.743] ← 收 0x242  92 00 00 00 61 DE FF FF
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1973
+[09:37:56.209] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:56.209] ← 收 0x141  9C 1D 00 00 00 00 68 BD
+[09:37:56.209] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:56.209] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:37:56.976] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:56.976] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:56.976] ← 收 0x242  92 00 00 00 61 DE FF FF
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1973
+[09:37:57.279] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:57.279] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:57.279] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:37:57.895] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:57.895] ← 收 0x141  9C 1D 00 00 00 00 68 BD
+[09:37:57.895] ← 收 0x242  92 00 00 00 61 DE FF FF
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1921
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1921
+[09:37:58.507] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:58.507] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:58.507] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:37:58.816] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:58.816] ← 收 0x141  9C 1D 00 00 00 00 68 BD
+[09:37:58.816] ← 收 0x242  92 00 00 00 61 DE FF FF
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1921
+[09:37:59.430] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:59.430] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:59.430] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:37:59.737] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:37:59.737] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:37:59.737] ← 收 0x242  92 00 00 00 61 DE FF FF
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1921
+[09:38:00.356] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:38:00.356] ← 收 0x141  9C 1D 00 00 00 00 68 BD
+[09:38:00.356] ← 收 0x242  9A 1C 00 00 EB 00 00 00
+[09:38:00.356] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:38:00.378] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:38:00.659] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:38:00.659] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:38:00.659] ← 收 0x242  9A 1B 00 00 EA 00 00 00
+[09:38:00.659] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:38:00.704] ← 收 0x141  9C 1D 00 00 00 00 68 BD
+[09:38:00.704] ← 收 0x242  9C 1B 00 00 00 00 AA FF
+[09:38:00.966] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:38:00.966] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:38:00.966] ← 收 0x242  92 00 00 00 61 DE FF FF
+[JS异常] Uncaught TypeError: Cannot read properties of null (reading 'toFixed') @ http://127.0.0.1:10998/index.html:1921
+[09:38:01.273] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:38:01.273] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:38:01.273] ← 收 0x242  9A 1B 00 00 EA 00 00 00
+[09:38:01.273] ← 收 0x242  9C 1C 00 00 00 00 AA FF
+[09:38:01.582] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:38:01.582] ← 收 0x141  9C 1D 00 00 00 00 68 BD
+[09:38:01.582] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:38:01.896] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:38:01.896] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:38:01.896] ← 收 0x242  9A 1C 00 00 EA 00 00 00
+[09:38:01.896] ← 收 0x242  9C 1B 00 00 00 00 AA FF
+[09:38:02.195] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:38:02.195] ← 收 0x141  92 6C DB FF FF FF FF FF
+[09:38:02.195] ← 收 0x242  92 00 00 00 61 DE FF FF
+[09:38:02.503] ← 收 0x141  9A 1D 00 ED 00 00 00 00
+[09:38:02.503] ← 收 0x141  9C 1D 00 00 00 00 68 BD
+[09:38:02.503] ← 收 0x242  92 00 00 00 61 DE FF FF
