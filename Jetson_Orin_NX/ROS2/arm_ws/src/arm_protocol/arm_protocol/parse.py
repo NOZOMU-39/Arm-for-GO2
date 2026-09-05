@@ -254,10 +254,16 @@ def parse_reply(proto: str, can_id: int, data, motor=None) -> dict | None:
             baud = {0: "1M", 1: "500K", 2: "250K"}.get(out["values"]["idx"])
             out["summary"] = f"波特率索引 {out['values']['idx']}({baud})"
         elif cmd == 0xB5:
-            part = data[1]
-            text = "".join(chr(b) for b in data[2:7])
-            out["values"] = {"part": part, "text": text}
-            out["summary"] = f"型号片段 {part}:{text}"
+            if proto == "V43":
+                # 真机 2026-09-05: X6 的 B5 回复 D1 起即型号文本(与 V3 同布局)——JS 同款分叉
+                text = "".join(chr(b) for b in data[1:8])
+                out["values"] = {"text": text}
+                out["summary"] = f"型号:{text}"
+            else:
+                part = data[1]
+                text = "".join(chr(b) for b in data[2:7])
+                out["values"] = {"part": part, "text": text}
+                out["summary"] = f"型号片段 {part}:{text}"
         elif cmd == 0xB6:
             out["values"] = {"on": data[7]}
             out["summary"] = f"主动回复:{'已开启' if out['values']['on'] else '已关闭'}"

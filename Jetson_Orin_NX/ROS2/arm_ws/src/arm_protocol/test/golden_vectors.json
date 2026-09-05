@@ -2,7 +2,7 @@
  "generated_by": "tools/gen_golden.js",
  "source": "e:/Work and Study Project/Program for Work and Study/Arm for GO2/机械臂操作交互界面/index.html",
  "frame_count": 45,
- "parse_count": 46,
+ "parse_count": 47,
  "note": "黄金向量: JS 版标准答案。frame_cases 组帧逐字节比对 build_frame; parse_cases 回复解析比对 parse_reply(values/summary)。",
  "cases": [
   {
@@ -1431,6 +1431,39 @@
    },
    "valuesOnly": false,
    "note": "V43 94 两字节"
+  },
+  {
+   "proto": "V43",
+   "cid": 578,
+   "bytes": [
+    181,
+    88,
+    54,
+    45,
+    80,
+    51,
+    54,
+    45
+   ],
+   "motor": {
+    "id": 2,
+    "name": "x6",
+    "proto": "V43",
+    "gear": 1,
+    "dir": 1
+   },
+   "out": {
+    "motorId": 2,
+    "broadcast": false,
+    "sys300": false,
+    "cmd": 181,
+    "summary": "型号:X6-P36-",
+    "values": {
+     "text": "X6-P36-"
+    }
+   },
+   "valuesOnly": false,
+   "note": "V43 B5 型号文本 X6-P36"
   },
   {
    "proto": "V44",

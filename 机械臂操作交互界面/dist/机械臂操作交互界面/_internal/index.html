@@ -843,6 +843,13 @@ function parseReply(proto, cid, bytes) {
         out.summary = `波特率索引 ${out.values.idx}(` + { 0: "1M", 1: "500K", 2: "250K" }[out.values.idx] + ")";
         break;
       case 0xB5:
+        /* 真机 2026-09-05（Jetson 侧全只读探测）: V43/X6 的 0xB5 回复 D1 起即型号文本
+           （"X6-P36" 分布在 D1~D6，与 V3 同布局）→ V43 分叉走文本；V44/X2 保持分段 */
+        if (proto === "V43") {
+          out.values = { text: String.fromCharCode(...bytes.slice(1, 8)) };
+          out.summary = `型号:${out.values.text}`;
+          break;
+        }
         out.values = { part: bytes[1], text: String.fromCharCode(...bytes.slice(2, 7)) };
         out.summary = `型号片段 ${out.values.part}:${out.values.text}`;
         break;
