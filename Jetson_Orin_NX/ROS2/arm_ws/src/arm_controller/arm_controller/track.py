@@ -64,3 +64,15 @@ def v3_pos_dual(st: V3TrackState, m: dict) -> float | None:
         return None
     e0 = 0.0 if st.E0 is None else st.E0
     return (st.rotDeg - e0) / gear_of(m) * dir_of(m)
+
+
+def v3_apply_92(st: V3TrackState, m: dict, pos_parse: float) -> float | None:
+    """V3 0x92 帧校准(JS updateMotorState 92 分支直译):
+    parse 输出的 pos = 固件角/gear×dir(输出轴单位, 未减 E0)——
+    先乘回 gear×dir 还原固件角存 st.rotDeg, 再经 v3_pos_dual 减 E0 得真显示角。
+    防护: pos==0 不更新(JS: if a!==0); lastEnc 未就绪时 v3_pos_dual=None → 跳过本轮。
+    返回显示角, 或 None(跳过——注意 st.rotDeg 已更新, 与 JS 行为一致)。"""
+    if pos_parse == 0:
+        return None
+    st.rotDeg = pos_parse * gear_of(m) * dir_of(m)
+    return v3_pos_dual(st, m)

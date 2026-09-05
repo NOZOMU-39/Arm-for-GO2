@@ -80,7 +80,7 @@ def limit_block(m: dict, alarm: dict | None, vals: dict,
     return True, ""
 
 
-def monitor_limit(alarm: dict, m: dict, ang, spd, iq) -> tuple[dict, str | None]:
+def monitor_limit(alarm: dict, m: dict, ang, spd=None, iq=None) -> tuple[dict, str | None]:
     """运行中监控(每个回复帧驱动)。alarm 就地更新并返回; 新触发返回维度 "角度"/"速度"/"电流",
     持续越限返回 None。角度 2° 死区回落解锁(lo+2 ~ hi-2 内); 速度/电流回落即解锁。
     非数(None/NaN)反馈不参与越限判定(JS 比较恒 False 语义)。"""
