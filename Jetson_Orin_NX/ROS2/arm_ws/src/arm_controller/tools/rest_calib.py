@@ -2,7 +2,7 @@
 """低势能自落位参考校正工具(V4 甩动丢圈软件折回) —— 2026-09-06
 
 用途: 急停/掉电甩动丢圈后, 上电前人工把臂摆到上电参考位 → 读 0x92 vs 档案 restDeg →
-     差 ≈ N×turnDeg → E4 += N×turnDeg(纯软件折回, 零 ROM 写入)。
+     显示差 ≈ N×turnDeg → E4 = 上电位置显示角 − raw(直设, 零 ROM 写入)。
 用法(Jetson, tmux ops):
     source ~/ROS2/arm_ws/install/setup.bash && python3 rest_calib.py        # dry-run
     python3 rest_calib.py --apply                                           # 落盘 registry.json(自动备份)
@@ -77,10 +77,11 @@ def main():
             if read is None:
                 print(f"ID{mid}: 0x92 无回复, 跳过")
                 continue
-            m["restDeg"] = round(read, 4)
+            disp = read + (m.get("E4") or 0.0)   # restDeg = 显示语义
+            m["restDeg"] = round(disp, 4)
             m["restDegDate"] = today
             n_ok += 1
-            print(f"ID{mid}: restDeg ← {read:.2f}° (标定 {today})")
+            print(f"ID{mid}: restDeg ← {disp:.2f}°(显示语义, 标定 {today})")
         if n_ok:
             write_registry(motors)
             print(f"== 已落盘 {n_ok} 台谷位档案, 备份 .bak-restcalib ==")
@@ -104,16 +105,17 @@ def main():
         if read is None:
             print(f"ID{mid}: 0x92 无回复, 跳过")
             continue
-        n = lost_turns(read, rest, turn, tol_deg=args.tol)
+        n = lost_turns(read, e4, rest, turn, tol_deg=args.tol)
         if n is None:
-            print(f"ID{mid}: 读 {read:.2f}° vs 谷位 {rest}°(标定 {date}) → 非整圈偏差, 不校, 交人工")
+            disp = read + e4
+            print(f"ID{mid}: 显示 {disp:.2f}° vs 上电位置 {rest}°(标定 {date}) → 非整圈偏差, 不校, 交人工")
             print(f"       可能: ①臂不在上电参考位(人工摆正后再跑) ②档案过期(结构更改/重设零后没重标 → 界面或 --mark-rest 重记)")
             continue
         if n == 0:
-            print(f"ID{mid}: 读 {read:.2f}° 与谷位一致(差 {read-rest:+.2f}°, 档案 {date}), 无需校正 ✅")
+            print(f"ID{mid}: 显示 {read+e4:.2f}° 与上电位置一致(差 {read+e4-rest:+.2f}°, 档案 {date}), 无需校正 ✅")
             continue
-        new_e4 = e4 + n * turn
-        print(f"ID{mid}: 丢圈 N={n:+d} (读 {read:.2f}° → 谷位 {rest}°, 档案 {date}) → E4 {e4:+.2f} → {new_e4:+.2f}°")
+        new_e4 = rest - read   # ⚠️ 2026-09-06 修正: E4 直设(参考位显示 − raw), 不叠加——叠加会重复补偿过校
+        print(f"ID{mid}: 丢圈 N={n:+d} (显示 {read+e4:.2f}° → 上电位置 {rest}°, 档案 {date}) → E4 {e4:+.2f} → {new_e4:+.2f}°")
         m["E4"] = round(new_e4, 4)
         changed.append(mid)
     if args.apply and changed:

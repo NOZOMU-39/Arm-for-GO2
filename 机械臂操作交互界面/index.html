@@ -2074,13 +2074,13 @@ async function markRest() {
   const staleN = v4.filter(x => x.restStale).length;
   const ok = await showConfirm("记录机械臂上电位置",
     "把以下电机的当前位置记录为上电位置?\n"
-    + v4.map(x => `· ${x.name}(#${x.id}) → ${(lastAngle[x.id] - e4Of(x)).toFixed(2)}°`).join("\n")
+    + v4.map(x => `· ${x.name}(#${x.id}) → ${lastAngle[x.id].toFixed(2)}°`).join("\n")
     + (staleN ? `\n(其中 ${staleN} 台标记「需重标」,一并更新)` : "")
     + "\n\n用途:每次开电前人工把整臂摆到此姿态,上电后核对角度纠正急停丢圈。\n换结构/换电机/重新设零后必须重新记录。");
   if (!ok) return;
   const today = todayLocal();
   v4.forEach(x => {
-    x.restDeg = Math.round((lastAngle[x.id] - e4Of(x)) * 100) / 100;
+    x.restDeg = Math.round(lastAngle[x.id] * 100) / 100;   // ⚠️ 显示语义(2026-09-06 修正:勿减 E4)
     x.restDegDate = today;
     x.restStale = false;
     if (!(typeof x.turnDeg === "number" && isFinite(x.turnDeg) && x.turnDeg > 0)) {

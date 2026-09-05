@@ -74,10 +74,10 @@ def main():
     shutil.copy(LOCAL_REG, LOCAL_REG + ".bak-sync")
     json.dump(local, open(LOCAL_REG, "w", encoding="utf-8"),
               indent=1, ensure_ascii=False)
-    print(f"== 已合并 {len(changed)} 处 → {LOCAL_REG} ==")
+    print(f"== 已合并 {len(changed)} 处 ==")
     for mid, k, old, new in changed:
         print(f"  ID{mid} {k}: {old!r} → {new!r}")
-    print("⚠️ 界面正在运行则内存不变——重启界面后生效")
+    print("[提示] 界面正在运行则内存不变——重启界面后生效")
 
 
 if __name__ == "__main__":

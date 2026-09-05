@@ -1,58 +1,56 @@
-"""rest 模块单测 —— 低势能自落位丢圈判定(2026-09-06, 真机验证后再补档案)
+"""rest 模块单测 —— 上电参考位丢圈判定(2026-09-06; N 正=丢圈, E4 直设语义见模块 docstring)
 
-用例设计: X6 型 turnDeg=10 (差 23°→N=2 残差 3°>2 容差 → None) 等边界
+lost_turns(raw, e4, rest, turn, tol): short = rest − (raw+e4) ≈ N×turn → N
+用例: X6 turn=10, 档案 rest=93.56(显示语义)
 """
 import pytest
 
 from arm_controller.rest import lost_turns
 
-# 典型档案: X6-40 谷位期望 93.69 / turnDeg 10; 容差 2.0
-REST, TURN = 93.69, 10.0
+REST, TURN = 93.56, 10.0
 
 
-def test_exact_one_turn_lost():
-    """丢 1 圈(读角 = 期望 − 10) → N=1"""
-    assert lost_turns(REST - 10.0, REST, TURN) == 1
+def test_one_turn_lost_e4_zero():
+    """丢1圈 e4=0: raw=83.56 → short=10 → N=+1"""
+    assert lost_turns(83.56, 0.0, REST, TURN) == 1
 
 
-def test_two_turns_with_valley_spread():
-    """丢 2 圈 + 谷位散布 1°(读 = 期望 − 21) → N=2(残差 1° 在容差内)"""
-    assert lost_turns(REST - 21.0, REST, TURN) == 2
+def test_two_turns_lost_e4_partial():
+    """丢2圈 e4已补1圈(10): raw=73.63 → short=93.56-83.63=9.93 → N=+1(再丢1圈)"""
+    assert lost_turns(73.63, 10.0, REST, TURN) == 1
 
 
-def test_negative_turns_overcount():
-    """多计 1 圈(读 = 期望 + 9.5, 散布 0.5) → N=-1"""
-    assert lost_turns(REST + 9.5, REST, TURN) == -1
+def test_fully_compensated_no_action():
+    """丢圈全补(e4=20): raw=73.63 → short=93.56-93.63=-0.07 → N=0 无需校"""
+    assert lost_turns(73.63, 20.0, REST, TURN) == 0
 
 
-def test_not_in_valley_returns_none():
-    """不在谷(读 = 期望 + 3.5, 残差 3.5 > 容差 2) → None 交人工"""
-    assert lost_turns(REST + 3.5, REST, TURN) is None
+def test_overcount_negative():
+    """多计1圈: raw=103.56 → short=-10 → N=-1"""
+    assert lost_turns(103.56, 0.0, REST, TURN) == -1
 
 
-def test_half_turn_ambiguous_returns_none():
-    """恰半圈残差(读 = 期望 − 5, N=0 残差 5 或 N=1 残差 5 都不稳) → None"""
-    assert lost_turns(REST - 5.0, REST, TURN) is None
+def test_valley_spread_within_tol():
+    """丢1圈+散布0.3: raw=83.86 → short=9.7 → N=+1 残差0.3 ≤2 ✓"""
+    assert lost_turns(83.86, 0.0, REST, TURN) == 1
+
+
+def test_not_in_reference_returns_none():
+    """不在参考位(显示偏3.5°非整圈): raw=90.06 → short=3.5 → round(0.35)=0 残差3.5>2 → None"""
+    assert lost_turns(90.06, 0.0, REST, TURN) is None
 
 
 def test_tolerance_must_be_under_half_turn():
-    """容差 ≥ turnDeg/2 = 硬界外 → 拒绝判定(返回 None 语义)"""
-    assert lost_turns(REST - 10.0, REST, TURN, tol_deg=5.0) is None
+    assert lost_turns(83.56, 0.0, REST, TURN, tol_deg=5.0) is None
 
 
 def test_bad_archive_returns_none():
-    """档案不全(turnDeg 0/None/NaN) → None"""
-    assert lost_turns(REST - 10.0, REST, 0.0) is None
-    assert lost_turns(REST - 10.0, None, TURN) is None
-    assert lost_turns(REST - 10.0, REST, float("nan")) is None
+    assert lost_turns(83.56, 0.0, REST, 0.0) is None
+    assert lost_turns(83.56, 0.0, None, TURN) is None
+    assert lost_turns(83.56, 0.0, REST, float("nan")) is None
+    assert lost_turns(83.56, float("nan"), REST, TURN) is None
 
 
 def test_x2_turn_unit():
-    """X2-7 型 turnDeg≈12.78: 丢 1 圈读差 12.8(散布 0.1) → N=1"""
-    assert lost_turns(0.0 - 12.8, 0.0, 12.78, tol_deg=1.0) == 1
-
-
-def test_negative_direction_note():
-    """(注)读数含 dir 映射时 restDeg 必须同基准——此处 dir=1 直读场景"""
-    m = {"proto": "V44", "dir": 1}
-    assert m["dir"] == 1
+    """X2 turn≈12.78: 丢1圈差12.8 散布0.1 → N=+1"""
+    assert lost_turns(-12.8, 0.0, 0.0, 12.78, tol_deg=1.0) == 1
