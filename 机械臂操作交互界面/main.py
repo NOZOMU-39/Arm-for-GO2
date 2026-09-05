@@ -7,7 +7,7 @@
   - js_api 接口类:界面经 window.pywebview.api.xxx() 直接调用本程序
   - 三种 CAN 后端(统一接口,Device 无感切换):
       ZLGCan        USB 直连(zlgcan.dll ctypes,32 位,脉塔 USBCAN 模块)
-      WiFiCANBridge ESP32 无线 CAN 中继(TCP 8888 命令 + UDP 8889 高频反馈批帧)
+      WiFiCANBridge ESP32 无线 CAN 中继(TCP 8888 命令与批帧反馈)
       MockCan       模拟模式(--mock,无硬件调试界面)
   - 接收线程:轮询收帧入队,界面 50ms 定时拉取
   - 文件日志:日志\调试日志_时间戳.txt,每次运行一个文件,即写即落盘
@@ -18,7 +18,7 @@
   打包:                                 打包机械臂.bat(PyInstaller,--onedir)
 
 技术路线:移植自 电机上位机开发 目录的 main.py(Device/Api/ZLGCan/MockCan 同源),
-无线后端按 ESP32 固件 v2.1.3 帧协议(命令走 TCP、反馈走 UDP 8889)实现,
+无线后端按 ESP32 固件 v2.1.3 帧协议(命令与反馈走 TCP 8888 批帧)实现,
 wifi_can_client.py 为 ESP32 examples 原样复制,仅在其上包装。
 """
 
@@ -388,9 +388,9 @@ class ZLGCan:
 
 # =====================================================================
 # 四、ESP32 无线 CAN 后端(与 ZLGCan/MockCan 同接口,Device 无感)
-#     命令走 TCP 8888(WiFiCANClient,可靠,批帧协商 0x0A13),
-#     高频反馈走 UDP 8889 订阅(独立线程无锁,30s 踢出/20s 续订)。
-#     两条读线程汇入线程安全 _rxq,由 Device 接收线程排空。
+#     命令与反馈均走 TCP 8888(WiFiCANClient,可靠,批帧协商 0x0A13)。
+#     交互界面已停用 UDP 8889 双推，避免反馈挤占命令处理。
+#     TCP 批量读线程汇入线程安全 _rxq,由 Device 接收线程排空。
 #     坑位笔记:WiFiCANClient 的 _recv_frame 持锁(最长 timeout),
 #        所以 TCP 读线程用 50ms 短超时,发送侧最坏等待 50ms 可接受;
 #        不可用 client.monitor()(每次持锁 0.5s 会阻塞 send_can)。

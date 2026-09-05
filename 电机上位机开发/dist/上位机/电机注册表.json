@@ -1,9 +1,9 @@
 [
   {
     "id": 1,
-    "name": "X8",
+    "name": "基座云台Yaw",
     "proto": "V3",
-    "note": "",
+    "note": "X8-Pro 旧拨盘电机",
     "gear": 6,
     "dir": -1,
     "E0": -92.97,
@@ -13,34 +13,47 @@
   },
   {
     "id": 2,
-    "name": "X6",
+    "name": "大臂Pitch",
     "proto": "V43",
-    "note": "协议自测支持 V4.3",
+    "note": "X6-40新V2电机",
     "gear": 1,
     "dir": 1,
     "E0": null,
     "v9cSemantics": "pulse",
-    "limMinDeg": -120.5,
-    "limMaxDeg": 92.5
+    "limMaxDeg": 93,
+    "limMinDeg": -192.5
   },
   {
     "id": 3,
-    "name": "X6",
+    "name": "小臂Pitch",
     "proto": "V43",
-    "note": "",
+    "note": "X6-40新V2电机",
     "gear": 1,
     "dir": 1,
-    "limMinDeg": -39,
-    "limMaxDeg": 183,
+    "E0": null,
+    "limMaxDeg": 93,
+    "limMinDeg": -169
+  },
+  {
+    "id": 4,
+    "name": "手腕Pitch",
+    "proto": "V44",
+    "note": "X2-7新V4电机",
+    "gear": 1,
+    "dir": 1,
+    "limMaxDeg": 85,
+    "limMinDeg": -124,
     "E0": null
   },
   {
     "id": 5,
-    "name": "X2",
+    "name": "末端Yaw",
     "proto": "V44",
-    "note": "",
+    "note": "X2-7新V4电机",
     "gear": 1,
     "dir": 1,
-    "E0": null
+    "E0": null,
+    "limMinDeg": -120,
+    "limMaxDeg": 120
   }
 ]
