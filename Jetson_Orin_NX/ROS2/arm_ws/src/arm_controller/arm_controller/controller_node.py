@@ -22,10 +22,12 @@ from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from ament_index_python.packages import get_package_share_directory
 
 from arm_interfaces.msg import ArmStatus, CanFrame, MotorState
+from arm_interfaces.srv import SafetyReset
 from arm_protocol import parse as arm_parse
 
 from .registry import load_list
 from .state import MotorView, SRC_92, SRC_9C, SRC_NONE, update_from_parse
+from .supervisor import ArmSupervisor
 from .track import V3Tracks
 
 Q = lambda: QoSProfile(depth=100, history=HistoryPolicy.KEEP_LAST,
@@ -71,6 +73,8 @@ class ArmControllerNode(Node):
         self._rx_count = 0
         self._last_alarm = ""
         self._stop = threading.Event()
+        self.supervisor = ArmSupervisor(has_motors=bool(self.motors))
+        self._stop_srv = self.create_service(SafetyReset, "safety_reset", self._on_safety_reset)
 
         self.pub_state = self.create_publisher(MotorState, "/arm/motor_states", Q())
         self.pub_status = self.create_publisher(ArmStatus, "/arm/status", Q())
@@ -132,8 +136,9 @@ class ArmControllerNode(Node):
         now = time.time()
         first = update_from_parse(m, self.views[n], pr, self.tracks, now)
         if first:
-            # 越限新触发: 安全链步骤起在此"先发 0x81 再报警"; 当前只记日志(监督只读)
-            self._last_alarm = f"#{m['name']} 反馈{first}越限(等待安全链接线)"
+            # 越限新触发: 先发 0x81 停止保持, 再报警(先停后报; 持续越限不重复触发)
+            self._send(m["id"], bytes([0x81, 0, 0, 0, 0, 0, 0, 0]))
+            self._last_alarm = f"#{m['name']} 反馈{first}越限, 已发 0x81 停止保持"
             self.get_logger().warn(self._last_alarm)
 
     def _motor(self, mid: int):
@@ -160,17 +165,39 @@ class ArmControllerNode(Node):
 
     def _publish_status(self):
         now = time.time()
+        online_ids = [m["id"] for m in self.motors
+                      if self.views[m["id"]].last_recv_ts is not None
+                      and (now - self.views[m["id"]].last_recv_ts) < OFFLINE_AFTER]
+        ev = self.supervisor.on_poll(now, online_ids)
+        if ev == "LOCKED":
+            self._last_alarm = "全失联 ≥2s → 整臂 LOCKED, 需 SafetyReset 复位"
+            self.get_logger().error(self._last_alarm)
         s = ArmStatus()
         s.header.stamp = self.get_clock().now().to_msg()
-        s.mode = 1 if self.motors else 0          # MANUAL(只读轮询期) / DISCONNECT
-        s.lock_reason = 0
-        s.online_ids = [m["id"] for m in self.motors
-                        if self.views[m["id"]].last_recv_ts is not None
-                        and (now - self.views[m["id"]].last_recv_ts) < OFFLINE_AFTER]
+        s.mode = self.supervisor.mode
+        s.lock_reason = self.supervisor.lock_reason
+        s.online_ids = online_ids
         s.tx_frames = self._tx_count
         s.rx_frames = self._rx_count
         s.last_alarm = self._last_alarm
         self.pub_status.publish(s)
+
+    # ---- SafetyReset 服务(人工复位全局锁, SOP 最后一步) ----
+    def _on_safety_reset(self, request, response):
+        ok, msg = self.supervisor.reset(self._online_ids_now())
+        response.ok = ok
+        response.msg = msg
+        if ok:
+            self.get_logger().info(f"SafetyReset: {msg}")
+        else:
+            self.get_logger().warn(f"SafetyReset 拒绝: {msg}")
+        return response
+
+    def _online_ids_now(self):
+        now = time.time()
+        return [m["id"] for m in self.motors
+                if self.views[m["id"]].last_recv_ts is not None
+                and (now - self.views[m["id"]].last_recv_ts) < OFFLINE_AFTER]
 
     def destroy_node(self):
         self._stop.set()
