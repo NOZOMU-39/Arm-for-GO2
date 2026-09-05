@@ -1489,7 +1489,8 @@ function v3PosDual(m) {
  * 轮询(多电机:全部注册电机依次 9A/9C/92,静默)
  * ===================================================================== */
 let polling = false;   // 轮询忙标志:周期小于一轮耗时时不并发(见下)
-let autoCalibDone = false; // 上电自动校正已执行(重连重置,见 autoCalibRest)
+let autoCalibDone = false; // 上电自动校正已执行(重连或电机重启恢复时重置,见 autoCalibRest)
+let wasAllDown = false;   // 上轮电机全离线(掉电重启检测用)
 let pollPaused = false;   // ⚠️ 设零等独占流程暂停轮询:命令帧与轮询帧并发挤入总线
                           // → 背靠背突发损坏(173e22b 根因)→ 0x76 偶发未执行(日志实证)
 function pollToggle(on) {
@@ -1533,13 +1534,25 @@ async function pollAll() {
     await sendMotorSilent(m, pad8([0x92]), "轮询 0x92");
     await sleep(iv);
   }
-  if (!autoCalibDone) autoCalibRest();   // 上电自动校正(一次性,见函数)
+  if (!autoCalibDone) autoCalibRest();   // 上电自动校正(见函数)
+  // ⚠️ 2026-09-06 体验修正(用户:为何要断连重连): 电机集体重启(急停/掉电→全离线→恢复)
+  // 后自动重跑校正——界面 TCP 不断也能自动修正,无需用户重连
+  else {
+    const anyOnline = motors.some(x => lastRecv[x.id] && Date.now() - lastRecv[x.id] < 2500);
+    if (anyOnline && wasAllDown) {
+      wasAllDown = false;
+      setTimeout(() => { autoCalibDone = false; }, 2500);  // 等轮询角度到位再校
+      addLog("sys", "检测到电机重启恢复,准备重新核对上电位置…");
+    } else if (!anyOnline && !wasAllDown && motors.some(x => lastRecv[x.id])) {
+      wasAllDown = true;                                   // 曾有在线→现全离线 = 掉电中
+    }
+  }
 }
 /* 上电位置自动校正(2026-09-06 用户定稿): 急停/掉电后按规范摆到上电位置再上电,
    连接后首轮角度到位即检测: 显示差 ≈ N×turnDeg(整圈) → E4 直设修正并显式提示。
    ⚠️ 只改显示层(本地 registry E4), 不碰电机 ROM/总线; 仅执行一次直到重连。 */
 function autoCalibRest() {
-  const v4 = motors.filter(x => x.proto !== "V3"
+  const v4 = motors.filter(x => x.proto !== "V3" && !x.restStale   // restStale=设零后失效,等重标不自动校
     && typeof x.restDeg === "number" && isFinite(x.restDeg)
     && typeof x.turnDeg === "number" && isFinite(x.turnDeg) && x.turnDeg > 0);
   if (!v4.length) { autoCalibDone = true; return; }   // 无档案 → 不检测(标定后生效)
