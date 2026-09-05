@@ -73,6 +73,17 @@ sudo stty -F /dev/ttyUSB0 921600 raw -echo && sudo timeout 2 cat /dev/ttyUSB0 | 
 # 统一放 /tmp/claude/（重启自动清）
 ```
 
+## 常见问题
+
+| 现象 | 原因与处理 |
+|---|---|
+| SSH 连不上 `192.168.31.114` | 先 Ping——不通多半是没开机或 IP 被 DHCP 换了（桌面看 IP） |
+| 按电源键没反应 | 开机要**短按两下**；关机用**长按 10 秒**（别直接拔电） |
+| can0 状态不是 ERROR-ACTIVE | `ip -d link show can0` 看；USB-CAN 拔插一下，udev 会自动重新 up |
+| 找不到 /dev/ttyUSB0/1 | CH340 没插或顺序变了（插拔顺序会互换名字，程序按实际设备名适配） |
+| 想确认有没有被别人远程占着 | 桌面终端 `who` / `tmux ls`——所有远程操作都在 tmux `ops` 会话里可见 |
+| 控制软件命令找不到/跑不起来 | 见 `ROS2\arm_ws\README.md`「常见问题」 |
+
 ---
 
 # 🔍 深度参考（需要时再看）
