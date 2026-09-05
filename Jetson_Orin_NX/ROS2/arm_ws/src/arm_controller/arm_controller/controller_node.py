@@ -22,13 +22,15 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 
-from arm_interfaces.msg import ArmStatus, CanFrame, MotorState, RegistryEntry
+from arm_interfaces.msg import ArmStatus, CanFrame, JointCmd, MotorState, RegistryEntry
 from arm_interfaces.srv import (GetRegistry, RemoveRegistryEntry, SafetyReset,
                                 Scan, SetLimits, SetRegistry, SetZero)
 from arm_protocol import parse as arm_parse
 
+from .commands import plan_command
 from .registry import RegistryStore, load_list
 from .state import MotorView, SRC_92, SRC_9C, SRC_NONE, update_from_parse
+from .supervisor import MODE_LOCKED
 from .supervisor import ArmSupervisor
 from .track import V3Tracks
 
@@ -97,6 +99,7 @@ class ArmControllerNode(Node):
         self.pub_state = self.create_publisher(MotorState, "/arm/motor_states", Q())
         self.pub_status = self.create_publisher(ArmStatus, "/arm/status", Q())
         self.sub_rx = self.create_subscription(CanFrame, "/arm/can/rx", self._on_rx, Q())
+        self.sub_cmd = self.create_subscription(JointCmd, "/arm/joint_cmd", self._on_joint_cmd, Q())
         self.pub_tx = self.create_publisher(CanFrame, "/arm/can/tx", Q())
 
         if self.get_parameter("poll_enable").value:
@@ -166,6 +169,29 @@ class ArmControllerNode(Node):
 
     def _motor(self, mid: int):
         return next((x for x in self.motors if x["id"] == mid), None)
+
+    # ---------------- JointCmd 命令通道(第 5 步: 意图→限幅校验→帧) ----------------
+    def _on_joint_cmd(self, msg: JointCmd):
+        m = self._motor(int(msg.motor_id))
+        if m is None:
+            self.get_logger().warn(f"JointCmd 拒绝: #{msg.motor_id} 不在注册表")
+            return
+        v = self.views.get(int(msg.motor_id))
+        cur_angle = v.last_angle if v and isinstance(v.last_angle, (int, float)) else None
+        cur_spd = v.last_spd if v and isinstance(v.last_spd, (int, float)) else None
+        if self.supervisor.mode == MODE_LOCKED and msg.kind in (1, 2, 5):
+            self.get_logger().error(f"JointCmd 拒绝: 整臂 LOCKED, #{m['name']} 运动指令不放行(仅可停/失能)")
+            return
+        v3_ready = self.tracks.of(int(msg.motor_id)).lastEnc is not None if m["proto"] == "V3" else True
+        ok, why, frame = plan_command(m, v.alarm if v else None, int(msg.kind),
+                                      float(msg.deg), float(msg.spd_dps),
+                                      cur_angle, cur_spd, v3_ready)
+        if not ok:
+            self._last_alarm = f"JointCmd 拦截 #{m['name']}: {why}"
+            self.get_logger().warn(self._last_alarm)
+            return
+        self._send(int(msg.motor_id), frame)
+        self.get_logger().info(f"JointCmd #{m['name']} kind={msg.kind}: {why}")
 
     # ---------------- 发布 ----------------
     def _publish_states(self):
