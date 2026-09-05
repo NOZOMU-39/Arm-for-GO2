@@ -2003,6 +2003,14 @@ function renderMotorCards() {
         <button data-tip="确认：写入角度下限">确认</button>
         <span class="hint">°</span>
       </div>
+      ${m.proto === "V3" ? "" : `
+      <div class="mrow" id="restRow_${m.id}">
+        <label data-tip="开电前必须人工把臂摆到的固定位置（建议低势能安全位，有刻度/凸点辅助更准）。上电后系统以此核对角度、纠正急停丢的圈数（不会让电机自己动，只是记录位置做比对）">上电位置</label>
+        <span class="hint" id="restVal_${m.id}">${typeof m.restDeg === "number" && isFinite(m.restDeg)
+            ? m.restDeg.toFixed(2) + "°" + (m.restDegDate ? "（" + m.restDegDate.slice(5) + "）" : "")
+            : "未记录"}</span>
+        <button id="restBtn_${m.id}" data-tip="把当前位置记为上电位置。仅当：①已人工把臂摆到固定的上电参考位 ②刚设过零点（显示角度 = 真实角度）。注意：换结构/换电机/重新设零后，必须重新记录">📍 记为上电位置</button>
+      </div>`}
       <div class="mtip" data-tip="">单击选中 · 双击进入单电机操控（键盘 ↑↓ 运动 / ←→ 切电机）</div>`;
     card.onclick = () => selectMotor(m.id);
     card.ondblclick = () => openSingleView(m.id);
@@ -2013,6 +2021,9 @@ function renderMotorCards() {
     card.querySelectorAll("button")[0].onclick = (e) => { e.stopPropagation(); setZero(); };
     card.querySelectorAll("button")[1].onclick = (e) => { e.stopPropagation(); setMax(); };
     card.querySelectorAll("button")[2].onclick = (e) => { e.stopPropagation(); setMin(); };
+    // 上电位置按钮(V4 卡片才有;独立 id 绑定,不占 querySelectorAll 索引)
+    const rb = document.getElementById("restBtn_" + m.id);
+    if (rb) rb.onclick = (e) => { e.stopPropagation(); markRest(m.id); };
     card.querySelectorAll("input")[0].onclick = (e) => e.stopPropagation();
     card.querySelectorAll("input")[1].onclick = (e) => e.stopPropagation();
     card.querySelectorAll("input")[0].onmousedown = (e) => e.stopPropagation();
@@ -2033,6 +2044,34 @@ function updateCardAngle(id) {
   const el = document.getElementById("mang_" + id);
   // ⚠️ typeof number 判空(null 曾导致 toFixed 崩 → 每秒刷新中断 → 卡片兜底不执行)
   if (el && typeof lastAngle[id] === "number") el.textContent = lastAngle[id].toFixed(2) + "°";
+}
+
+/* 记为上电位置(2026-09-06 用户定名;内部字段 restDeg = 掉电自落谷位的协议角档案)。
+   用途:掉电/急停甩动丢圈后,臂自落回此位置,校正工具(rest_calib, Jetson 侧)以此核对圈数。
+   ⚠️ 取值基准 = 协议角(显示角 − E4),与 Jetson rest_calib 读角(raw 0x92)同基准;
+      turnDeg = 转子 1 圈对应输出角(X6-40 36:1→10°,X2-7 28.17:1→12.78),首次记录自动填。
+   重标触发:换结构/换电机/重新设零后必须重新记录(否则校正会按旧位置错判)。 */
+async function markRest(id) {
+  const m = motorById(id); if (!m) return;
+  if (typeof lastAngle[id] !== "number") { showBanner("尚无角度读数,请稍候再试", true); return; }
+  const raw = lastAngle[id] - e4Of(m);
+  const old = (typeof m.restDeg === "number" && isFinite(m.restDeg))
+    ? `当前记录:${m.restDeg.toFixed(2)}°${m.restDegDate ? "(" + m.restDegDate.slice(5) + ")" : ""}\n` : "";
+  const ok = await showConfirm("记录上电位置",
+    `把 ${m.name}(#${id}) 当前位置 ${raw.toFixed(2)}° 记为上电位置?\n\n` +
+    `用途:以后每次开电前,人工把臂摆到此位置,上电后系统以此核对角度、纠正急停丢的圈数。\n` +
+    old +
+    `注意:换结构/换电机/重新设零后,必须重新记录。`);
+  if (!ok) return;
+  m.restDeg = Math.round(raw * 100) / 100;
+  m.restDegDate = new Date().toISOString().slice(0, 10);
+  if (!(typeof m.turnDeg === "number" && isFinite(m.turnDeg) && m.turnDeg > 0)) {
+    m.turnDeg = (m.proto === "V44") ? 12.78 : 10.0;
+  }
+  saveMotors();
+  renderMotorCards(); renderChartGrid();
+  addLog("sys", `${m.name}:上电位置记录 ${m.restDeg}°(${m.restDegDate})`);
+  showBanner(`✅ ${m.name} 上电位置已记录 ${m.restDeg}°——开电前请把臂摆到此位置`);
 }
 
 /* 设为零点(当前位置 = 机械零点 0°;用户 2026-08-26 反馈:不需要输入框,直接按钮)
@@ -2095,6 +2134,10 @@ async function setZeroNow(id) {
       lastAngle[id] = 0; lastAngleSrc[id] = "0x92";
       await sleep(10000); // ⚠️ 实测复位耗时约 10s(10:42:00 空窗后才读到 0.00°),等足再恢复轮询
       addLog("sys", `✅ ${m.name} 零点已写入固件:当前位置 = 0°(V4 三步)。复位完成,观察角度显示——归零并保持 = 写入成功;回到原值 = 写入失败,请重试`);
+      // ⚠️ 2026-09-06:设零后上电位置档案失效(零点变了,参考位的显示角也变)——提示重标
+      if (typeof m.restDeg === "number" && isFinite(m.restDeg)) {
+        showBanner(`⚠️ ${m.name} 零点已更新——之前记录的上电位置(${m.restDeg.toFixed(2)}°)已失效:请把臂摆回上电参考位,点「📍 记为上电位置」重新记录`, true);
+      }
     }
   } finally {
     if (!wasPaused) pollPaused = false;
