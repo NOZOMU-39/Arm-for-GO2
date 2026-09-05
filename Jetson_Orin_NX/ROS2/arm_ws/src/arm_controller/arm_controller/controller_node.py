@@ -20,7 +20,6 @@ import rclpy
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
-from ament_index_python.packages import get_package_share_directory
 
 from arm_interfaces.msg import ArmStatus, CanFrame, MotorState, RegistryEntry
 from arm_interfaces.srv import (GetRegistry, RemoveRegistryEntry, SafetyReset,
@@ -61,9 +60,8 @@ def _frame_interval(period_ms: float, n_motors: int, n_cmds: int = len(POLL_CMDS
 class ArmControllerNode(Node):
     def __init__(self):
         super().__init__("arm_controller")
-        share = get_package_share_directory("arm_controller")
         self.declare_parameter("registry_file",
-                               str(Path(share) / "config" / "registry.json"))
+                               "~/ROS2/arm_ws/config/registry.json")
         self.declare_parameter("poll_interval_ms", 500)
         self.declare_parameter("poll_enable", True)
 
