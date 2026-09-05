@@ -1,0 +1,6 @@
+# 拉取注册表全表（前端缓存用 rev 比对，无需每次全刷）
+
+---
+bool ok
+uint32 rev            # 变更版本号（每次写入递增；前端缓存比对）
+RegistryEntry[] entries   # 全表（空 = 尚未配置）

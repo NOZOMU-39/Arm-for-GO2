@@ -1,0 +1,8 @@
+# 写入/更新一台电机配置（upsert, 全量覆盖语义）
+# 前端流程: Get 全表 → 改一台 → Set 回
+# 服务端校验: id 1~32 / gear>0 / dir∈{±1} / limMin<limMax / proto 白名单(V3,V43,V44)
+
+RegistryEntry entry
+---
+bool ok
+string msg

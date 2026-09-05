@@ -1,0 +1,11 @@
+# 写软限幅（全量替换语义）: 请求 = 该台电机的完整新限幅集合; NaN = 未设（清除该项）
+# 服务端校验: limMinDeg < limMaxDeg 才可生效
+
+int8 motor_id
+float32 lim_min_deg   # 下限 °（NaN=未设）
+float32 lim_max_deg   # 上限 °（NaN=未设）
+float32 lim_max_spd   # 限速 °/s（NaN=未设）
+float32 lim_max_iq    # 限流 A（NaN=未设）
+---
+bool ok
+string msg

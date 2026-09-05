@@ -1,0 +1,9 @@
+# 总线扫描: 逐个 id 发 0x9A 探测（含 40ms 节奏踩坑结论；只读，不写任何东西）
+# 探测后等待回复窗口判定在线; 返回在线列表与逐 id 诊断。
+
+int8 start_id   # 起始 id（默认 1）
+int8 end_id     # 结束 id（默认 32）
+---
+bool ok
+int8[] online_ids   # 在线电机列表
+string diag         # 逐 id 探测结果（人读诊断）

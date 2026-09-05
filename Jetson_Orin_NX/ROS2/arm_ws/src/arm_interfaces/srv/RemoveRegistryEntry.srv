@@ -1,0 +1,7 @@
+# 删除一台电机配置（仅删配置，不影响电机本身）
+# 电机仍在线时删除 -> controller 停止轮询/控制该台并提示（由实现决定）
+
+int8 motor_id
+---
+bool ok
+string msg
