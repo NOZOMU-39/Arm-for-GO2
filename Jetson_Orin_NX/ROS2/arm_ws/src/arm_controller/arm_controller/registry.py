@@ -90,3 +90,60 @@ def load_list(items: list) -> list:
 
 def by_id(motors: list, mid: int) -> dict | None:
     return next((m for m in motors if m["id"] == mid), None)
+
+
+class RegistryStore:
+    """注册表运行时容器(节点持有权威副本; 变更带 rev 版本号, 供前端缓存比对)。
+
+    upsert 校验与 SetRegistry.srv 契约一致: id 1~32 / proto 白名单 / gear>0 / dir±1 /
+    limMin<limMax(NaN=未设放行)。remove 仅删配置不动电机。set_limits 全量替换(清理=置 NaN)。
+    """
+
+    def __init__(self, motors: list | None = None):
+        self.motors = load_list(motors) if motors else []
+        self.rev = 0
+
+    def get_all(self) -> list:
+        return list(self.motors)
+
+    def get(self, mid: int) -> dict | None:
+        return by_id(self.motors, mid)
+
+    def upsert(self, entry: dict) -> dict:
+        """写入/更新一台(全量覆盖)。先经 normalize(非法字段回落默认), 再查 limMin<limMax。"""
+        m = normalize(entry)
+        self._check_limits(m)
+        old = by_id(self.motors, m["id"])
+        if old is None:
+            self.motors.append(m)
+        else:
+            self.motors[self.motors.index(old)] = m
+        self.rev += 1
+        return m
+
+    def remove(self, mid: int) -> bool:
+        old = by_id(self.motors, mid)
+        if old is None:
+            return False
+        self.motors.remove(old)
+        self.rev += 1
+        return True
+
+    def set_limits(self, mid: int, lim_min_deg=None, lim_max_deg=None,
+                   lim_max_spd=None, lim_max_iq=None) -> dict:
+        """全量替换某台限幅(None=未设即清除该项)。校验 limMin<limMax 才生效。"""
+        m = by_id(self.motors, mid)
+        if m is None:
+            raise ValueError(f"电机 #{mid} 不在注册表中")
+        for k, v in (("limMinDeg", lim_min_deg), ("limMaxDeg", lim_max_deg),
+                     ("limMaxSpd", lim_max_spd), ("limMaxIq", lim_max_iq)):
+            m[k] = float(v) if v is not None and v == v else None   # NaN → None
+        self._check_limits(m)
+        self.rev += 1
+        return m
+
+    @staticmethod
+    def _check_limits(m: dict):
+        lo, hi = m.get("limMinDeg"), m.get("limMaxDeg")
+        if lo is not None and hi is not None and lo >= hi:
+            raise ValueError(f"电机 #{m['id']} 限幅下限 {lo}° 需小于上限 {hi}°")

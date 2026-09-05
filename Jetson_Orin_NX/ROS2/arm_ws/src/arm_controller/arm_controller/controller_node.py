@@ -17,18 +17,23 @@ import time
 from pathlib import Path
 
 import rclpy
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from ament_index_python.packages import get_package_share_directory
 
-from arm_interfaces.msg import ArmStatus, CanFrame, MotorState
-from arm_interfaces.srv import SafetyReset
+from arm_interfaces.msg import ArmStatus, CanFrame, MotorState, RegistryEntry
+from arm_interfaces.srv import (GetRegistry, RemoveRegistryEntry, SafetyReset,
+                                Scan, SetLimits, SetRegistry, SetZero)
 from arm_protocol import parse as arm_parse
 
-from .registry import load_list
+from .registry import RegistryStore, load_list
 from .state import MotorView, SRC_92, SRC_9C, SRC_NONE, update_from_parse
 from .supervisor import ArmSupervisor
 from .track import V3Tracks
+
+# NaN = 未设(RegistryEntry 契约: float32 用 NaN 表示未标定/未设, 对应 JSON null)
+NAN = float("nan")
 
 Q = lambda: QoSProfile(depth=100, history=HistoryPolicy.KEEP_LAST,
                        reliability=ReliabilityPolicy.RELIABLE)
@@ -63,7 +68,9 @@ class ArmControllerNode(Node):
         self.declare_parameter("poll_enable", True)
 
         reg_path = Path(self.get_parameter("registry_file").value).expanduser()
-        self.motors = load_list(json.loads(reg_path.read_text(encoding="utf-8")))
+        self._reg_path = reg_path
+        self.store = RegistryStore(load_list(json.loads(reg_path.read_text(encoding="utf-8"))))
+        self.motors = self.store.motors          # 与 store 同一列表对象(服务变更即时可见)
         self.get_logger().info(f"档案加载 {len(self.motors)} 台: "
                                + ", ".join(f"#{m['id']}{m['proto']}" for m in self.motors))
 
@@ -73,8 +80,20 @@ class ArmControllerNode(Node):
         self._rx_count = 0
         self._last_alarm = ""
         self._stop = threading.Event()
+        self._poll_paused = False                # 设零等独占流程暂停轮询(173e22b 教训)
         self.supervisor = ArmSupervisor(has_motors=bool(self.motors))
-        self._stop_srv = self.create_service(SafetyReset, "safety_reset", self._on_safety_reset)
+        for name, cb in (("safety_reset", self._on_safety_reset),
+                         ("get_registry", self._on_get_registry),
+                         ("set_registry", self._on_set_registry),
+                         ("remove_registry_entry", self._on_remove_entry),
+                         ("set_limits", self._on_set_limits),
+                         ("scan", self._on_scan),
+                         ("set_zero", self._on_set_zero)):
+            self.create_service({"safety_reset": SafetyReset, "get_registry": GetRegistry,
+                                 "set_registry": SetRegistry,
+                                 "remove_registry_entry": RemoveRegistryEntry,
+                                 "set_limits": SetLimits, "scan": Scan,
+                                 "set_zero": SetZero}[name], name, cb)
 
         self.pub_state = self.create_publisher(MotorState, "/arm/motor_states", Q())
         self.pub_status = self.create_publisher(ArmStatus, "/arm/status", Q())
@@ -93,13 +112,18 @@ class ArmControllerNode(Node):
     # ---------------- 轮询线程 ----------------
     def _poll_loop(self):
         period_ms = float(self.get_parameter("poll_interval_ms").value)
-        interval = _frame_interval(period_ms, len(self.motors))
         while not self._stop.is_set():
+            if self._poll_paused:
+                self._stop.wait(0.2)
+                continue
+            interval = _frame_interval(period_ms, len(self.motors))
             t0 = time.monotonic()
-            for m in self.motors:
+            for m in list(self.motors):
                 if self._stop.is_set():
                     return
                 for cmd in POLL_CMDS:
+                    if self._poll_paused:
+                        break
                     self._send(m["id"], bytes([cmd, 0, 0, 0, 0, 0, 0, 0]), silent=True)
                     time.sleep(interval / 1000.0)
             el = time.monotonic() - t0
@@ -182,7 +206,179 @@ class ArmControllerNode(Node):
         s.last_alarm = self._last_alarm
         self.pub_status.publish(s)
 
-    # ---- SafetyReset 服务(人工复位全局锁, SOP 最后一步) ----
+    # ---------------- 服务(注册表 CRUD / 扫描 / 设零) ----------------
+
+    def _persist(self):
+        """内存档案变更落盘(controller 为 Jetson 侧权威; 界面侧经二期 gateway 同步)"""
+        try:
+            self._reg_path.write_text(
+                json.dumps(self.motors, ensure_ascii=False, indent=1), encoding="utf-8")
+        except OSError as e:
+            self.get_logger().error(f"档案落盘失败: {e}")
+
+    def _ensure_view(self, mid: int):
+        if mid not in self.views:
+            self.views[mid] = MotorView(mid)
+
+    @staticmethod
+    def _entry_to_dict(e: RegistryEntry) -> dict:
+        return {
+            "id": int(e.id), "name": e.name, "proto": e.proto,
+            "gear": e.gear, "dir": int(e.dir),
+            "E0": None if e.e0_deg != e.e0_deg else float(e.e0_deg),
+            "E0Date": e.e0_date or None,
+            "E4": 0.0 if e.e4_deg != e.e4_deg else float(e.e4_deg),
+            "limMinDeg": None if e.lim_min_deg != e.lim_min_deg else float(e.lim_min_deg),
+            "limMaxDeg": None if e.lim_max_deg != e.lim_max_deg else float(e.lim_max_deg),
+            "limMaxSpd": None if e.lim_max_spd != e.lim_max_spd else float(e.lim_max_spd),
+            "limMaxIq": None if e.lim_max_iq != e.lim_max_iq else float(e.lim_max_iq),
+            "defaultPosDeg": None if e.default_pos_deg != e.default_pos_deg else float(e.default_pos_deg),
+        }
+
+    @staticmethod
+    def _dict_to_entry(m: dict) -> RegistryEntry:
+        e = RegistryEntry()
+        e.id = int(m["id"])
+        e.name = m.get("name", "")
+        e.proto = m["proto"]
+        e.gear = float(m.get("gear", 1))
+        e.dir = int(m.get("dir", 1))
+        e.e0_deg = NAN if m.get("E0") is None else float(m["E0"])
+        e.e0_date = m.get("E0Date") or ""
+        e.e4_deg = float(m.get("E4") or 0.0)
+        e.lim_min_deg = NAN if m.get("limMinDeg") is None else float(m["limMinDeg"])
+        e.lim_max_deg = NAN if m.get("limMaxDeg") is None else float(m["limMaxDeg"])
+        e.lim_max_spd = NAN if m.get("limMaxSpd") is None else float(m["limMaxSpd"])
+        e.lim_max_iq = NAN if m.get("limMaxIq") is None else float(m["limMaxIq"])
+        e.default_pos_deg = NAN if m.get("defaultPosDeg") is None else float(m["defaultPosDeg"])
+        return e
+
+    def _on_get_registry(self, request, response):
+        response.ok = True
+        response.rev = self.store.rev
+        response.entries = [self._dict_to_entry(m) for m in self.motors]
+        return response
+
+    def _on_set_registry(self, request, response):
+        try:
+            m = self.store.upsert(self._entry_to_dict(request.entry))
+            self._ensure_view(m["id"])
+            self._persist()
+            response.ok = True
+            response.msg = f"#{m['id']} 已写入(rev {self.store.rev})"
+        except ValueError as e:
+            response.ok = False
+            response.msg = str(e)
+        return response
+
+    def _on_remove_entry(self, request, response):
+        mid = int(request.motor_id)
+        if self.store.remove(mid):
+            self.views.pop(mid, None)
+            self._persist()
+            response.ok = True
+            response.msg = f"#{mid} 配置已删除(电机本身不受影响)"
+        else:
+            response.ok = False
+            response.msg = f"#{mid} 不在注册表中"
+        return response
+
+    def _on_set_limits(self, request, response):
+        try:
+            self.store.set_limits(int(request.motor_id),
+                                  None if request.lim_min_deg != request.lim_min_deg else request.lim_min_deg,
+                                  None if request.lim_max_deg != request.lim_max_deg else request.lim_max_deg,
+                                  None if request.lim_max_spd != request.lim_max_spd else request.lim_max_spd,
+                                  None if request.lim_max_iq != request.lim_max_iq else request.lim_max_iq)
+            self._persist()
+            response.ok = True
+            response.msg = f"#{request.motor_id} 限幅已更新(rev {self.store.rev})"
+        except ValueError as e:
+            response.ok = False
+            response.msg = str(e)
+        return response
+
+    def _on_scan(self, request, response):
+        """逐个 id 发 0x9A 探测(只读)。间隔 40ms(契约踩坑结论: 总线突发防损坏节奏)。"""
+        online, diag = [], []
+        start = max(1, int(request.start_id))
+        end = min(32, int(request.end_id))
+        for mid in range(start, end + 1):
+            self._send(mid, bytes([0x9A, 0, 0, 0, 0, 0, 0, 0]), silent=True)
+            time.sleep(0.04)
+            time.sleep(0.03)   # 回复窗口
+            now = time.time()
+            v = self.views.get(mid)
+            if v is not None and v.last_recv_ts is not None and (now - v.last_recv_ts) < OFFLINE_AFTER:
+                online.append(mid)
+                diag.append(f"#{mid} 在线")
+            else:
+                diag.append(f"#{mid} 无应答")
+        response.ok = True
+        response.online_ids = online
+        response.diag = " | ".join(diag)
+        return response
+
+    def _on_set_zero(self, request, response):
+        """设零(契约注释踩坑全集): V3 记 E0 档案(0x92 到位才记, 防记错圈);
+        V4 三步 0x80→500ms→0x64→1000ms→0x76→10s 等复位; 期间暂停轮询独占总线。
+        服务在 MultiThreadedExecutor 线程内, sleep 不阻塞状态发布。"""
+        mid = int(request.motor_id)
+        m = self._motor(mid)
+        if m is None:
+            response.ok = False
+            response.msg = f"#{mid} 不在注册表中"
+            return response
+        v = self.views.get(mid)
+        if v is None or not isinstance(v.last_angle, (int, float)):
+            response.ok = False
+            response.msg = "尚未收到该电机角度反馈, 请稍候再操作"
+            return response
+        was_paused = self._poll_paused
+        self._poll_paused = True
+        try:
+            if m["proto"] == "V3":
+                if v.angle_src != SRC_92:
+                    response.ok = False
+                    response.msg = "0x92 绝对角尚未到位, 设零可能记错圈数, 请稍候再试"
+                    return response
+                st = self.tracks.of(mid, m.get("E0"))
+                e0 = round(st.rotDeg * 100) / 100
+                m["E0"] = e0
+                m["E0Date"] = time.strftime("%Y-%m-%d")
+                st.E0 = e0
+                self._persist()
+                v.last_angle = 0.0
+                response.ok = True
+                response.msg = f"V3 零点已标定: 当前位置=0°, E0={e0}°(档案)"
+                response.new_e0 = e0
+                response.new_e4 = NAN
+                return response
+            # V4 三步(节奏 500/1000/10000ms 为 2026-08-26 实测二次修复值)
+            self.get_logger().info(f"设零 #{m['name']} 1/3 失能(0x80)")
+            self._send(mid, bytes([0x80, 0, 0, 0, 0, 0, 0, 0]))
+            time.sleep(0.5)
+            self.get_logger().info("设零 2/3 写零点(0x64)")
+            self._send(mid, bytes([0x64, 0, 0, 0, 0, 0, 0, 0]))
+            time.sleep(1.0)
+            self.get_logger().info("设零 3/3 复位(0x76), 电机约 10 秒不响应属正常")
+            self._send(mid, bytes([0x76, 0, 0, 0, 0, 0, 0, 0]))
+            time.sleep(10.0)
+            m["E4"] = 0.0
+            m["E0"] = None
+            self._persist()
+            v.last_angle = 0.0
+            v.angle_src = SRC_92
+            response.ok = True
+            response.msg = "V4 零点已写入固件: 归零并保持=成功; 回到原值=失败请重试"
+            response.new_e0 = NAN
+            response.new_e4 = 0.0
+            return response
+        finally:
+            if not was_paused:
+                self._poll_paused = False
+
+    # ---- SafetyReset 服务(人工复位全局锁) ----
     def _on_safety_reset(self, request, response):
         ok, msg = self.supervisor.reset(self._online_ids_now())
         response.ok = ok
@@ -207,11 +403,14 @@ class ArmControllerNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = ArmControllerNode()
+    executor = MultiThreadedExecutor()   # 服务回调(设零等长流程 sleep)与 timer 互不阻塞
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
+        executor.shutdown()
         node.destroy_node()
         if rclpy.ok():          # 防重复 shutdown 报错(KeyboardInterrupt 路径怪癖)
             rclpy.shutdown()
