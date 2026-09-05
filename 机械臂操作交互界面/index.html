@@ -2046,6 +2046,13 @@ function updateCardAngle(id) {
 }
 
 /* 上电位置按钮动态提示:选中电机(V4)显示档案值/失效态;V3 禁用提示(2026-09-06 demo 定稿) */
+/* 本地日期(YYYY-MM-DD)——⚠️ 勿用 toISOString:UTC 日期在中国时区晚间会偏前一天(2026-09-06 实测 bug) */
+function todayLocal() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0")
+    + "-" + String(d.getDate()).padStart(2, "0");
+}
+
 /* 记录机械臂上电位置(2026-09-06 用户定稿:臂级一键,记录全部 V4 电机当前协议角)。
    内部字段 restDeg/restDegDate/turnDeg;取值基准 = 协议角(显示角 − E4),
    与 Jetson rest_calib 读角(raw 0x92)同基准;turnDeg = 转子 1 圈输出角
@@ -2071,7 +2078,7 @@ async function markRest() {
     + (staleN ? `\n(其中 ${staleN} 台标记「需重标」,一并更新)` : "")
     + "\n\n用途:每次开电前人工把整臂摆到此姿态,上电后核对角度纠正急停丢圈。\n换结构/换电机/重新设零后必须重新记录。");
   if (!ok) return;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   v4.forEach(x => {
     x.restDeg = Math.round((lastAngle[x.id] - e4Of(x)) * 100) / 100;
     x.restDegDate = today;
@@ -2120,7 +2127,7 @@ async function setZeroNow(id) {
     if (m.proto === "V3") {
       const t = v3TrackOf(m);
       m.E0 = Math.round(t.rotDeg * 100) / 100;   // E0 = 当前固件角(0x92 校准后)
-      m.E0Date = new Date().toISOString().slice(0, 10);
+      m.E0Date = todayLocal();
       t.E0 = m.E0;
       t.rotDeg = m.E0;
       saveMotors();
