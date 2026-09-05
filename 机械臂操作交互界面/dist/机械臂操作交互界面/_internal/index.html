@@ -1304,6 +1304,7 @@ async function doConnect(kind) {
  * 主界面切换 / 徽章
  * ===================================================================== */
 function showMainView() {
+  autoCalibDone = false;   // 2026-09-06: 每次连接都做一次上电自动校正
   document.getElementById("connectView").style.display = "none";
   document.getElementById("mainView").classList.add("show");
   updateCanCard();
@@ -1488,6 +1489,7 @@ function v3PosDual(m) {
  * 轮询(多电机:全部注册电机依次 9A/9C/92,静默)
  * ===================================================================== */
 let polling = false;   // 轮询忙标志:周期小于一轮耗时时不并发(见下)
+let autoCalibDone = false; // 上电自动校正已执行(重连重置,见 autoCalibRest)
 let pollPaused = false;   // ⚠️ 设零等独占流程暂停轮询:命令帧与轮询帧并发挤入总线
                           // → 背靠背突发损坏(173e22b 根因)→ 0x76 偶发未执行(日志实证)
 function pollToggle(on) {
@@ -1530,6 +1532,45 @@ async function pollAll() {
     await sleep(iv);
     await sendMotorSilent(m, pad8([0x92]), "轮询 0x92");
     await sleep(iv);
+  }
+  if (!autoCalibDone) autoCalibRest();   // 上电自动校正(一次性,见函数)
+}
+/* 上电位置自动校正(2026-09-06 用户定稿): 急停/掉电后按规范摆到上电位置再上电,
+   连接后首轮角度到位即检测: 显示差 ≈ N×turnDeg(整圈) → E4 直设修正并显式提示。
+   ⚠️ 只改显示层(本地 registry E4), 不碰电机 ROM/总线; 仅执行一次直到重连。 */
+function autoCalibRest() {
+  const v4 = motors.filter(x => x.proto !== "V3"
+    && typeof x.restDeg === "number" && isFinite(x.restDeg)
+    && typeof x.turnDeg === "number" && isFinite(x.turnDeg) && x.turnDeg > 0);
+  if (!v4.length) { autoCalibDone = true; return; }   // 无档案 → 不检测(标定后生效)
+  const ready = v4.every(x => lastAngleSrc[x.id] === "0x92" && typeof lastAngle[x.id] === "number");
+  if (!ready) return;                                  // 首轮 0x92 未全到位,下轮再试
+  autoCalibDone = true;
+  const tol = 2.0, fixes = [], warns = [];
+  v4.forEach(x => {
+    const short = x.restDeg - lastAngle[x.id];        // 显示差(正=少圈=丢圈)
+    const N = Math.round(short / x.turnDeg);
+    const resid = short - N * x.turnDeg;
+    if (Math.abs(resid) <= tol) {
+      if (N !== 0) {
+        // E4 直设 = restDeg − raw(2026-09-06 语义修正,勿叠加); raw = lastAngle − E4
+        const newE4 = x.restDeg - (lastAngle[x.id] - (x.E4 || 0));
+        x.E4 = Math.round(newE4 * 100) / 100;
+        lastAngle[x.id] = x.restDeg;
+        fixes.push(`${x.name} ${N > 0 ? "少" : "多"}${Math.abs(N)} 圈(${Math.abs(N * x.turnDeg).toFixed(1)}°)`);
+      }
+    } else {
+      warns.push(`${x.name} 差 ${short.toFixed(1)}°(非整圈,臂可能不在上电位置)`);
+    }
+  });
+  if (fixes.length) {
+    saveMotors(); renderMotorCards(); renderChartGrid(); updateMarkRestTip();
+    addLog("warn", "上电位置自动校正:" + fixes.join("; ") + "——E4 已按档案修正,零 ROM 写入");
+    showBanner(`⚠️ 检测到掉电丢圈,已自动修正显示:${fixes.join("、")}`, true);
+  }
+  if (warns.length) {
+    addLog("warn", "上电位置核对:" + warns.join("; ") + "——请把臂摆到上电位置后重新连接,或点「📍 记录机械臂上电位置」重标");
+    showBanner(`⚠️ ${warns.join("; ")}——请确认臂已摆到上电位置后重连`, true);
   }
 }
 /* 轮询帧间延迟(测试 vm 中 setTimeout 同步执行,不阻塞) */

@@ -287,6 +287,35 @@ function enterMain(ip) {
   const badge = document.querySelector("#mainView header .badge");
   if (badge && ip) badge.textContent = `🟢 无线 ${ip}`;
   addLog("sys", `连接成功(无线 ${ip || "—"}, 1000kbps)——开始状态刷新`);
+  setTimeout(autoCalibMock, 1500);   // 模拟首轮角度到位后自动校正
+}
+/* 上电自动校正(mock): 臂在上电位置时检测整圈差 → 显式修正(E4 = restDeg − raw) */
+function autoCalibMock() {
+  const v4 = motors.filter(x => x.proto !== "V3" && typeof x.restDeg === "number");
+  const fixes = [], warns = [];
+  v4.forEach(x => {
+    const turn = x.turnDeg || (x.proto === "V44" ? 12.78 : 10.0);
+    const short = x.restDeg - x.ang;          // 显示差(正=少圈)
+    const N = Math.round(short / turn);
+    const resid = short - N * turn;
+    if (Math.abs(resid) <= 2.0) {
+      if (N !== 0) {
+        fixes.push(`${x.name} ${N > 0 ? "少" : "多"}${Math.abs(N)} 圈(${Math.abs(N * turn).toFixed(1)}°)`);
+        x.E4 = (x.E4 || 0) + short;           // mock 简化: E4 += short
+        x.ang = x.restDeg;                    // 显示归位
+      }
+    } else {
+      warns.push(`${x.name} 差 ${short.toFixed(1)}°(非整圈)`);
+    }
+  });
+  renderCards();
+  if (fixes.length) {
+    addLog("warn", "上电位置自动校正:" + fixes.join("; "));
+    showBanner(`⚠️ 检测到掉电丢圈,已自动修正显示:${fixes.join("、")}`, true);
+  }
+  if (warns.length) {
+    addLog("warn", "上电位置核对:" + warns.join("; ") + "——请把臂摆到上电位置后重连");
+  }
 }
 function backToConnect() {
   document.getElementById("mainView").style.display = "none";
@@ -336,10 +365,10 @@ document.getElementById("demoUseFound").onclick = () => {
 /* ---------- mock 电机(虚构数据) ---------- */
 const motors = [
   { id: 1, name: "基座云台Yaw", proto: "V3",  ang: 15.81, zeroing: false, restDeg: null, restDegDate: null, restStale: false },
-  { id: 2, name: "大臂Pitch",   proto: "V43", ang: 93.56, zeroing: false, restDeg: 93.69, restDegDate: "2026-09-06", restStale: false },
-  { id: 3, name: "小臂Pitch",   proto: "V43", ang: -170.40, zeroing: false, restDeg: -170.46, restDegDate: "2026-09-06", restStale: false },
-  { id: 4, name: "手腕Pitch",   proto: "V44", ang: 16.47, zeroing: false, restDeg: 16.45, restDegDate: "2026-09-06", restStale: false },
-  { id: 5, name: "末端Yaw",     proto: "V44", ang: 0.15, zeroing: false, restDeg: null, restDegDate: null, restStale: false },
+  { id: 2, name: "大臂Pitch",   proto: "V43", ang: 83.56, zeroing: false, restDeg: 93.56, restDegDate: "2026-09-06", restStale: false },  // 模拟急停丢1圈
+  { id: 3, name: "小臂Pitch",   proto: "V43", ang: -160.40, zeroing: false, restDeg: -170.40, restDegDate: "2026-09-06", restStale: false },  // 模拟多1圈
+  { id: 4, name: "手腕Pitch",   proto: "V44", ang: 16.47, zeroing: false, restDeg: 16.51, restDegDate: "2026-09-06", restStale: false },
+  { id: 5, name: "末端Yaw",     proto: "V44", ang: 0.05, zeroing: false, restDeg: 0.02, restDegDate: "2026-09-06", restStale: false },
 ];
 let selectedId = 2;
 let singleId = null;   // 非 null = 单电机操控视图激活
