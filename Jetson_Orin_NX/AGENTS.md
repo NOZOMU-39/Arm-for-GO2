@@ -25,7 +25,7 @@
 |---|---|
 | 密码 | `1`（用户定案，keyring 无密码） |
 | 桌面 | 自动登录 nvidia（GDM），ToDesk 远程 |
-| CAN | **can0 = USB-CAN（PCAN）**，开机自启 1Mbps，udev 热插拔自动 up；板载 mttcan 已 blacklist |
+| CAN | **can0 = USB-CAN（PCAN）**，开机自启 1Mbps，udev 热插拔自动 up；板载 mttcan 已 blacklist；**PCAN 经 USB HUB 可用（2026-09-06 实测：枚举稳/200Hz 全通/冷启动自启全绿），CH340 类 FS 串口仍直插（见 IMU AGENTS 2.7）** |
 | 串口 | CH340 插上即用 ttyUSB0/1（IMU 921600→1000Hz）；⚠️ 插拔顺序导致名字互换 |
 | 禁更新 | 图为约束已配（NVIDIA 源停用/apt-daily 禁/6 内核包 hold）——**不得擅自升级 JetPack/L4T/内核/rootfs/BSP** |
 | 开机/关机 | 短按两下开机；**关机=长按 10 秒（优雅）**；桌面短按弹 60 秒框；电源键非 input 设备，logind 收不到，勿再折腾短按直关 |
