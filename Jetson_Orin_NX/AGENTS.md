@@ -32,7 +32,7 @@
 
 ## CAN 技术档案（干活必读）
 
-- 驱动：**PEAK 官方 peak-linux-driver 8.15.2 `make netdev`** 编译的 SocketCAN 版 pcan.ko（源码在 `Database\USBCAN卡资料_PCAN\02-Linux下驱动\`；chardev 版≠SocketCAN 版）
+- 驱动：**PEAK 官方 peak-linux-driver 8.20.0 `make netdev`** 编译的 SocketCAN 版 pcan.ko（2026-09-07 升级；源码 8.13~8.20 在 `Database\USBCAN卡资料_PCAN\02-Linux下驱动\`；chardev 版≠SocketCAN 版）。**⚠️ 8.15.2 有收包缺陷（详见情报 09-07 条目）：CAN 流量下偶发 pcan_netdev_rx Oops/hang，曾致整机反复重启循环——勿降回 8.15.2**；旧 ko 备份 ~/pcan.ko.bak_8.15.2 仅存档勿用
 - 开机服务：`/etc/systemd/system/can0.service`（modprobe can/can_raw/pcan + up can0 1M）
 - 热插拔：`/etc/udev/rules.d/99-can0-autoup.rules` + `/usr/local/bin/can0-autoup.sh`（KERNEL can* 匹配 + %k 接口名，多块 USB-CAN 各自触发）
 - **已知坑**：
