@@ -8,17 +8,21 @@
 - 硬件事实：**S2 型号 = IMU/VRU，无磁力计**（规格书型号表实锤；S3 才有磁力计/AHRS）。只能用 6 轴模式：yaw 上电归零、相对航向。这不可惜——手册明示室内/机器人/电机磁场环境慎用 9 轴，本场景全是电机，6DoF 选型正确（2026-08-16 用户确认）。
 - 接口：UART（0x91 二进制，**921600 波特实测 1kHz 全量达成**）＋ CAN（CANopen/J1939，默认 500K/100Hz，硬件未到货未实测）＋ 外部 SYNC 触发（800µs）。
 - 外设状态（2026-09-03）：本体 ×2 已到手一只在测（USB/UART 直连 CHCenter 可读）；**Jetson 侧 CAN 收发器（T801 无板载收发器，需 SN65HVD230 类）与 USBCAN 均未到货 → CAN 侧一切实测锁死**。
+- 外设状态（2026-09-06）：**Jetson 侧 UART 双路 1kHz 全量达成**——双 CH340（第三方 USB-TTL，非官方 CP2104）直插 Jetson 板载 USB 口 + open 后写 1 字节激活（见 2.7 与已知坑表），实测 999.9fps × 2、CRC≈0；CAN 侧仍锁死（等收发器）。
 
 ```
 IMU_HI12S2_MI1\
-├── README.md          # 人类说明书（本文档同目录）
+├── README.md          # 人类说明书(本文档同目录)
 ├── AGENTS.md          # 本文件（AI 对接）
-└── HI12_SDK\          # 官方 SDK（开源，GitHub hipnuc/products）
-    ├── drivers\       #   解码库：hipnuc_dec(0x91/0x81/0x83)、canopen_parser、hipnuc_j1939_parser
-    ├── examples\C\          #   串口 Linux CLI：hihost
-    ├── examples\CAN\linux\  #   CAN Linux CLI：canhost（主线 J1939，硬件时间戳+JSONL 落盘）
-    ├── examples\CAN\dbc\    #   CANopen.dbc / J1939.dbc + ini（分析仪可直接导入）
-    └── usb_uart_drivers\    #   CP210x 驱动（win/linux）
+├── HI12_SDK\          # 官方 SDK（开源，GitHub hipnuc/products）
+│   ├── drivers\       #   解码库：hipnuc_dec(0x91/0x81/0x83)、canopen_parser、hipnuc_j1939_parser
+│   ├── examples\C\          #   串口 Linux CLI：hihost
+│   ├── examples\CAN\linux\  #   CAN Linux CLI：canhost（主线 J1939，硬件时间戳+JSONL 落盘）
+│   ├── examples\CAN\dbc\    #   CANopen.dbc / J1939.dbc + ini（分析仪可直接导入）
+│   └── usb_uart_drivers\    #   CP210x 驱动（win/linux）——官方评估用 CP2104，非 CH340
+└── tools\
+    ├── uart_recorder\       #   Windows 采集器 + 分析器（09-03 基线用）
+    └── imu_dt.py            #   帧到达间隔分析器（stdlib，验证 921600 收流完整性/丢帧形态）
 ```
 
 ## 2. 协议与关键结论（已查证，勿再推翻）
@@ -56,10 +60,19 @@ IMU_HI12S2_MI1\
 - 首次配置：Windows CHCenter（USB/UART，支持固件更新、波特率/频率/URFR/协议烧写，配置存 IMU flash 掉电保存）；CLI 侧：canhost `config reg`（J1939 寄存器）+ ASCII CONFIG 命令。改波特率后 CHCenter 连接侧要同步选新值；连不上就断电重启＋自动识别波特率，出厂默认 115200 总能回。
 - CHCenter 2026-09-03 已升 1.7.8.14；运行 log 在 `Database\IMU\CHCenter_上位机\log\`（排查利器，纯文本）。
 
+### 2.7 Jetson 侧 USB 收流定论（2026-09-06 实测闭环，写码必读）
+
+- **部署形态定案**：双 CH340 直插 Jetson 板载 USB 口（现用 port1+port3；**port4 有间歇枚举失败/modem -110 半死史，避用**）；**勿用华升 214b:7260 无源 HUB 接 Jetson**（枚举风暴 `descriptor read -110`/`not accepting address -71`，时好时坏——该 HUB 在 Windows 双插 996fps×2 正常，属 HUB×tegra-xusb 组合不兼容，Windows 侧可留用）。用户已购 HUB 处置：Jetson 弃用。
+- **⚠️ ch341 枚举后丢帧 + 写激活（本日最大坑）**：每个 CH340 新枚举后 921600 收流固有丢 ~6.8%（933fps，每 ~15ms 缺整帧、CRC 全 0、dt 空洞恰好 2ms；重启/单双路/任意口均复现）。**往串口写 1 字节（如 0x00）即达 999.9fps 完整**；拔插/重启后回到丢帧态，再写再修复（三次可复现）——判定为 ch341 驱动在 tegra-xusb 上的 RX 调度缺陷。**采集侧纪律：open 串口后必须先 write 1 字节再开始读**（recorder.py/未来 Jetson 采集栈必带此步）。
+- 验证基线：双 CH340 直插 + 写激活 → 30s 长测 **999.9fps × 2、CRC 0/1**（Windows 对照 996fps×2，同一 HUB 同一设备）。
+- 检查工具：`tools/imu_dt.py`（stdlib 帧间隔分析，验证收流完整性/丢帧形态）；Jetson 临时脚本跑完即删（/tmp/claude 重启清空）。
+
 ## 3. 已知坑 / 未解问题
 
 | 坑/问题 | 记忆点 |
 |---|---|
+| ch341 枚举后丢 ~6.8% 帧（2026-09-06 定论） | 每个 CH340 新枚举后 921600 收流丢整帧（933fps、dt 空洞恰 2ms、CRC 0）；**写 1 字节激活即 999.9fps**；拔插/重启复发。采集 open 后必写 |
+| 华升 214b HUB × Jetson 不兼容（2026-09-06 定论） | 无源 USB2.0 HUB 插 Jetson 枚举风暴（descriptor -110/-71）；Windows 双插正常。Jetson 直插弃 HUB；板载 1-3.4 口间歇坏避用（现用 port1+port3） |
 | 配 1000Hz 实测 ~142Hz | 波特率没拉高——921600 才行，不是 IMU 坏（2026-09-03 已解决） |
 | ch checksum error（**已定案，勿再追**） | 实测为 **IMU 串口流真实 CRC 错**（独立脚本绕过 CHCenter 证实）：460800 下 90s 共 4 帧错、错率 0.0081%、约每 20s 一次，与波特率无关（921600 同量级）。**2026-09-03 用户拍板：错率太低不追根因，管线加 CRC 校验坏帧丢弃兜底**（recorder.py 已实现）；换线可试但非必须 |
 | PDF 中文提取 | pdftotext 乱码（字体子集无 ToUnicode 映射）→ pypdf 提取写 UTF-8 |
