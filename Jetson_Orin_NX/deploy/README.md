@@ -10,8 +10,6 @@
 | `arm-ip.sh` | `/usr/local/bin/arm-ip` | 查 Jetson 当前 IP + 控制栈状态（野外填界面 IP 用） |
 | `arm-net-watch.sh` | `~/.local/bin/` | 网络哨兵：双无（无有线无 WiFi）时桌面提醒；恢复提醒 |
 | `arm-net-watch.service` | `~/.config/systemd/user/` | 哨兵的用户自启服务 |
-| `todesk-ui-conflict-guard.sh` | `/usr/local/bin/` | **界面与 ToDesk 互斥守护**：界面(TCP 8888)接入自动退出 ToDesk 客户端、断开自动恢复——原因：界面满速轮询 + ToDesk 同开会触发内核崩溃(pcan 收包缺陷,2026-09-07 定论,详见情报)；mttcan 根治前勿删此守护 |
-| `todesk-ui-conflict-guard.service` | `/etc/systemd/system/` | 上述守护的开机自启服务(描述含完整背景) |
 
 ## 网络策略（三档，装完即生效）
 
