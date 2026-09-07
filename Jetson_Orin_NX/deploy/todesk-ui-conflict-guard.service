@@ -1,0 +1,13 @@
+[Unit]
+# 背景(2026-09-07 实测定论):界面满速轮询(USB-CAN)与 ToDesk 客户端同开时,
+# 双高负载叠加会触发 Jetson 内核崩溃(pcan 收包路径缺陷,8.15.2/8.20.0 均未根治)。
+# 纯界面无 ToDesk = 1h+ 稳定。本服务 = 界面(TCP 8888)接入自动退 ToDesk、断开自动恢复。
+# 详见项目 AI间交流/情报.md 09-07 条目;根治方向 = 收发器到货后启用板载 mttcan。
+Description=ToDesk-UI conflict guard: quit ToDesk while UI(8888) connected (crash-avoid, 2026-09-07)
+After=network.target
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/todesk-ui-conflict-guard.sh
+Restart=always
+[Install]
+WantedBy=multi-user.target
