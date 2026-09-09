@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>后坐力模拟器 布局三视图工具</title>
+<style>
+  * { box-sizing: border-box; margin:0; padding:0; }
+  body { font-family: "Microsoft YaHei", sans-serif; background:#f5f6f8; color:#222; }
+  header { background:#1f4e79; color:#fff; padding:10px 16px; font-size:15px; }
+  header small { opacity:.85; font-weight:normal; }
+  #wrap { display:flex; gap:12px; padding:12px; align-items:flex-start; }
+  #views { flex:1; display:flex; flex-direction:column; gap:10px; }
+  .viewbox { background:#fff; border:1px solid #ccc; border-radius:6px; padding:6px; }
+  .viewbox .cap { font-size:12px; color:#555; padding:2px 4px; }
+  svg { display:block; background:#fff; }
+  svg text { pointer-events:none; }
+  #panel { width:250px; background:#fff; border:1px solid #ccc; border-radius:6px; padding:10px; position:sticky; top:12px; }
+  #panel h3 { font-size:13px; margin:6px 0; color:#1f4e79; }
+  .btnrow { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px; }
+  .btnrow button { font-size:12px; padding:3px 7px; border:1px solid #bbb; border-radius:4px; background:#fafafa; cursor:pointer; }
+  .btnrow button:hover { background:#e8f0f8; }
+  #selinfo label { display:block; font-size:12px; margin-top:6px; color:#333; }
+  #selinfo input { width:100%; padding:3px; font-size:13px; border:1px solid #bbb; border-radius:3px; }
+  .sidebtn { width:100%; margin-top:6px; padding:5px; font-size:12px; border-radius:4px; border:1px solid #999; cursor:pointer; background:#fafafa; }
+  .del { background:#fdeaea; color:#a33; }
+  #exportbtn, #clearbtn { width:100%; margin-top:8px; padding:6px; font-size:13px; border-radius:4px; border:none; cursor:pointer; }
+  #exportbtn { background:#1f4e79; color:#fff; }
+  #clearbtn { background:#eee; }
+  #out { width:100%; height:110px; font-size:11px; font-family:Consolas,monospace; margin-top:6px; display:none; }
+  .note { font-size:11px; background:#fffbe6; border:1px solid #e3d27a; padding:6px; border-radius:4px; margin-top:8px; line-height:1.5; color:#5a4a00; }
+</style>
+</head>
+<body>
+<header>后坐力模拟器 · 布局三视图工具 <small>坐标系：X = 机架长度（+X 朝缓冲侧）｜Y = 宽度｜Z = 高度。图幅 248mm，超出范围请整体左移</small></header>
+<div id="wrap">
+  <div id="views">
+    <div class="viewbox"><div class="cap">俯视图（X 向右 Y 向上）　按住方块拖动＝移动（与鼠标 1:1）</div><svg id="vTop" width="640" height="360"></svg></div>
+    <div class="viewbox"><div class="cap">主视图（X 向右 Z 向上）　同上</div><svg id="vFront" width="640" height="360"></svg></div>
+    <div class="viewbox"><div class="cap">侧视图（Y 向右 Z 向上）　同上</div><svg id="vSide" width="640" height="360"></svg></div>
+  </div>
+  <div id="panel">
+    <h3>添加构件</h3>
+    <div class="btnrow" id="lib"></div>
+    <div class="btnrow"><button onclick="addPart('自定义块',25,25,25)">＋自定义块</button></div>
+    <h3>选中构件</h3>
+    <div id="selinfo">（点击视图里的方块选中；按住拖动＝移动；选后可改尺寸/旋转/删除）</div>
+    <button id="exportbtn" onclick="doExport()">导出布局 JSON</button>
+    <button id="clearbtn" onclick="clearAll()">清空全部</button>
+    <textarea id="out"></textarea>
+    <div class="note">导出 JSON 复制发给 AI 做干涉核算。<br>
+    摆放提示：电机长边=轴向；锥小齿贴电机轴端；锥大齿与半齿轮 X/Y 对齐=同轴串列；<br>
+    活块在击发弹簧座与受力板之间；齿条贴活块表面；RB1007 放在活块上（杆朝受力板）；<br>
+    高度 Z 与精确数值用输入框改。</div>
+  </div>
+</div>
+<script>
+var parts = [];
+var COLORS = ["#2f6fb3","#d9a13b","#c25e5e","#5e9e5e","#7a5ec2","#3ba8a8","#c270b8","#a8833b","#777777","#8a5e3b","#4a7d4a","#b34d4d","#5577aa"];
+var selIdx = -1;
+var VIEW_W = 620, VIEW_H = 340, ORIGIN = {x:40, y:40}, SCALE = 2.5;
+var LIB = [
+  ["2325电机",  78,28,28], ["锥小齿", 15,15,10], ["锥大齿", 15,15,12],
+  ["半齿轮",    12,20,20], ["齿条",   31,12,8],  ["活块组件", 80,48,40],
+  ["击发弹簧TF27",27,27,70], ["缓冲器RB1007",14,14,54], ["弹力弹簧TF22x2",22,44,35],
+  ["受力板",    6,60,60],  ["弹簧座前墙",6,60,60]
+];
+function addPart(name, Lx, Ly, Lz, x, y, z) {
+  var n = parts.length;
+  var px = (x === undefined) ? 30 + (n % 5) * 15 : x;
+  var py = (y === undefined) ? 30 + Math.floor(n / 5) * 15 : y;
+  parts.push({name:name, Lx:Lx, Ly:Ly, Lz:Lz, x:px, y:py, z:(z===undefined)?0:z, color:COLORS[n % COLORS.length]});
+  selIdx = n; drawAll(); refreshInfo();
+}
+function buildLib() {
+  var lib = document.getElementById('lib');
+  for (var k = 0; k < LIB.length; k++) {
+    (function (it) {
+      var b = document.createElement('button');
+      b.textContent = it[0];
+      b.onclick = function () { addPart(it[0], it[1], it[2], it[3]); };
+      lib.appendChild(b);
+    })(LIB[k]);
+  }
+}
+buildLib();
+function clearAll() { parts.length = 0; selIdx = -1; drawAll(); refreshInfo(); }
+function axisOf(svgId, k) {
+  if (svgId === 'vTop') return k === 0 ? 'X' : 'Y';
+  if (svgId === 'vFront') return k === 0 ? 'X' : 'Z';
+  return k === 0 ? 'Y' : 'Z';
+}
+function OX(svgId) { return svgId === 'vSide' ? 250 : 40; }
+function ns(svg, tag) { return document.createElementNS(svg.namespaceURI, tag); }
+// ---------- 网格：每视图只画一次 ----------
+function ensureGrid(svg, axU, ayU) {
+  if (svg.querySelector('.grid')) return;
+  var g = ns(svg, 'g'); g.setAttribute('class', 'grid');
+  var px0, py0, l;
+  // 竖网格线：铺满整个画布宽度，从 0 像素到 VIEW_W
+  for (px0 = 0; px0 <= VIEW_W; px0 += 20) {
+    l = ns(svg, 'line');
+    l.setAttribute('x1', px0); l.setAttribute('x2', px0);
+    l.setAttribute('y1', ORIGIN.y); l.setAttribute('y2', ORIGIN.y + VIEW_H - 60);
+    l.setAttribute('stroke', '#e0e0e0'); l.setAttribute('stroke-width', 1);
+    g.appendChild(l);
+  }
+  // 横网格线：铺满垂直区
+  for (py0 = ORIGIN.y; py0 <= ORIGIN.y + VIEW_H - 60; py0 += 20) {
+    l = ns(svg, 'line');
+    l.setAttribute('x1', 0); l.setAttribute('x2', VIEW_W);
+    l.setAttribute('y1', py0); l.setAttribute('y2', py0);
+    l.setAttribute('stroke', '#e0e0e0'); l.setAttribute('stroke-width', 1);
+    g.appendChild(l);
+  }
+  // 世界原点（0mm）竖轴线：加粗深色
+  var o = OX(svg.id);
+  var axis = ns(svg, 'line');
+  axis.setAttribute('x1', o); axis.setAttribute('x2', o);
+  axis.setAttribute('y1', ORIGIN.y); axis.setAttribute('y2', ORIGIN.y + VIEW_H - 60);
+  axis.setAttribute('stroke', '#808080'); axis.setAttribute('stroke-width', 2);
+  g.appendChild(axis);
+  var t1 = ns(svg, 'text');
+  t1.setAttribute('x', VIEW_W - 26); t1.setAttribute('y', ORIGIN.y + VIEW_H - 48);
+  t1.setAttribute('font-size', '10'); t1.setAttribute('fill', '#999');
+  t1.textContent = '→ ' + axU + ' (mm)'; g.appendChild(t1);
+  var t2 = ns(svg, 'text');
+  t2.setAttribute('x', 6); t2.setAttribute('y', ORIGIN.y + 14);
+  t2.setAttribute('font-size', '10'); t2.setAttribute('fill', '#999');
+  t2.textContent = '↑ ' + ayU + ' (mm)'; g.appendChild(t2);
+  svg.appendChild(g);
+}
+// ---------- 部件层：重建只发生在这里，网格不重画 ----------
+function drawAll() {
+  var ids = ['vTop', 'vFront', 'vSide'];
+  for (var v = 0; v < 3; v++) {
+    var svg = document.getElementById(ids[v]);
+    var axU = axisOf(ids[v], 0), ayU = axisOf(ids[v], 1);
+    var ax = axU.toLowerCase(), ay = ayU.toLowerCase();
+    ensureGrid(svg, axU, ayU);
+    var old = svg.querySelector('.parts');
+    if (old) svg.removeChild(old);
+    var g = ns(svg, 'g'); g.setAttribute('class', 'parts');
+    var i;
+    for (i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      var px = OX(svg.id) + p[ax] * SCALE, py = ORIGIN.y + p[ay] * SCALE;
+      var pw = p['L' + ax] * SCALE, ph = p['L' + ay] * SCALE;
+      var r = ns(svg, 'rect');
+      r.setAttribute('x', px); r.setAttribute('y', py);
+      r.setAttribute('width', pw); r.setAttribute('height', ph);
+      r.setAttribute('fill', p.color);
+      r.setAttribute('fill-opacity', selIdx === i ? 0.9 : 0.55);
+      r.setAttribute('stroke', selIdx === i ? '#c00000' : '#222222');
+      r.setAttribute('stroke-width', selIdx === i ? 2 : 1);
+      r.setAttribute('data-i', i);
+      g.appendChild(r);
+      if (pw > 10 && ph > 10) {
+        var t = ns(svg, 'text');
+        t.setAttribute('x', px + pw / 2); t.setAttribute('y', py + Math.max(ph / 2, 10));
+        t.setAttribute('text-anchor', 'middle'); t.setAttribute('font-size', pw < 20 ? '7' : '9');
+        t.setAttribute('fill', '#ffffff');
+        t.textContent = pw * ph > 700 ? p.name : (p.name.length > 5 ? p.name.slice(0, 4) + '…' : p.name);
+        g.appendChild(t);
+      }
+    }
+    svg.appendChild(g);
+  }
+}
+// ---------- 拖动：更新数据后按 rAF 合并重画，跟手不卡 ----------
+var rafPending = false;
+function scheduleDraw() {
+  if (!rafPending) {
+    rafPending = true;
+    requestAnimationFrame(function () { rafPending = false; drawAll(); });
+  }
+}
+function rotate90(a1, a2) {
+  var p = parts[selIdx];
+  if (!p) return;
+  a1 = a1.toLowerCase(); a2 = a2.toLowerCase();
+  var c1 = p[a1] + p['L' + a1] / 2, c2 = p[a2] + p['L' + a2] / 2;
+  var tmp = p['L' + a1];
+  p['L' + a1] = p['L' + a2]; p['L' + a2] = tmp;
+  p[a1] = c1 - p['L' + a1] / 2; p[a2] = c2 - p['L' + a2] / 2;
+}
+function bindDrag() {
+  var down = function (e) {
+    var t = e.target;
+    if (t.tagName !== 'rect' || !t.hasAttribute('data-i')) return;
+    var i = parseInt(t.getAttribute('data-i'), 10);
+    var svg = t.ownerSVGElement;
+    selIdx = i; drawAll(); refreshInfo();
+    var ax = axisOf(svg.id, 0).toLowerCase(), ay = axisOf(svg.id, 1).toLowerCase();
+    var st = { lastX: e.clientX, lastY: e.clientY, ax: ax, ay: ay, i: i, moved: false };
+    var mv = function (ev) {
+      var dx = (ev.clientX - st.lastX) / SCALE;
+      var dy = (ev.clientY - st.lastY) / SCALE;
+      if (dx === 0 && dy === 0) return;
+      st.lastX = ev.clientX; st.lastY = ev.clientY;
+      var p = parts[st.i];
+      p[st.ax] += dx; p[st.ay] += dy;
+      if (p.x < -25) p.x = -25; if (p.y < -25) p.y = -25; if (p.z < 0) p.z = 0;
+      st.moved = true;
+      scheduleDraw();
+    };
+    var up = function () {
+      document.removeEventListener('mousemove', mv);
+      document.removeEventListener('mouseup', up);
+      drawAll();
+      if (st.moved) refreshInfo();
+    };
+    document.addEventListener('mousemove', mv);
+    document.addEventListener('mouseup', up);
+  };
+  var ids = ['vTop', 'vFront', 'vSide'];
+  for (var k = 0; k < 3; k++) {
+    (function (id) {
+      var svg = document.getElementById(id);
+      svg.addEventListener('mousedown', down);
+      svg.addEventListener('click', function (e) {
+        if (e.target.tagName === 'svg') { selIdx = -1; drawAll(); refreshInfo(); }
+      });
+    })(ids[k]);
+  }
+}
+bindDrag();
+function refreshInfo() {
+  var box = document.getElementById('selinfo');
+  if (selIdx < 0) { box.innerHTML = '（未选中。点击视图里的方块选中；按住拖动＝移动）'; return; }
+  var p = parts[selIdx];
+  box.innerHTML = '';
+  var mk = function (label, val, cb) {
+    var lab = document.createElement('label');
+    lab.textContent = label;
+    var inp = document.createElement('input');
+    inp.type = 'number'; inp.step = '0.5'; inp.value = val;
+    inp.onchange = function () { cb(parseFloat(inp.value) || 0); drawAll(); };
+    lab.appendChild(inp); box.appendChild(lab);
+  };
+  var l1 = document.createElement('label'); l1.textContent = '名称';
+  var n1 = document.createElement('input'); n1.value = p.name;
+  n1.onchange = function () { p.name = n1.value || p.name; drawAll(); };
+  l1.appendChild(n1); box.appendChild(l1);
+  mk('长 Lx (mm)', p.Lx, function (v) { p.Lx = v; });
+  mk('宽 Ly (mm)', p.Ly, function (v) { p.Ly = v; });
+  mk('高 Lz (mm)', p.Lz, function (v) { p.Lz = v; });
+  mk('起点 x', p.x, function (v) { p.x = v; });
+  mk('起点 y', p.y, function (v) { p.y = v; });
+  mk('起点 z', p.z, function (v) { p.z = v; });
+  var b1 = document.createElement('button');
+  b1.className = 'sidebtn'; b1.textContent = '↻ 俯视面旋转90°（交换 Lx/Ly）';
+  b1.onclick = function () { rotate90('X', 'Y'); drawAll(); refreshInfo(); };
+  box.appendChild(b1);
+  var b2 = document.createElement('button');
+  b2.className = 'sidebtn'; b2.textContent = '↻ 主视面旋转90°（交换 Lx/Lz）';
+  b2.onclick = function () { rotate90('X', 'Z'); drawAll(); refreshInfo(); };
+  box.appendChild(b2);
+  var b3 = document.createElement('button');
+  b3.className = 'sidebtn'; b3.textContent = '↻ 侧视面旋转90°（交换 Ly/Lz）';
+  b3.onclick = function () { rotate90('Y', 'Z'); drawAll(); refreshInfo(); };
+  box.appendChild(b3);
+  var del = document.createElement('button');
+  del.className = 'sidebtn del'; del.textContent = '删除该构件';
+  del.onclick = function () { parts.splice(selIdx, 1); selIdx = -1; drawAll(); refreshInfo(); };
+  box.appendChild(del);
+}
+refreshInfo();
+drawAll();
+function doExport() {
+  var out = document.getElementById('out');
+  out.style.display = 'block';
+  var arr = [];
+  for (var k = 0; k < parts.length; k++) {
+    var p = parts[k];
+    arr.push({name: p.name, Lx: Math.round(p.Lx * 10) / 10, Ly: Math.round(p.Ly * 10) / 10, Lz: Math.round(p.Lz * 10) / 10, x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, z: Math.round(p.z * 10) / 10});
+  }
+  out.value = JSON.stringify(arr, null, 1);
+  out.select();
+  try { document.execCommand('copy'); } catch (err) {}
+  out.value += '\n（已复制到剪贴板）';
+}
+</script>
+</body>
+</html>
