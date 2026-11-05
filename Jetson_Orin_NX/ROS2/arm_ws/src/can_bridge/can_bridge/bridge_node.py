@@ -47,7 +47,14 @@ class CanBridgeNode(Node):
         self._err_count = 0
         self._tx_count = 0
         self._last_warn = 0.0
-        self._open()
+        # can0 可能尚未就绪(开机时 PCAN 未插/热插拔窗口):首连失败不崩,
+        # rx 线程 recv 遇 socket 未打开 → _close_and_retry 持续重试直至 can0 出现
+        # (2026-09-08 容错修复:此前无保护直接抛异常致进程退出,开机后插 PCAN 栈半残)
+        try:
+            self._open()
+        except CanError as e:
+            self._err_count += 1
+            self.get_logger().warn(f"can0 初始连接失败,进入后台重试: {e}")
         self._rx_thread.start()
 
     # ---------------- 底层 ----------------

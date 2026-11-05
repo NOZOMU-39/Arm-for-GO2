@@ -24,11 +24,11 @@
     "v9cSemantics": "pulse",
     "limMaxDeg": 94,
     "limMinDeg": -40,
-    "E4": 139.98,
+    "E4": 170.01,
     "defaultPosDeg": 80,
-    "restDeg": 93.56,
+    "restDeg": 93.76,
     "turnDeg": 10,
-    "restDegDate": "2026-09-06",
+    "restDegDate": "2026-11-03",
     "restStale": false
   },
   {
@@ -41,11 +41,11 @@
     "E0": null,
     "limMaxDeg": 77,
     "limMinDeg": -171,
-    "E4": -210.39,
+    "E4": -241.04,
     "defaultPosDeg": -159.99,
-    "restDeg": -170.4,
+    "restDeg": -170.41,
     "turnDeg": 10,
-    "restDegDate": "2026-09-06",
+    "restDegDate": "2026-11-03",
     "restStale": false
   },
   {
@@ -58,28 +58,11 @@
     "limMaxDeg": 85,
     "limMinDeg": -124,
     "E0": null,
-    "E4": 0,
+    "E4": -0.01,
     "defaultPosDeg": -10,
-    "restDeg": 16.51,
+    "restDeg": 22.08,
     "turnDeg": 12.78,
-    "restDegDate": "2026-09-06",
-    "restStale": false
-  },
-  {
-    "id": 5,
-    "name": "末端Yaw",
-    "proto": "V44",
-    "note": "X2-7新V4电机",
-    "gear": 1,
-    "dir": 1,
-    "E0": null,
-    "limMinDeg": -110,
-    "limMaxDeg": 110,
-    "E4": 0,
-    "defaultPosDeg": 0,
-    "restDeg": 0.02,
-    "turnDeg": 12.78,
-    "restDegDate": "2026-09-06",
+    "restDegDate": "2026-11-03",
     "restStale": false
   }
 ]

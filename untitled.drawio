@@ -1,0 +1,64 @@
+<mxfile host="dsh-drawai" agent="dsh-drawai" type="device">
+  <diagram id="dsh-drawai-page-1" name="untitled">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <object label="" drawaiMeta="1" drawaiPinned="1" id="drawai-meta">
+          <mxCell parent="1" />
+        </object>
+        <mxCell id="n1" value="Jetson ROS 控制栈 · 双模式数据流
+单主纪律：同一时刻只有一个总线主；controller:=true 时网关不启动" vertex="1" parent="1">
+          <mxGeometry x="0" y="0" width="460" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="n2" value="Windows 操作界面（非 ROS 节点）" style="fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="240" y="150" width="300" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="n3" value="tcp_gateway
+TCP :8888 · 帧透传
+↑/arm/can/tx ↓/arm/can/rx" style="fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="240" y="300" width="300" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="n4" value="can_bridge
+唯一硬件入口 · SocketCAN
+话题 ↔ can0 双向" style="fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="240" y="450" width="300" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="n5" value="CAN 总线 @1 Mbps" style="fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="320" y="600" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="n6" value="脉塔电机 ×5
+X8(V3)×1 + X6/X2(V4)×4" style="fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="260" y="750" width="260" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="n7" value="arm_controller
+自主任模式总线主 · 7 个服务" style="fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="590" y="560" width="280" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="e1" style="html=1;edgeStyle=none;orthogonalLoop=1;jettySize=auto;" edge="1" parent="1" source="n1" target="n2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="TCP 帧" style="rounded=0;html=1;edgeStyle=orthogonalEdgeStyle;orthogonalLoop=1;jettySize=auto;endArrow=classic;" edge="1" parent="1" source="n2" target="n3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="去程 /arm/can/tx" style="rounded=0;html=1;edgeStyle=orthogonalEdgeStyle;orthogonalLoop=1;jettySize=auto;endArrow=classic;" edge="1" parent="1" source="n3" target="n4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="写 can0" style="rounded=0;html=1;edgeStyle=orthogonalEdgeStyle;orthogonalLoop=1;jettySize=auto;endArrow=classic;" edge="1" parent="1" source="n4" target="n5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="驱动 / 反馈帧" style="rounded=0;html=1;edgeStyle=orthogonalEdgeStyle;orthogonalLoop=1;jettySize=auto;endArrow=classic;" edge="1" parent="1" source="n5" target="n6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="自主任模式接管 /arm/can/tx" style="html=1;strokeColor=#b85450;dashed=1;edgeStyle=orthogonalEdgeStyle;orthogonalLoop=1;jettySize=auto;endArrow=classic;" edge="1" parent="1" source="n7" target="n4">
+          <mxGeometry relative="1" as="geometry" x="0" y="-16" />
+        </mxCell>
+        
+        
+        
+        
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -2,11 +2,16 @@
 """帧到达间隔分析:判断丢帧形态(周期空洞 vs 均匀)。
 用途:Jetson/主机侧验证 HI91 921600 收流完整性——好帧率应≈目标、dt>1.6ms 空洞≈0。
 用法:python3 imu_dt.py /dev/ttyUSB0 /dev/ttyUSB1 --secs 8
-踩坑(2026-09-06 Jetson 实测定论):ch341 驱动在 tegra-xusb 上枚举后 921600 收流固有丢
-~6.8%(933fps,每 ~15ms 缺整帧,CRC 全 0)——**采集侧 open 后先写 1 字节(0x00)激活,
-即达 999.9fps 完整**;拔插/重启后需重新激活。详见 IMU_HI12S2_MI1/AGENTS.md 已知坑表。"""
+踩坑(2026-09-08 修正):丢帧真根因=termios lflag ECHO 残留(漏清 ECHO 时 n_tty 回显占
+USB 带宽→921600 每 ~15ms 丢整帧 933fps),本工具已内置 lflag 全清修复,open 即满速;
+09-06「写 1 字节激活」定论已废。同步用 len==0x4C 校验+逐字节滑动(2026-09-08 v2,
+滤除 payload 伪 5A A5 伪同步——CRC 门控的 dt 统计不受伪帧影响但跳帧会吃真帧)。
+另:满速收流后 close 可致 ch341 死锁(后续 open 永久挂起),详见 AGENTS.md 已知坑表。"""
 import os, time, termios, argparse, struct
 from collections import Counter
+
+HI91_LEN = 0x004C   # len 字段固定
+FRAME = 82          # 6 头 + 76 payload
 
 def crc16_xmodem(data):
     crc = 0
@@ -24,7 +29,7 @@ def analyze(port, secs):
     at[1] &= ~(termios.OPOST)
     at[2] &= ~(termios.CSIZE | termios.PARENB | termios.CSTOPB)
     at[2] |= termios.CS8
-    at[3] &= ~(termios.ECHONL | termios.ICANON | termios.ISIG | termios.IEXTEN)
+    at[3] = 0  # lflag 全清(关键:清 ECHO 回显组)。2026-09-08 实锤:ECHO 残留致 n_tty 回显占 USB 带宽,921600 下每~15ms 丢整帧 933fps;清后 open 即 999.9fps 满速
     at[6][termios.VMIN] = 1
     at[6][termios.VTIME] = 2
     termios.tcsetattr(fd, termios.TCSANOW, at)
@@ -33,6 +38,7 @@ def analyze(port, secs):
     termios.tcsetattr(fd, termios.TCSANOW, at)
     start = time.time(); buf = b""; t0 = None
     dts = []
+    len_bad = crc_bad = 0
     while time.time() - start < secs:
         try:
             d = os.read(fd, 65536)
@@ -45,19 +51,19 @@ def analyze(port, secs):
             if i < 0:
                 buf = buf[-2:]; break
             if i > 0: buf = buf[i:]
-            if len(buf) < 8: break
-            (ln,) = struct.unpack("<H", buf[2:4])
-            fl = ln + 6
-            if fl < 8 or fl > 400:
-                buf = buf[4:]; continue
-            if len(buf) < fl: break
+            if len(buf) < FRAME: break
+            if struct.unpack("<H", buf[2:4])[0] != HI91_LEN:
+                len_bad += 1
+                buf = buf[1:]; continue   # 逐字节滑动,滤伪同步
             crcgot = buf[4] | (buf[5] << 8)
-            if crc16_xmodem(buf[0:4] + buf[6:fl]) == crcgot:
+            if crc16_xmodem(buf[0:4] + buf[6:FRAME]) == crcgot:
                 now = time.time()
                 if t0 is not None:
                     dts.append((now - t0) * 1000.0)
                 t0 = now
-            buf = buf[fl:]
+            else:
+                crc_bad += 1
+            buf = buf[FRAME:]
     os.close(fd)
     n = len(dts)
     if n == 0: return f"{port}: no frames"
@@ -68,7 +74,7 @@ def analyze(port, secs):
     top = sorted(hist.items())[:12]
     return (f"{port}: {n}帧 mean={mean:.4f}ms  "
             f"dt∈(1.6,2.6]ms={len(over)-len(over2)}次 dt>2.6ms={len(over2)}次 "
-            f"max={max(dts):.2f}ms 分布ms(0~11)={top}")
+            f"max={max(dts):.2f}ms len错={len_bad} crc错={crc_bad} 分布ms(0~11)={top}")
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
