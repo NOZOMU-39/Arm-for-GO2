@@ -1,7 +1,7 @@
 # Jetson_Orin_NX — AI 对接文档
 
 > 本目录 = Jetson 主控（图为 T801 + Orin NX 16GB）开发侧；人看 `README.md`；AI 看本文件。
-> 事实层（硬件/协议/结论）以 `AI间交流\情报.md` Jetson 条目为准；本文件只放 AI 干活要用的对接信息。
+> 事实层（硬件/协议/结论）以 `AI间交流\情报\03_通信与IMU.md` 的 Jetson 条目为准（2026-11-03 起该站情报改为「目录页＋分册」，原「情报.md Jetson 条目」即此册）；本文件只放 AI 干活要用的对接信息。
 > **目录边界（2026-09-05 用户定案）**：本目录只放 Jetson 板上运行的内容（`ROS2\arm_ws\`＝ROS2 源码单一源，与 Jetson 侧 `~/ROS2/arm_ws` 同名镜像）；Windows 操作前端＝顶层 `机械臂操作交互界面\`，与本目录是客户端-服务端关系（tcp_gateway 接入），**不并入本目录**；其协议逻辑第 1 步单一源化时改指向 `ROS2\arm_ws\src\arm_protocol`。
 
 ## 系统部署件（2026-09-06 安装，源码归档 `Jetson_Orin_NX\deploy\`，勿忘勿乱改）
@@ -16,7 +16,7 @@
 
 - SSH：`192.168.31.114` / `nvidia` / 密码 `1`（登录界面有提示；sudo 密码同 `1`）；**免密已配（2026-09-05）**：Windows `~/.ssh/id_ed25519_jetson_go2`（无口令，`ssh -i` 直连；旧带口令密钥备份为 `.old-passphrase`）
 - **远程操作可见性（用户规定）**：一切 Jetson 操作在 Jetson 的 tmux `ops` 会话内执行（send-keys + capture-pane），用户桌面「查看Claude操作」实时可见；不得旁路 SSH 直连（详见 `AI间交流\AGENTS.md` 规则 8）
-- 临时文件一律 `/tmp/claude/`（重启自动清，不留垃圾）；Jetson 重启后 tmux 会话需重建
+- **文件整洁纪律（用户要求，电脑与 Jetson 同等待遇，2026-09-08 定案强化）**：①临时/诊断文件一律 `/tmp/claude/`（重启自动清），**任何日志/脚本不得落家目录根**（capture 渲染问题不是借口——结果直接读或落 /tmp/claude 用完即删）；②备份集中归档 `~/backups/<日期>/`（不散落家目录）；③每会话收尾自查家目录（`ls ~ | grep -cE "\.log|\.bak"` 应为 0）；④Jetson 重启后 tmux 会话需重建
 - 日常写码环境：Jetson 上已装 VS Code + Claude Code（DeepSeek 供应商）
 
 ## 系统现状速查（2026-09-05）

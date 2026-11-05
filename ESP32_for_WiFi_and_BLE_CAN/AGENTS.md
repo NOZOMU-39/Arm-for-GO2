@@ -1,6 +1,6 @@
 # AGENTS.md — ESP32 无线 CAN 中继(AI 对接文档)
 
-> 🤖 AI 对接文档(后续 AI 开发自动读取);人类使用说明见 `ESP32 for WiFi CAN Custom\README.md`(三部分:用户手册/开发者参考/技术内幕),协议细节与性能实测见 `AI间交流\情报.md` 第五节。
+> 🤖 AI 对接文档(后续 AI 开发自动读取);人类使用说明见 `ESP32 for WiFi CAN Custom\README.md`(三部分:用户手册/开发者参考/技术内幕),协议细节与性能实测见 `AI间交流\情报\03_通信与IMU.md`(2026-11-03 起该站情报改为「目录页＋分册」,原「情报.md 第五节」即此册)。
 
 ## 1. 工程定位与目录
 
@@ -48,4 +48,4 @@ ESP32 for WiFi and BLE CAN\
 
 ## 5. 文档分工
 
-- 人类:工程内 README.md(三部分式);AI:本文件 + `AI间交流\情报.md` 第五节;交接协议见项目根 AGENTS.md。
+- 人类:工程内 README.md(三部分式);AI:本文件 + `AI间交流\情报\03_通信与IMU.md`(原「情报.md 第五节」);交接协议见项目根 AGENTS.md。

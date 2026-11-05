@@ -1,6 +1,6 @@
 # AGENTS.md — IMU 双端测量（HIPNUC HI12S2，AI 对接文档）
 
-> 🤖 AI 对接文档（后续 AI 开发自动读取）；人类使用说明见同目录 `README.md`。一手资料：`Database\IMU\HI12系列指令与编程手册.pdf`（65 页）＋`HI12系列规格书.pdf`（30 页）＋`CHCenter_上位机\`（log 也在）；跨模块结论见 `AI间交流\情报.md` 第六节。⚠️ 两本 PDF 中文为内嵌字体子集，**pdftotext 中文乱码，须 pypdf 提取到 UTF-8**（临时脚本曾放 /tmp/claude，已删）。
+> 🤖 AI 对接文档（后续 AI 开发自动读取）；人类使用说明见同目录 `README.md`。一手资料：`Database\IMU\HI12系列指令与编程手册.pdf`（65 页）＋`HI12系列规格书.pdf`（30 页）＋`CHCenter_上位机\`（log 也在）；跨模块结论见 `AI间交流\情报\03_通信与IMU.md`（2026-11-03 起情报改为「目录页＋分册」，原「情报.md 第六节」即此册）。⚠️ 两本 PDF 中文为内嵌字体子集，**pdftotext 中文乱码，须 pypdf 提取到 UTF-8**（临时脚本曾放 /tmp/claude，已删）。
 
 ## 1. 工程定位与目录
 
@@ -60,19 +60,21 @@ IMU_HI12S2_MI1\
 - 首次配置：Windows CHCenter（USB/UART，支持固件更新、波特率/频率/URFR/协议烧写，配置存 IMU flash 掉电保存）；CLI 侧：canhost `config reg`（J1939 寄存器）+ ASCII CONFIG 命令。改波特率后 CHCenter 连接侧要同步选新值；连不上就断电重启＋自动识别波特率，出厂默认 115200 总能回。
 - CHCenter 2026-09-03 已升 1.7.8.14；运行 log 在 `Database\IMU\CHCenter_上位机\log\`（排查利器，纯文本）。
 
-### 2.7 Jetson 侧 USB 收流定论（2026-09-06 实测闭环，写码必读）
+### 2.7 Jetson 侧 USB 收流定论（2026-09-06 首案，2026-09-08 修正根因，写码必读）
 
-- **部署形态定案**：双 CH340 直插 Jetson 板载 USB 口（现用 port1+port3；**port4 有间歇枚举失败/modem -110 半死史，避用**）；**勿用华升 214b:7260 无源 HUB 接 Jetson**（枚举风暴 `descriptor read -110`/`not accepting address -71`，时好时坏——该 HUB 在 Windows 双插 996fps×2 正常，属 HUB×tegra-xusb 组合不兼容，Windows 侧可留用）。用户已购 HUB 处置：Jetson 弃用。
-- **⚠️ ch341 枚举后丢帧 + 写激活（本日最大坑）**：每个 CH340 新枚举后 921600 收流固有丢 ~6.8%（933fps，每 ~15ms 缺整帧、CRC 全 0、dt 空洞恰好 2ms；重启/单双路/任意口均复现）。**往串口写 1 字节（如 0x00）即达 999.9fps 完整**；拔插/重启后回到丢帧态，再写再修复（三次可复现）——判定为 ch341 驱动在 tegra-xusb 上的 RX 调度缺陷。**采集侧纪律：open 串口后必须先 write 1 字节再开始读**（recorder.py/未来 Jetson 采集栈必带此步）。
-- 验证基线：双 CH340 直插 + 写激活 → 30s 长测 **999.9fps × 2、CRC 0/1**（Windows 对照 996fps×2，同一 HUB 同一设备）。
-- 检查工具：`tools/imu_dt.py`（stdlib 帧间隔分析，验证收流完整性/丢帧形态）；Jetson 临时脚本跑完即删（/tmp/claude 重启清空）。
+- **部署形态定案**：双 CH340 直插 Jetson 板载 USB 口（port1+port3 已验证 1000.0fps×2；**port4 有间歇枚举失败/modem -110 半死史，避用**）；**勿用华升 214b:7260 无源 HUB 接 CH340**（枚举风暴 `descriptor read -110`/`not accepting address -71`——HUB×tegra-xusb 组合不兼容，Windows 双插 996fps×2 正常；该 HUB 供 PCAN/Nordic 低速外设可用，部署形态见情报 09-06 HUB 补充条）。
+- **⚠️⚠️ 丢帧真根因 = termios lflag ECHO 残留（2026-09-08 实锤，推翻 09-06「写激活」定论）**：Linux tty 默认 c_lflag 含 ECHO，`os.open` 后若只做部分清除（原 imu_dt.py 写法 `&= ~(ECHONL|ICANON|ISIG|IEXTEN)`，**漏清 ECHO/ECHOE/ECHOK**），n_tty 会把每个输入字节回显到 TX 方向——921600 收流已占 USB 全速 ~89% 带宽，加回显必然周期溢出：**933fps、每 ~15ms 缺整帧、dt 空洞 2ms、CRC 0**（与 09-06 观测形态完全一致）。配置二分实证：V1 部分清除=935fps 丢帧；V2 补清 ECHO 组=999.5fps；lflag 全清=1000.0fps。**采集侧标准配置：`at[3] = 0`（lflag 全清）——open 即满速，无需任何写激活**。09-06「写 1 字节激活、拔插/重启复发、三次可复现」为治标偏方，今证非必需，勿再依赖。
+- **⚠️⚠️ ch341 满速收流后 close 高频死锁（2026-09-08 实锤，采集栈设计必读）**：921600 满速收流 ≥30s 后 close，ch341 芯片进死锁——**后续 os.open 永久挂起**（60s+ 超时仍不返回，无 dmesg 报错，USB 层疑似活着但 UART 引擎/控制通道不响应）；当日 4 次收流会话 3 次触发（matrix 重协商、cfg_test 多轮配置、imu_validate 正常收流×2），**正常满速收流直接 close 也锁**。恢复 = 拔插或 sysfs 软重置（`echo 0/1 > /sys/bus/usb/devices/<1-3.x>/authorized`，~2s 重枚举）。**⚠️ 软重置仅限直插板载口的设备；HUB 下游设备做授权循环会引发 HUB clear tt error -71 风暴波及同 HUB 全部设备（含键盘/Nordic 输入）→ X 输入重配 → gnome-shell 崩溃黑屏（2026-09-08 实测事故），HUB 下设备死锁用物理拔插**。**采集栈设计：①进程常驻连续收流避免频繁 close；②收尾勿依赖正常 close，直插设备可 authorized 软重置（HUB 设备改物理拔插）；③或 open 前先 timeout 3s 探测，卡则按链路形态恢复**。
+- 验证基线（2026-09-08 修复版）：双 CH340 直插 port1+port3 → 30s 长测 **1000.0fps × 2**（30001 帧/路、mean 1.0000/0.9999ms、大空洞 ≈0）；Windows 对照 996fps×2（同一 HUB 同一设备）。
+- 检查工具（均 stdlib，**2026-09-08 v2 同步修复**：len==0x4C 校验+逐字节滑动滤伪同步+坏帧分型；v1 曾把 payload 伪 `5A A5` 误当帧头致坏帧误报/跳帧吃真帧）：①`tools/imu_dt.py` 帧间隔分析（内置 lflag 全清修复，无需手动激活）；②`tools/imu_verify.py` 严格 payload 验证（坏帧分型 len错/crc错、sys_time 跳变 Δ>1ms 全记、静止基线统计——**真丢帧判据以 IMU 侧 system_time 为准，dt 空洞只作参考**）；Jetson 临时脚本跑完即删（/tmp/claude 重启清空）。
 
 ## 3. 已知坑 / 未解问题
 
 | 坑/问题 | 记忆点 |
 |---|---|
-| ch341 枚举后丢 ~6.8% 帧（2026-09-06 定论） | 每个 CH340 新枚举后 921600 收流丢整帧（933fps、dt 空洞恰 2ms、CRC 0）；**写 1 字节激活即 999.9fps**；拔插/重启复发。采集 open 后必写 |
-| 华升 214b HUB × Jetson 不兼容（2026-09-06 定论） | 无源 USB2.0 HUB 插 Jetson 枚举风暴（descriptor -110/-71）；Windows 双插正常。Jetson 直插弃 HUB；板载 1-3.4 口间歇坏避用（现用 port1+port3） |
+| ch341 丢帧真根因 = termios ECHO 残留（2026-09-08 实锤修正） | 漏清 lflag ECHO 组→n_tty 回显占 USB 带宽→921600 每 ~15ms 丢整帧（933fps）；**配置 `at[3]=0` 即 open 满速**。09-06「写激活」定论已废 |
+| ch341 满速收流后 close 高频死锁（2026-09-08 实锤） | ≥30s 满速收流 close → open 永久挂起（当日 3/4 触发）；恢复=拔插或 sysfs authorized 软重置。采集栈须常驻或软重置收尾 |
+| 华升 214b HUB × Jetson 不兼容（2026-09-06 定论） | 无源 USB2.0 HUB 插 Jetson 枚举风暴（descriptor -110/-71）；Windows 双插正常。CH340 直插弃 HUB（HUB 供 PCAN/Nordic 低速外设用）；板载 1-3.4 口间歇坏避用（现用 port1+port3） |
 | 配 1000Hz 实测 ~142Hz | 波特率没拉高——921600 才行，不是 IMU 坏（2026-09-03 已解决） |
 | ch checksum error（**已定案，勿再追**） | 实测为 **IMU 串口流真实 CRC 错**（独立脚本绕过 CHCenter 证实）：460800 下 90s 共 4 帧错、错率 0.0081%、约每 20s 一次，与波特率无关（921600 同量级）。**2026-09-03 用户拍板：错率太低不追根因，管线加 CRC 校验坏帧丢弃兜底**（recorder.py 已实现）；换线可试但非必须 |
 | PDF 中文提取 | pdftotext 乱码（字体子集无 ToUnicode 映射）→ pypdf 提取写 UTF-8 |
@@ -87,7 +89,7 @@ IMU_HI12S2_MI1\
 四层（对论文侧「测量链 P3」）：P1 驱动解析（读出正确数据）→ P2 同步与时间戳（核心难点）→ P3 标定与基线（静噪/Allan/零偏/坐标系标定文件）→ P4 落盘与呈现（原始只读保存＋元数据＋可回放；交互界面 V1.0 设备面板 SIDEBAR_MODULES/DEVICE_TABS 已预留 IMU 占位）。
 
 - 当前阶段：P1 大半完成（UART 链路通、波特率/帧率上限摸清）；CAN 侧实测等硬件。
-- 开发模式（2026-09-03 共识方向）：**代码源 Windows（git 唯一根）→ 同步到 Jetson 跑**（Remote-SSH 既定工作流；can0 已 1Mbps 开机自启）；UART/CHCenter 是 Windows 评估通道。Jetson 上临时文件放 /tmp/claude/ 用完即删。
+- 开发模式（2026-09-03 共识方向）：**代码源 Windows（git 唯一根）→ 同步到 Jetson 跑**（Remote-SSH 既定工作流；can0 已 1Mbps 开机自启）；UART/CHCenter 是 Windows 评估通道。Jetson 上临时文件放 /tmp/claude/ 用完即删。**传文件细节（2026-09-08 补）：/tmp/claude root 属主+重启即清空（含目录）——scp 到 ~/ 中转再 `echo "1" | sudo -S mv`，勿直传；重启后先 `sudo mkdir -p /tmp/claude`；sudo 一律 -S 喂密码勿裸 sudo**。
 - 协作姿势：用户当实验员、AI 远程读数据；CHCenter 界面操作让用户截图 → vision.js 识图再指导。
 - 数据面方向性理解（**待用户确认，未定案**）：枪口端＝欧拉/四元数＋陀螺 1kHz 高保真（论文指标：枪口角误差/角速度峰值/恢复时间）；基座端＝陀螺为主（yaw 扰动前馈）；加计配角（后坐力激励校核/动量法）；欧拉与四元数冗余，可省一路换帧预算。
 
@@ -119,5 +121,5 @@ IMU_HI12S2_MI1\
 
 ## 6. 文档分工
 
-- 人类：`README.md`；AI：本文件＋`AI间交流\情报.md` 第六节；交接协议见项目根 AGENTS.md。
+- 人类：`README.md`；AI：本文件＋`AI间交流\情报\03_通信与IMU.md`（原「情报.md 第六节」）；交接协议见项目根 AGENTS.md。
 - 一手来源：`Database\IMU\` 两本 PDF＋CHCenter；官方 SDK 线上仓库 `github.com/hipnuc/products`。

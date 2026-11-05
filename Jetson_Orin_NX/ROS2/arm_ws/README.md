@@ -2,7 +2,7 @@
 
 > 给机械臂主控（Jetson Orin NX）用的 ROS2 控制软件：把电脑上的操作指令变成电机动作、把电机状态读回来看得懂。
 > 源码在 Windows 仓库（本目录），Jetson 上的 `~/ROS2/arm_ws` 是同步过去的构建副本。
-> AI 开发对接见 `Jetson_Orin_NX\AGENTS.md`；架构决策见 `AI间交流\情报.md`。
+> AI 开发对接见 `Jetson_Orin_NX\AGENTS.md`；架构决策见 `AI间交流\情报\03_通信与IMU.md`。
 
 ---
 
@@ -142,5 +142,5 @@ arm_ws/
 |---|---|
 | AI 开发对接（同步/构建/踩坑） | `Jetson_Orin_NX\AGENTS.md` |
 | 设备操作（开关机/CAN 硬件） | `Jetson_Orin_NX\README.md` |
-| 架构决策/协议结论（长期记忆） | `AI间交流\情报.md` |
+| 架构决策/协议结论（长期记忆） | `AI间交流\情报\03_通信与IMU.md` |
 | 协议 JS 源与回归 | `机械臂操作交互界面\index.html`（PROTO_CORE 段）+ `测试\proto_core_test.js` |

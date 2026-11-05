@@ -1,7 +1,7 @@
 # Jetson Orin NX — 使用说明
 
 > 机械臂主控设备（图为 TWOWIN T801 定制载板 + NVIDIA 原装 Orin NX 16GB 模组）
-> AI 协作细节见项目 `AI间交流\情报.md`（Jetson 条目）
+> AI 协作细节见项目 `AI间交流\情报\03_通信与IMU.md`（2026-11-03 起该站情报改为「目录页＋分册」，Jetson 条目在此册）
 > 目录边界（2026-09-05 用户定案）：本目录只放 **Jetson 板上运行**的内容（`ROS2\arm_ws\` 控制软件源码等）；Windows 操作前端 `机械臂操作交互界面\` 保持顶层独立、经 TCP 接入（客户端-服务端）
 
 ---
@@ -120,13 +120,13 @@ sudo stty -F /dev/ttyUSB0 921600 raw -echo && sudo timeout 2 cat /dev/ttyUSB0 | 
 
 - 源码在 Windows 仓库 `Jetson_Orin_NX\ROS2\arm_ws\`（开发在 Windows 侧），本机 `~/ROS2/arm_ws` 是同步构建副本
 - 上电位置校正工具：`~/ROS2/arm_ws/src/arm_controller/tools/rest_calib.py`（用法见上文「掉电丢圈」节）
-- 架构决策与开发细节：见 `AI间交流\情报.md` Jetson 条目（AI 协作文档）
+- 架构决策与开发细节：见 `AI间交流\情报\03_通信与IMU.md`（Jetson 条目，AI 协作文档）
 
 ## 资料索引
 
 | 想看什么 | 去哪 |
 |---|---|
 | 硬件接口图解（40pin/CAN/电源） | `Database\Jetson\TW-T801-User-Guide.pdf`（p13-18 接口图） |
-| CAN/USB-CAN 驱动与踩坑（AI 向） | `AI间交流\情报.md` Jetson 条目 |
+| CAN/USB-CAN 驱动与踩坑（AI 向） | `AI间交流\情报\03_通信与IMU.md`（Jetson 条目） |
 | 刷机资料 | `Database\Jetson\JP6.2.2\`（rootfs + BSP） |
 | PCAN 驱动源码 | `Database\USBCAN卡资料_PCAN\` |

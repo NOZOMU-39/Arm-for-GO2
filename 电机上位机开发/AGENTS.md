@@ -96,7 +96,7 @@
 
 ## 5. 回归测试框架(无硬件验证界面逻辑)
 
-- 环境:Node.js ≥18,不需要浏览器。临时测试脚本放 `C:\Users\NOZOMU\AppData\Local\Temp\claude\`,用完即删。
+- 环境:Node.js ≥18,不需要浏览器。临时测试脚本放**自己家**的临时目录(DSH→`C:\Users\NOZOMU\AppData\Local\Temp\dsh\`、Codex→`Temp\Codex\`、Claude→`Temp\claude\`),用完即删。
 - 套路(参照 verify_fix8.js,28/28 过):
   ```js
   const js = html.slice(html.indexOf("<script>")+8, html.lastIndexOf("</script>"))
@@ -126,9 +126,9 @@ powershell -NoProfile -Command "& '.\打包上位机.bat'" </dev/null 2>&1 | ico
 ## 7. 用户全局约定(必须遵守)
 
 - 一律**中文**回复;每段回复第一句以「**我的朋友**」开头;操作完汇报(做了什么/改了哪个文件/变更概要)。
-- 临时文件统一放 `C:\Users\NOZOMU\AppData\Local\Temp\claude\`,用完即删。
+- 临时文件**各用各家**(2026-11-05 用户定):DSH→`C:\Users\NOZOMU\AppData\Local\Temp\dsh\`、Codex→`Temp\Codex\`、Claude→`Temp\claude\`,只往自己家写,用完即删;**不得清理别人家目录**。
 - **不得读「使用前说明.pdf」**。
-- 识图用 `node C:\Users\NOZOMU\.claude\tools\vision.js "<路径>" "描述"`(DashScope qwen3.5-omni-plus),不要用 Read 读图片。
+- 识图**各用各家**:DSH/Codex 用 `node C:\Users\NOZOMU\.codex\tools\vision.js "<路径>" "描述"`,Claude 用 `node C:\Users\NOZOMU\.claude\tools\vision.js "<路径>" "描述"`(同一套 DashScope qwen3.5-omni-plus 后端,两份脚本等价),不要用 Read 读图片。
 - 论文库 `E:\Work and Study Project\论文\`、资料库 `E:\Work and Study Project\资料库\`(脉塔协议手册在 `资料库\脉塔电机相关资料\`)。
 - 用户是博士生;工程为博士论文配套,节奏上注意「结论先行、操作落地下游」。
 
