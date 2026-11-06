@@ -320,9 +320,15 @@ def recover(expect=2, allow_authorized=False, cache=None, verbose=True, timeout=
             print(msg)
             sys.stdout.flush()
 
-    ok, ports, bad = wait_ports(expect, timeout=2.0, log=log)
-    say("恢复前：%d 个 ttyUSB，ch341 已绑定 %d 个；目标 %d 个"
-        % (len(ports) + len(bad), len(ports), expect))
+    # 现场实际插了几台，就该按几台判成功。
+    # 只插 1 台却按 2 台判，会把"设备本来就没插"误报成"恢复失败"（2026-11-06 单插验证踩到）。
+    present = len(list_tty_usb())
+    expect_eff = present if 0 < present < expect else expect
+    ok, ports, bad = wait_ports(expect_eff, timeout=2.0, log=log)
+    say("恢复前：%d 个 ttyUSB，ch341 已绑定 %d 个；目标 %d 个%s"
+        % (len(ports) + len(bad), len(ports), expect_eff,
+           "" if expect_eff == expect else
+           "（期望 %d，现场只插了 %d，按 %d 判）" % (expect, present, expect_eff)))
     for q, detail in bad:
         say("  未就绪 %s: %s" % (q, detail))
     if not list_tty_usb():
@@ -349,7 +355,7 @@ def recover(expect=2, allow_authorized=False, cache=None, verbose=True, timeout=
             if not okr:
                 continue
             time.sleep(1.0)
-            ok2, ports2, _ = wait_ports(expect, timeout=8.0)
+            ok2, ports2, _ = wait_ports(expect_eff, timeout=8.0)
             if ok2:
                 say("%s 成功：%d 个口恢复（reset 了 %s）" % (tag, len(ports2), name))
                 save_topology(cache, ports2, verbose=False)
@@ -403,7 +409,7 @@ def recover(expect=2, allow_authorized=False, cache=None, verbose=True, timeout=
             okr, msg = toggle_authorized(name, os.path.join(SYS_USB, name))
             say("  " + msg)
             time.sleep(1.0)
-        ok, ports2, _ = wait_ports(expect, timeout=15.0)
+        ok, ports2, _ = wait_ports(expect_eff, timeout=15.0)
         if ok:
             say("L4 成功：%d 个口恢复" % len(ports2))
             save_topology(cache, ports2, verbose=False)
