@@ -205,6 +205,21 @@ class TestAssignRoles(unittest.TestCase):
         self.assertEqual(result.role_of("uuid:AAA"), ROLE_UNASSIGNED)
         self.assertTrue(any("动臂判别建议" in w for w in result.warnings))
 
+    def test_missing_role_warns(self):
+        roster = Roster()
+        a = DeviceIdentity(IDENTITY_UUID, "AAA")
+        b = DeviceIdentity(IDENTITY_UUID, "BBB")
+        roster.bind(a, ROLE_BASE)
+        roster.bind(b, ROLE_MUZZLE)
+        # 只插了基座那台：应报“muzzle 不在线”
+        result = assign_roles([a], roster)
+        self.assertTrue(any("muzzle" in w and "不在线" in w for w in result.warnings))
+
+    def test_empty_roster_does_not_warn_missing(self):
+        roster = Roster()
+        result = assign_roles([DeviceIdentity(IDENTITY_UUID, "AAA")], roster)
+        self.assertFalse(any("不在线" in w for w in result.warnings))
+
     def test_auto_discriminate_adopts(self):
         roster = Roster()
         ids = [DeviceIdentity(IDENTITY_UUID, "AAA"), DeviceIdentity(IDENTITY_UUID, "BBB")]

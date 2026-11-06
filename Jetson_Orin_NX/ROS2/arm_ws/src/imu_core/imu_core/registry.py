@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 
 from .discriminator import discriminate
 from .identity import DeviceIdentity
-from .roster import ROLE_MUZZLE, ROLE_UNASSIGNED, ROLES, Assignment, resolve_all
+from .roster import ROLE_BASE, ROLE_MUZZLE, ROLE_UNASSIGNED, ROLES, Assignment, resolve_all
 
 
 def _natural_key(path):
@@ -60,7 +60,8 @@ class RoleAssignments:
         return found.role if found else ROLE_UNASSIGNED
 
 
-def assign_roles(identities, roster, stats=None, auto_discriminate=False, min_ratio=4.0):
+def assign_roles(identities, roster, stats=None, auto_discriminate=False, min_ratio=4.0,
+                 expected_roles=(ROLE_MUZZLE, ROLE_BASE)):
     """把一组身份派到岗位上，返回 RoleAssignments（不写花名册）。
 
     规则（用户 2026-11-06 定）：
@@ -113,5 +114,17 @@ def assign_roles(identities, roster, stats=None, auto_discriminate=False, min_ra
         else:
             warnings.append("动臂判别未成功（%s）：请让机械臂动一下再试，或直接查花名册。"
                             % proposal.reason)
+
+    # 岗位缺员：只插了一台、或线/供电有问题时，另一路会静默缺席——必须说出来。
+    # 判定前提是“花名册已经认出了至少一台”，否则空花名册首次部署时会一直误报。
+    known = [a for a in assignments if a.role != ROLE_UNASSIGNED]
+    if known:
+        present = set(a.role for a in known)
+        for role in expected_roles:
+            if role not in present:
+                warnings.append(
+                    "岗位 %s 的设备不在线（本次只认出 %d 台）：这一路会缺数据，查 USB 与供电。"
+                    % (role, len(known))
+                )
 
     return RoleAssignments(assignments=assignments, warnings=warnings, proposal=proposal)
