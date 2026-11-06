@@ -1,22 +1,22 @@
 {
   "schema": 1,
   "devices": {
-    "24B4EB573C480701": {
-      "label": "arm end / muzzle / 1-3.3.1",
-      "last_seen_utc": "2026-11-06T18:32:35",
-      "last_usb_path": "1-3.3.1",
+    "243173AE3CCD8701": {
+      "label": "arm end / muzzle (mounted on arm)",
+      "last_seen_utc": "2026-11-06T19:50:00",
+      "last_usb_path": "1-3.2.1",
       "model": "HI12S2-MI1-000",
       "role": "muzzle",
-      "serial": "",
+      "serial": "12162630500043",
       "vendor": "HIPNUC"
     },
-    "243173AE3CCD8701": {
-      "label": "X8 stator / base / 1-3.3.2",
-      "last_seen_utc": "2026-11-06T18:32:35",
-      "last_usb_path": "1-3.3.2",
+    "24B4EB573C480701": {
+      "label": "base / hanging (X8 stator, not mounted yet)",
+      "last_seen_utc": "2026-11-06T19:50:00",
+      "last_usb_path": "1-3.2.2",
       "model": "HI12S2-MI1-000",
       "role": "base",
-      "serial": "12162630500043",
+      "serial": "",
       "vendor": "HIPNUC"
     }
   },
