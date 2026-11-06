@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>imu_hi12s2</name>
+  <version>0.1.0</version>
+  <description>HIPNUC HI12S2-MI1-000 驱动：UART 921600/1000 Hz、0x91 全量帧、UUID 身份、hub-first 恢复。</description>
+  <maintainer email="nvidia@todo.todo">nvidia</maintainer>
+  <license>MIT</license>
+  <depend>imu_core</depend>
+  <test_depend>python3-pytest</test_depend>
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

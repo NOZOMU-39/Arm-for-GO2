@@ -32,7 +32,7 @@ CMD_END = b"\r\n"
 
 # 0x91 数据域 76 字节，全小端。注意 temperature 是 i8（int8），不是 int32；
 # 这里曾经写成 "<BHBifI..." 多了一个 i，struct.error: unpack requires a buffer of 80 bytes。
-PAYLOAD_091 = struct.Struct("<BHBfI3f3f3f3f4f")
+PAYLOAD_091 = struct.Struct("<BHbfI3f3f3f3f4f")  # 2026-11-06 修正：temperature 是 i8，原来用的 B 在 0℃ 以下会读成 253
 PAYLOAD_091_LEN = PAYLOAD_091.size          # 76
 
 P091_FIELDS = (
@@ -134,6 +134,12 @@ class FrameSplitter:
                 i = j
                 break
             ln = buf[j + 2] | (buf[j + 3] << 8)
+            if ln > 128:
+                # 2026-11-06 补：payload 里撞上伪帧头 5A A5 时，把后两字节当长度会得到
+                # 几万，原实现要等 4 万字节才 CRC 失败 —— 1 kHz 下等于丢 0.5 s 数据
+                self.resync_bytes += 1
+                i = j + 1
+                continue
             total = 6 + ln
             if n - j < total:
                 i = j
