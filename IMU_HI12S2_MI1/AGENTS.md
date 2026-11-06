@@ -72,6 +72,8 @@ IMU_HI12S2_MI1\
 - **统一基线（2026-11-06，30 min）**：双路各 1,800,040 帧、**1000 fps**、CRC 0、sys_time 步长恒 1 ms；JSON 在 ~/imu_probe/baseline/soak30m.json。原 30 s 的 999.9/1000.0 不再区分，统一按 1000 fps 记。
 - **身份（2026-11-06）**：查询 LOG VERSION 回 PNAME/BUILD/UUID/SN/APP_VER/BL_VER；UUID 随模块走、与 USB 口无关；/dev/serial/by-id 不可用（两颗 CH340 的 ID_SERIAL 相同），by-path 随插口变 → 采集按 UUID 派角色，花名册放配置；认不出的设备照样出数据、只报 WARN，绝不拒跑。
   - **本项目实测绑定（2026-11-06 现场判别）**：`24B4EB573C480701` = **muzzle（末端，USB 1-3.3.1）**、`243173AE3CCD8701` = **base（基座，USB 1-3.3.2，SN 12162630500043）**。判别依据：手晃末端约 19 s——末端 RMS **35.95 dps** vs 基座 **11.33 dps**（线缆很短，悬空那台被带着一起动），挑单秒比值最大的一秒是 **85.50 vs 0.21 dps＝403×**。花名册入库副本 `config\imu_roles.json`，部署路径 `~/.config/imu/imu_roles.json`。
+  - **插拔验证（2026-11-06，用户把 HUB 从 `1-3.3` 换到 `1-3.2` 并对调两颗 IMU）**：`ttyUSB0` 变 `1-3.2.1`、读到 `243173AE…`→**base**；`ttyUSB1` 变 `1-3.2.2`、读到 `24B4EB…`→**muzzle**，角色全对——**编号与端口都不参与身份**，这条闭环了。
+  - ⚠️ **HUB 换口后必须刷新拓扑缓存**（`ch340_recover.py --cache-topology`），否则恢复链 L2 会去 reset 已经不存在的旧 HUB（本次已刷新为 `1-3.2`/`1-3`）。
 - 检查工具（均 stdlib，**2026-09-08 v2 同步修复**：len==0x4C 校验+逐字节滑动滤伪同步+坏帧分型；v1 曾把 payload 伪 `5A A5` 误当帧头致坏帧误报/跳帧吃真帧）：①`tools/imu_dt.py` 帧间隔分析（内置 lflag 全清修复，无需手动激活）；②`tools/imu_verify.py` 严格 payload 验证（坏帧分型 len错/crc错、sys_time 跳变 Δ>1ms 全记、静止基线统计——**真丢帧判据以 IMU 侧 system_time 为准，dt 空洞只作参考**）；Jetson 临时脚本跑完即删（/tmp/claude 重启清空）。
 
 ## 3. 已知坑 / 未解问题
