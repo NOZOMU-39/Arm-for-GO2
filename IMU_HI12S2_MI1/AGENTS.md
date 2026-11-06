@@ -9,6 +9,7 @@
 - 接口：UART（0x91 二进制，**921600 波特实测 1kHz 全量达成**）＋ CAN（CANopen/J1939；**路线停用，2026-11-06 用户定，只留资料**）＋ 外部 SYNC 触发（800µs）。
 - 外设状态（2026-11-06）：双 HI12S2 均在 Jetson 上收流；30 min 长测双路 1000 fps；CAN 不走（路线停用）。
 - 部署形态：双 CH340（第三方 USB-TTL，非官方 CP2104）直插或经 HUB 均可；按 UUID 派角色（见 2.7）。
+- 工具（2026-11-06 起）：`imu_identify`（认设备/派岗位/写花名册）、`motion_probe`（分秒运动统计，现场核验用）——都在 `imu_hi12s2` 包里，见包 README。
 - 驱动代码（2026-11-06 起）：`Jetson_Orin_NX\ROS2\arm_ws\src\imu_core`（厂商无关：身份/花名册/时间戳契约/质量位/驱动抽象）＋ `imu_hi12s2`（本型号：串口/0x91/配置/UUID 识别 CLI `imu_identify`）。**单 workspace，不建第二个 ws**；用法见两包 README。
 
 ```
@@ -70,6 +71,7 @@ IMU_HI12S2_MI1\
 - **ch341 满速收流后 close 死锁（概率性，非必现）**：921600 满速收流 ≥30s 后 close，ch341 可能进死锁，后续 open 永久挂起（60s+ 不返回、无 dmesg、USB 层疑似存活但 UART 控制通道不响应）。**恢复链（hub-first、零 open）**：L1 现有 tty 的 sysfs 祖先 HUB 由深到浅 reset → L2 拓扑缓存里的 HUB → L3 现场兜底（子设备全 CH340 且非空的 HUB）→ L4 authorized 软重置（默认关）→ L5 人工。**禁止 reset CH340 芯片本身**；**恢复工具必须零 open**（open 验证会把刚救回的口再次打死）。采集栈应常驻收流、避免频繁 close；健康期写 ~/imu_probe/topology.json。工具 tools/baseline/ch340_recover.py。
 - **统一基线（2026-11-06，30 min）**：双路各 1,800,040 帧、**1000 fps**、CRC 0、sys_time 步长恒 1 ms；JSON 在 ~/imu_probe/baseline/soak30m.json。原 30 s 的 999.9/1000.0 不再区分，统一按 1000 fps 记。
 - **身份（2026-11-06）**：查询 LOG VERSION 回 PNAME/BUILD/UUID/SN/APP_VER/BL_VER；UUID 随模块走、与 USB 口无关；/dev/serial/by-id 不可用（两颗 CH340 的 ID_SERIAL 相同），by-path 随插口变 → 采集按 UUID 派角色，花名册放配置；认不出的设备照样出数据、只报 WARN，绝不拒跑。
+  - **本项目实测绑定（2026-11-06 现场判别）**：`24B4EB573C480701` = **muzzle（末端，USB 1-3.3.1）**、`243173AE3CCD8701` = **base（基座，USB 1-3.3.2，SN 12162630500043）**。判别依据：手晃末端约 19 s——末端 RMS **35.95 dps** vs 基座 **11.33 dps**（线缆很短，悬空那台被带着一起动），挑单秒比值最大的一秒是 **85.50 vs 0.21 dps＝403×**。花名册入库副本 `config\imu_roles.json`，部署路径 `~/.config/imu/imu_roles.json`。
 - 检查工具（均 stdlib，**2026-09-08 v2 同步修复**：len==0x4C 校验+逐字节滑动滤伪同步+坏帧分型；v1 曾把 payload 伪 `5A A5` 误当帧头致坏帧误报/跳帧吃真帧）：①`tools/imu_dt.py` 帧间隔分析（内置 lflag 全清修复，无需手动激活）；②`tools/imu_verify.py` 严格 payload 验证（坏帧分型 len错/crc错、sys_time 跳变 Δ>1ms 全记、静止基线统计——**真丢帧判据以 IMU 侧 system_time 为准，dt 空洞只作参考**）；Jetson 临时脚本跑完即删（/tmp/claude 重启清空）。
 
 ## 3. 已知坑 / 未解问题
