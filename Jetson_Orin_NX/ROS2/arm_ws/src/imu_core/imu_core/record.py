@@ -72,6 +72,20 @@ def pack(sample):
     )
 
 
+def pack_fields(t_rx_ns, seq, t_sys_ms, acc, gyr, quat, status, temperature):
+    """直接从已解析的字段打包（**快路径**）：不构造 ImuSample，采集热点走这里。
+
+    1 kHz × 2 路下每帧省下 dataclass + 属性访问，实测是「掉帧到 937 fps」的主因之一。
+    """
+    temp = max(-128, min(127, int(round(temperature))))
+    return RECORD.pack(
+        int(t_rx_ns), int(seq) & 0xFFFFFFFF, int(t_sys_ms) & 0xFFFFFFFF,
+        acc[0], acc[1], acc[2], gyr[0], gyr[1], gyr[2],
+        quat[0], quat[1], quat[2], quat[3],
+        int(status) & 0xFFFF, temp,
+    )
+
+
 def unpack(buf):
     """64 字节 -> 字段字典（比重建 ImuSample 快，导出/校验用）。"""
     if len(buf) != RECORD_SIZE:
@@ -162,6 +176,17 @@ class SessionWriter:
         if self.t0_ns is None:
             self.t0_ns = sample.t_rx_ns
         st["fh"].write(pack(sample))
+        st["frames"] += 1
+        return True
+
+    def append_blob(self, role, blob, t_rx_ns=None):
+        """快路径：直接写已打包的 64 B 记录（避免再经过 ImuSample）。"""
+        st = self.streams.get(role)
+        if st is None:
+            return False
+        if self.t0_ns is None and t_rx_ns is not None:
+            self.t0_ns = int(t_rx_ns)
+        st["fh"].write(blob)
         st["frames"] += 1
         return True
 

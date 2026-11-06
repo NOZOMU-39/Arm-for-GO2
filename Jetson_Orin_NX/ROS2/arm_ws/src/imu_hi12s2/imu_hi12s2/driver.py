@@ -10,6 +10,7 @@
   设备给的是 g 与 deg/s；ImuSample 里保持 g / deg-s（用 G_TO_MS2、DPS_TO_RADS 换算），
   这是为了让原始量与本机显示对得上，避免“看起来换了单位其实没换”的混淆。
 """
+import os
 import time
 
 from imu_core.driver import DriverInfo, ImuDriver
@@ -19,11 +20,12 @@ from imu_core.identity import (
     IDENTITY_USB_PATH,
     IDENTITY_UUID,
 )
+from imu_core import record
 from imu_core.registry import usb_path_of
 from imu_core.types import ImuSample
 
 from .link import BAUD_TABLE, Hi12Link
-from .protocol import FrameSplitter, parse_091
+from .protocol import FrameSplitter, parse_091, unpack_091_fast
 
 # 采样率 -> 波特率（实测：115200≈142 Hz、460800≈500 Hz、921600=1000 Hz）
 # 记住用户那句：**波特率是派生量**——先定 1000 Hz，921600 是被逼出来的。
@@ -167,6 +169,27 @@ class Hi12s2Driver(ImuDriver):
                 status=int(field["main_status"]),
                 seq=self._seq,
             ))
+        return out
+
+    # ---- 快路径（常驻采集用）
+    def read_records(self):
+        """读一次（非阻塞）并直接产出 64 B 记录：[(seq, blob, t_rx_ns), ...]。
+
+        与 read_batch 的区别是**不构造 ImuSample/dict**——1 kHz x 2 路时这点开销
+        足以让采集掉到 ~937 fps（2026-11-06 实测）。常驻进程请用本方法。
+        调用前应由调用方 select() 确认可读。
+        """
+        data = os.read(self.link.fd, 262144)
+        if not data:
+            return []
+        now_ns = time.monotonic_ns()
+        out = []
+        for payload in self.splitter.feed(data):
+            status, temp, sys_ms, acc, gyr, quat = unpack_091_fast(payload)
+            self._seq += 1
+            out.append((self._seq,
+                        record.pack_fields(now_ns, self._seq, sys_ms, acc, gyr, quat, status, temp),
+                        now_ns))
         return out
 
     # ---- 统计

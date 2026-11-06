@@ -142,3 +142,15 @@ def build_frame_091(fields):
     payload = PAYLOAD_091.pack(*values)
     head = HEAD + struct.pack("<H", len(payload))
     return head + struct.pack("<H", crc16_xmodem(head + payload)) + payload
+
+
+# ---------------------------------------------------------------- 快路径
+# 采集热点（1 kHz x 2 路）不能每帧建 dict + dataclass：实测那样会掉到 937 fps。
+# 这里只做一次 struct.unpack，把需要的字段按位置取出来交给 record.pack_fields。
+_FAST_091 = struct.Struct("<BHBfI3f3f3f3f4f")
+
+
+def unpack_091_fast(payload):
+    """0x91 payload -> (status, temperature, system_time, acc, gyr, quat)。"""
+    v = _FAST_091.unpack(payload)
+    return v[1], v[2], v[4], v[5:8], v[8:11], v[17:21]
