@@ -1,7 +1,7 @@
 # Jetson_Orin_NX — AI 对接文档
 
 > 本目录 = Jetson 主控（图为 T801 + Orin NX 16GB）开发侧；人看 `README.md`；AI 看本文件。
-> 事实层（硬件/协议/结论）以 `AI间交流\情报\02_硬件构型.md`、`03_通信与IMU.md` 的 Jetson 条目为准；本文件只放 AI 干活要用的对接信息。
+> **本文件是 Jetson 侧的事实与操作主文档（自足：本目录单独拷走也能干 Jetson 的活）**。`AI间交流\情报\02_硬件构型.md`、`03_通信与IMU.md` 只做跨模块索引；两边冲突时**以本文件为准**，并回头改情报册，不反向移植。
 > **目录边界（2026-09-05 用户定案）**：本目录只放 Jetson 板上运行的内容（`ROS2\arm_ws\`＝ROS2 源码单一源，与 Jetson 侧 `~/ROS2/arm_ws` 同名镜像）；Windows 操作前端＝顶层 `机械臂操作交互界面\`，与本目录是客户端-服务端关系（tcp_gateway 接入），**不并入本目录**；其协议逻辑第 1 步单一源化时改指向 `ROS2\arm_ws\src\arm_protocol`。
 
 ## 系统部署件（2026-09-06 安装，源码归档 `Jetson_Orin_NX\deploy\`，勿忘勿乱改）
@@ -72,7 +72,7 @@
 ## ROS2 控制栈（开发进度 2026-09-06：六包全完成）
 
 - **包地图与边界规则（2026-09-05 架构决议，勿破）**：
-  - **命名规律**：`arm_` 前缀 = 臂脉塔电机域专属（interfaces/protocol/can_bridge/controller）；**外设（IMU/摄像头/手柄）独立 driver 包、用自己的名**（如 hi12s2_imu），不并入臂域；ROS 惯例=协议随设备走，**arm_protocol 只装脉塔电机协议**，其余设备协议归各自 driver，不得并入（边界声明在包 README）
+  - **命名规律**：`arm_` 前缀 = 臂脉塔电机域专属（interfaces/protocol/can_bridge/controller）；**外设（IMU/摄像头/手柄）独立 driver 包、用自己的名**（如 `imu_hi12s2`；**类型在前、型号在后**，旧写法 hi12s2_imu 作废），不并入臂域；ROS 惯例=协议随设备走，**arm_protocol 只装脉塔电机协议**，其余设备协议归各自 driver，不得并入（边界声明在包 README）
   - **arm_controller = 臂主控总包，一名到底**（命名决议：曾议拆 supervisor+controller，撤销——中小型项目一包演进更常用）：一期=档案/轮询/安全链/流程服务；**二期控制算法模块（后坐抑制等）挂入本包 control/ 或作扩展节点**，届时安全语义=controller 持总闸与授权包络、算法在包络内自主（生成 vs 执行判据写架构文档）
   - **tcp_gateway = Windows 前端（公用）↔ Jetson 统一入口**（非 arm 专属，故不叫 arm_gateway）：一期 v1 帧透传（臂域）→ 二期语义化接 controller → 三期接入外设监控（IMU 曲线/手柄回显/摄像头状态）；**边界：视频走独立流不进帧网关；实验高频数据不出 Jetson（1kHz 采样本地 rosbag），前端只看降频**
   - **单主纪律**：任何时刻总线只有一个轮询/命令主（Windows 界面或 Jetson 栈，二选一，v1 透传期=界面主、controller 只旁听不轮询）
