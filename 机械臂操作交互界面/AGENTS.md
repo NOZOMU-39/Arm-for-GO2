@@ -6,9 +6,9 @@
 > - 电机协议/角度/限位经验全部来自 `电机上位机开发\index.html`(移植源,勿重新发明);
 > - 无线通信走 `ESP32 for WiFi and BLE CAN\ESP32 for WiFi CAN Custom\examples\wifi_can_client.py`(本目录为原样复制,一行不改);
 > - 通信模式/日志/注册表/限幅链与上位机同源(Device/Api 事件队列 + 50ms 拉取 + 三层日志)。
-> 发现其他模块的问题,通过 `AI间交流\` 同步(更新前先问用户)。
+> 发现其他模块的问题,通过 `AI间交流\` 同步(技术事实直接落盘;改口径/删事实须用户过目)。
 >
-> **目录定位（2026-09-05 用户定案）**：本界面＝Jetson 主控栈的 **Windows 操作前端**,与 `Jetson_Orin_NX\` 是客户端-服务端关系、**顶层目录保持独立不并入**;终态协议逻辑单一源化——**第 1 步在 arm_protocol 移植完成时执行**(PROTO_CORE 停止自维护、改指向 `Jetson_Orin_NX\ROS2\arm_ws\src\arm_protocol`),当前保留 USB/ESP32 直连(A 段只读验收/无 Jetson 兜底调试)。
+> **目录定位（2026-09-05 用户定案）**：本界面＝Jetson 主控栈的 **Windows 操作前端**,与 `Jetson_Orin_NX\` 是客户端-服务端关系、**顶层目录保持独立不并入**;终态协议逻辑单一源化——**第 1 步在 arm_protocol 移植完成时执行**(PROTO_CORE 停止自维护、改指向 `Jetson_Orin_NX\ROS2\arm_ws\src\arm_protocol`),当前保留 USB/ESP32 直连（无 Jetson 兜底调试）。
 >
 > **⚠️ 协议改动联动纪律（2026-09-05 起）**：本文件是 arm_protocol 的 **JS 移植源**——改任何协议逻辑（组帧/解析/角度模型）后必须三同步：
 > ① 界面侧 Node 回归（`测试\proto_core_test.js`）全绿 → ② Jetson 侧重跑两个黄金生成器（`arm_protocol\tools\gen_golden.js` + `gen_rand_vectors.js`，输入本 index.html）→ pytest 全绿 → ③ 同步 Jetson 副本 + colcon build。**不许只改一边**（黄金向量是 Python 版与 JS 版逐字节一致的验收尺）。
@@ -60,14 +60,14 @@
 - **方向映射只在输入输出两端**:`out2rot = v×gear×dir` / `rot2out = v/gear×dir` / `amp2rot = v×dir`(电流不乘减速比)/ `spd2rot = |out2rot|`;内部坐标系不含 dir;
 - **V3 0x9C 语义分叉**:`v9cSemantics`("angle"|"pulse")人工按实测写入,默认 pulse(D6-D7 编码器脉冲);**0.92 已到位时 0x9C 相位仅兜底**(快速反转取错圈 ±360N 坑,2026-08-25 实测修复);
 - 轮询帧:`0x9A + 0x9C + 0x92`;勿用 0x94;V3 位置发送前 rotDeg 必须已校准;
-- 固件角度限幅(0x20 索引 6/7)语义未定论,**本界面不提供**(只用软件限幅 limMinDeg/limMaxDeg)。
+- 固件角度限幅(0x20 索引 6/7)语义已定论(1°/LSB、默认 65535、仅失能态写,见情报 05);**本界面不提供**,只用软件限幅 limMinDeg/limMaxDeg。
 
 ## 4. 机械臂新增逻辑(与上位机差异点)
 
 1. **多电机轮询 `pollAll()`**:每周期(默认 500ms,**200~2000ms 可调**,UI hover 提示写明范围)对全部注册电机发 9A/9C/92(silent);各电机独立 `lastAngle[id]/lastAngleSrc[id]/chartBufs[id]`;
 2. **设为零点(当前位置标定为输入值 X)**——用户确认语义:
    - V3:`E0 = rotDeg_cur − out2rot(X)`(纯函数 `v3E0ForX`),写注册表,不动固件;X=0 即原「记录机械零点」;
-   - V4:`0x80→0x64→0x76` 三步(掉力警告确认);X≠0 额外写注册表 `E4 = X`(显示偏移);显示 = `rot2out(0x92)+E4`,发送目标 = `out2rot(deg−E4)`(E4=0 时与上位机行为一致);
+   - V4:`0x80→500ms→0x64→1000ms→0x76→10s` 三步(掉力警告确认,设零期间 pollPaused 独占总线);X≠0 额外写注册表 `E4 = X`(显示偏移);显示 = `rot2out(0x92)+E4`,发送目标 = `out2rot(deg−E4)`(E4=0 时与上位机行为一致);
 3. **设置最大/最小角** = 软件限位 limMaxDeg/limMinDeg(saveLimits 逻辑 + 确认 + 清越限锁定);
 4. **默认位置**:注册表字段 `defaultPosDeg`;「设置默认位置」= 记录当前显示角;「移动到默认位置」= 所有已设默认位置的电机逐个发 0xA4(确认框列出电机数);
 5. **键盘 ↑/↓(按住连续、松手停)**:0xA2 速度指令(V3 无力矩字段;V4 tqMaxPct=50%);`v = min(速度输入, limMaxSpd)`;焦点守卫(输入框聚焦忽略);多键同按后者覆盖、两键都松才停;四重停止——松手/失焦/到限位(`kbLimitBlocked` 纯函数)/反馈超时 1.5s(发 0x81);
@@ -104,7 +104,7 @@ node 测试\proto_core_test.js
 
 - 52 项断言:字节工具边界、V3/V4 组帧字节布局、0x92 解析(D1-D4/D4-D7 分叉)、V3 相位最近邻(快速反转场景)、显示公式含 E0/dir、**设零点数学(V3 E0=rotDeg−out2rot(X);V4 E4 与 out2rot(deg−E4))**、limitBlock 判定矩阵、monitorLimit 状态机(先 0x81 后报警/死区解锁)、键盘限位停、chartAutoScale(±15%+2% 地板)、decode79Reply、扫描一致性比对、界面 HTML 无指令号;
 - 套路:正则提取全部 `<script>` 段 → vm 执行(DOM/bridge stub)→ 断言;`setInterval` stub 为 noop、`setTimeout` 同步立即执行(否则事件循环不退出);**在 vm 内执行 `delete limitAlarm[4]` 等状态清理,不能 delete vm 返回值**;
-- 真机验证步骤(精确到按钮)见 README「真机验证步骤」章节:只读验证(A 1~5)通过前不进入运动验证(B 6~10)。
+- 真机验证步骤(精确到按钮)见 README「真机验证步骤」章节;旧 A/B 段门禁已停用(实机已装狗调试),步骤保留作首次验收清单。
 
 ## 7. 打包
 
@@ -126,10 +126,13 @@ powershell -NoProfile -Command "& '.\打包机械臂.bat'" </dev/null 2>&1 | ico
 | V4 0x64 设零 | 必须 0x80→0x64→0x76 三步(失能掉力警告) |
 | V3 0x9C 相位校准虚跳 | 快速反转采样跳变>180° 取错圈 → 0.92 到位时相位仅兜底 |
 | 0x92 帧勿直接改面板 | 被同周期 0x9A/0x9C 覆盖;缓存 lastAngle 由常驻渲染 |
-| 固件限位(0x20 索引 6/7) | 语义未定论,本界面不提供;只用软件限幅 |
+| 固件限位(0x20 索引 6/7) | 语义已定论(1°/LSB、默认 65535、仅失能态写,见情报 05);本界面不提供,只用软件限幅 |
 | log_line 静默失败 | 必须挂 Api 类(js_api 暴露 Api 非 Device)+ .catch 显式告警 |
 | 轮询帧刷日志 | 轮询 9A/9C/92 收发静默(silent 参数 + 接收端判定两层),日志供人读 |
 | WiFiCANClient 锁竞争 | 当前 TCP 批量读线程不用 monitor()；交互界面已停用 UDP 双推，避免反馈挤占命令 |
+| 无线丢帧根因(2026-08-26) | 背靠背 sendall 无锁→总线突发→ESP32 TWAI CRC 拒收 9A/9C；修复=每帧 sleep(60)+busy flag，轮询默认 500ms |
+| 设零/写 ROM(2026-08-26) | 三步必须 pollPaused 独占总线；0x80→500ms→0x64→1000ms→0x76→10s；0x76 后 0x92 空窗≥10s 再归 0 为成功 |
+| ESP32 三缺陷 | 单帧重复推送(>200ms 间隔，200ms 去重挡不住)、复位后滞留帧、无命令回执；客户端只能缓解 |
 | 批帧协商常量 | CMD_ENABLE_BATCH=0x0A13(0x0A12 留给心跳看门狗勿占);直接复用库逻辑 |
 | ESP32 空数据帧被丢 | 固件 len<7 丢弃:发送恒 8 字节补零(Device.send_frame 已 ljust) |
 | 键盘误触发 | 焦点守卫 + 单电机视图激活 + 首次按下提示 + 四重停止 |
@@ -140,14 +143,13 @@ powershell -NoProfile -Command "& '.\打包机械臂.bat'" </dev/null 2>&1 | ico
 ## 9. 与上位机/ESP32 模块的接口约定
 
 - **zlgcan.dll/kerneldlls**:打包时从 `..\电机上位机开发\` 拷入(不复制源码到本目录,避免双份维护);
-- **wifi_can_client.py**:原样复制(一行不改),升级固件客户端时用新文件整体替换;协议变化同步记录到本文件与 `AI间交流\情报.md`(先问用户);
+- **wifi_can_client.py**:原样复制(一行不改),升级固件客户端时用新文件整体替换;协议变化同步记录到本文件与 `AI间交流\情报\03_通信与IMU.md`(技术事实直接落盘;改口径/删事实须用户过目);
 - **注册表互不影响**:本界面 机械臂注册表.json 独立;导入上位机注册表 = 一次性合并(文件选择器),不联动;
 - 其他模块(IMU/摄像头/手柄)接入:左侧设备面板 `SIDEBAR_MODULES` 数据驱动 + `DEVICE_TABS` 设备类型标签,加条目 + 渲染函数即可,V1.0 已预留占位。
 
 ## 10. 遗留待办
 
-- [ ] 真机只读验证(README 步骤 A)——通过前不开放运动验证;
-- [ ] 真机运动验证(README 步骤 B)——小角度低速,末端关节优先;
+- [x] 旧 A/B 段验收口径已停用(2026-11-06 用户确认不沿用;实机已装狗调试,按情报 04 安全链执行);README 的 A/B 步骤保留作首次验收清单。
 - [ ] 无线实测(README 步骤 B10)——USB/无线对照;
 - [ ] 协议只读特征探测增强:扫描时对在线电机追加 0x94/0x79 只读探测与注册表 proto 比对(当前只做在线/离线与 ID 核对);
 - [ ] MockCan 注册表驱动化(当前写死在线 1~4,浏览器演示桥支持到 6);
